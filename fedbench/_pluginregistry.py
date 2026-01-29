@@ -1,5 +1,7 @@
 from typing import Callable
 
+from flwr.serverapp.strategy import Strategy
+
 from fedbench.aggregator import Aggregator
 from fedbench.common import MLRuntime
 from fedbench.configurator import Configurator
