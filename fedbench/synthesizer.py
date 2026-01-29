@@ -1,29 +1,25 @@
-import numpy as np
 from abc import ABC, abstractmethod
 
-from fedbench.strategy import Strategy
+from fedbench.common import MLRuntimeWeights
+from fedbench.common import TrainPlan, TrainResult, EvalPlan, EvalResult
 
 
 class Synthesizer(ABC):
-    def __init_subclass__(cls, **kwargs):
-        # TODO: Register concrete impl.
-        # Skip if cls is abstract.
-        # Raise exc if already registered.
-        pass
-
-    @classmethod
     @abstractmethod
-    def load(cls, model_state: dict[str, np.ndarray]) -> Synthesizer:
+    def get_weights(self) -> MLRuntimeWeights:
         pass
 
     @abstractmethod
-    @property
-    def server_strategy(self) -> Strategy:
+    def set_weights(self, weights: MLRuntimeWeights) -> None:
         pass
 
-    # TODO! Figure out signature...
+    # TODO! Probably also inject context information...
     @abstractmethod
-    def local_train(self):
+    def train(self, plan: TrainPlan) -> TrainResult:
+        pass
+
+    @abstractmethod
+    def evaluate(self, plan: EvalPlan) -> EvalResult | None:
         pass
 
     # TODO! Figure out signature...

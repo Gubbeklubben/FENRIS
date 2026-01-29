@@ -1,0 +1,5 @@
+from fedbench._pluginregistry import instance as _pluginregistry
+
+register_synthesizer = _pluginregistry.register_synthesizer
+register_server_components = _pluginregistry.register_server_components
+register_flwr_strategy = _pluginregistry.register_flwr_strategy
