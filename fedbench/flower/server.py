@@ -3,6 +3,9 @@ from flwr.server import Grid
 from flwr.serverapp import ServerApp
 
 
+_strategy = None
+
+
 app = ServerApp()
 
 
