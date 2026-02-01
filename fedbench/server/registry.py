@@ -1,3 +1,4 @@
+from enum import Enum
 from typing import Callable
 
 from flwr.serverapp.strategy import Strategy
@@ -5,94 +6,91 @@ from flwr.serverapp.strategy import Strategy
 from fedbench._registry import PluginRegistry
 from fedbench.server.server_policy import ServerPolicy
 
-# python >= 3.12
-type FlwrStrategyFactory = Callable[[], Strategy]
-type ServerPolicyFactory = Callable[[], ServerPolicy]
+_SERVER_POLICY_FACTORY = "_server_policy_factory"
+_FLWR_STRATEGY_FACTORY = "_flwr_strategy_factory"
 
-_SERVER_POLICY_KEY = "ServerPolicy"
-_FLWR_STRATEGY_KEY = "FlowerStrategy"
-_CONF_INIT_KEY = "configure_init"
-_AGGR_INIT_KEY = "aggregate_init"
-_CONF_TRAIN_KEY = "configure_train"
-_AGGR_TRAIN_KEY = "aggregate_train"
-_CONF_EVALUATE_KEY = "configure_evaluate"
-_AGGR_EVALUATE_KEY = "aggregate_evaluate"
+
+class _Components(Enum):
+    CONF_INIT     = "_configure_init"
+    AGGR_INIT     = "_aggregate_init"
+    CONF_TRAIN    = "_configure_train"
+    AGGR_TRAIN    = "_aggregate_train"
+    CONF_EVALUATE = "_configure_evaluate"
+    AGGR_EVALUATE = "_aggregate_evaluate"
 
 
 class ServerPolicyRegistry(PluginRegistry):
-    def server_policy(self, factory: ServerPolicyFactory) -> ServerPolicyFactory:
-        return self._register(_SERVER_POLICY_KEY, factory)
+    def server_policy(
+            self,
+            factory: Callable[[], ServerPolicy]) -> Callable[[], ServerPolicy]:
 
-    # Internal ComponentResolver api
-    @property
-    def _server_policy_factory(self) -> ServerPolicyFactory:
-        return self._get(_SERVER_POLICY_KEY)
+        return self._register(
+            decorator_name="server_policy",
+            attr_name=_SERVER_POLICY_FACTORY,
+            plugin=factory)
+
+    def get_server_policy_factory(self) -> Callable[[], ServerPolicy] | None:
+        return getattr(self, _SERVER_POLICY_FACTORY, None)
 
 
 class FlwrStrategyRegistry(PluginRegistry):
-    def flwr_strategy(self, factory: FlwrStrategyFactory) -> FlwrStrategyFactory:
-        return self._register(_FLWR_STRATEGY_KEY, factory)
+    def flwr_strategy(
+            self, factory: Callable[[], Strategy]) -> Callable[[], Strategy]:
+
+        return self._register(
+            decorator_name="flwr_strategy",
+            attr_name=_FLWR_STRATEGY_FACTORY,
+            plugin=factory)
 
     def configure_init(self, func):
-        return self._register(_CONF_INIT_KEY, func)
+        raise NotImplementedError()
 
     def aggregate_init(self, func):
-        return self._register(_AGGR_INIT_KEY, func)
+        raise NotImplementedError()
 
-    # Internal ComponentResolver api
-    @property
-    def _flwr_strategy_factory(self) -> FlwrStrategyFactory:
-        return self._get(_FLWR_STRATEGY_KEY)
+    def get_flwr_strategy_factory(self) -> Callable[[], Strategy] | None:
+        return getattr(self, _FLWR_STRATEGY_FACTORY, None)
 
-    @property
-    def _configure_init(self):
-        return self._get(_CONF_INIT_KEY)
+    def get_configure_init(self):
+        raise NotImplementedError()
 
-    @property
-    def _aggregate_init(self):
-        return self._get(_AGGR_INIT_KEY)
+    def get_aggregate_init(self):
+        raise NotImplementedError()
 
 
 class ServerComponentRegistry(PluginRegistry):
     def configure_init(self, func):
-        return self._register(_CONF_INIT_KEY, func)
+        raise NotImplementedError()
 
     def aggregate_init(self, func):
-        return self._register(_AGGR_INIT_KEY, func)
+        raise NotImplementedError()
 
     def configure_train(self, func):
-        return self._register(_CONF_TRAIN_KEY, func)
+        raise NotImplementedError()
 
     def aggregate_train(self, func):
-        return self._register(_AGGR_TRAIN_KEY, func)
+        raise NotImplementedError()
 
     def configure_evaluate(self, func):
-        return self._register(_CONF_EVALUATE_KEY, func)
+        raise NotImplementedError()
 
     def aggregate_evaluate(self, func):
-        return self._register(_AGGR_EVALUATE_KEY, func)
+        raise NotImplementedError()
 
-    # Internal ComponentResolver api
-    @property
-    def _configure_init(self):
-        return self._get(_CONF_INIT_KEY)
+    def get_configure_init(self):
+        raise NotImplementedError()
 
-    @property
-    def _aggregate_init(self):
-        return self._get(_AGGR_INIT_KEY)
+    def get_aggregate_init(self):
+        raise NotImplementedError()
 
-    @property
-    def _configure_train(self):
-        return self._get(_CONF_TRAIN_KEY)
+    def get_configure_train(self):
+        raise NotImplementedError()
 
-    @property
-    def _aggregate_train(self):
-        return self._get(_AGGR_TRAIN_KEY)
+    def get_aggregate_train(self):
+        raise NotImplementedError()
 
-    @property
-    def _configure_evaluate(self):
-        return self._get(_CONF_EVALUATE_KEY)
+    def get_configure_evaluate(self):
+        raise NotImplementedError()
 
-    @property
-    def _aggregate_evaluate(self):
-        return self._get(_AGGR_EVALUATE_KEY)
+    def get_aggregate_evaluate(self):
+        raise NotImplementedError()

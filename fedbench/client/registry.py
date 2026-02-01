@@ -1,21 +1,21 @@
-from typing import Callable
+from collections.abc import Callable
 
 from fedbench._registry import PluginRegistry
 from fedbench.client.synthesizer import Synthesizer
 
 
-# python >= 3.12
-type SynthesizerFactory = Callable[[], Synthesizer]
-
-_SYNTHESIZER_KEY = "synthesizer"
+_SYNTHESIZER_FACTORY = "_synthesizer_factory"
 
 
 class ClientRegistry(PluginRegistry):
-    def synthesizer(self, factory: SynthesizerFactory) -> SynthesizerFactory:
+    def synthesizer(
+            self,
+            factory: Callable[[], Synthesizer]) -> Callable[[], Synthesizer]:
         """Register a synthesizer factory."""
-        return self._register(_SYNTHESIZER_KEY, factory)
+        return self._register(
+            decorator_name="synthesizer",
+            attr_name=_SYNTHESIZER_FACTORY,
+            plugin=factory)
 
-    # Internal ComponentResolver api
-    @property
-    def _synthesizer_factory(self):
-        return self._get(_SYNTHESIZER_KEY)
+    def get_synthesizer_factory(self) -> Callable[[], Synthesizer] | None:
+        return getattr(self, _SYNTHESIZER_FACTORY, None)

@@ -12,7 +12,7 @@ def test_register_flwr_strategy() -> None:
     def factory() -> FedAvg:
         return FedAvg()
 
-    assert reg._flwr_strategy_factory is factory
+    assert reg.get_flwr_strategy_factory() is factory
 
 
 def test_can_not_register_flwr_strategy_twice() -> None:
@@ -26,5 +26,5 @@ def test_can_not_register_flwr_strategy_twice() -> None:
         def other() -> FedAvg:
             return FedAvg()
 
-    assert reg._flwr_strategy_factory is some
+    assert reg.get_flwr_strategy_factory() is some
 
