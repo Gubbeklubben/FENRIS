@@ -5,7 +5,7 @@ from typing import Any, Self
 from fedbench.common import MLRuntime
 
 
-class PluginRegistry(ABC):
+class BaseRegistry(ABC):
     def __init__(self, ml_runtime: MLRuntime):
         if not isinstance(ml_runtime, MLRuntime):
             raise TypeError(f"Invalid ml_runtime '{ml_runtime}'")
@@ -27,3 +27,13 @@ class PluginRegistry(ABC):
 
     def resolve_components[T](self, resolver: Callable[[Self], T]) -> T:
         return resolver(self)
+
+
+# Split hierarchy to simplify early validation of registry types.
+# The most straight forward approach I could think of.
+class ClientRegistry(BaseRegistry, ABC):
+    pass
+
+
+class ServerRegistry(BaseRegistry, ABC):
+    pass

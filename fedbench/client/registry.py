@@ -1,13 +1,13 @@
 from collections.abc import Callable
 
-from fedbench._registry import PluginRegistry
+from fedbench._registry import ClientRegistry as _ClientRegistry
 from fedbench.client.synthesizer import Synthesizer
 
 
 _SYNTHESIZER_FACTORY = "_synthesizer_factory"
 
 
-class ClientRegistry(PluginRegistry):
+class ClientRegistry(_ClientRegistry):
     def synthesizer(
             self,
             factory: Callable[[], Synthesizer]) -> Callable[[], Synthesizer]:

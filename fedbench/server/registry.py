@@ -3,7 +3,7 @@ from enum import Enum
 
 from flwr.serverapp.strategy import Strategy
 
-from fedbench._registry import PluginRegistry
+from fedbench._registry import ServerRegistry
 from fedbench.server.server_policy import ServerPolicy
 
 
@@ -20,7 +20,7 @@ class _Components(Enum):
     AGGR_EVALUATE = "_aggregate_evaluate"
 
 
-class ServerPolicyRegistry(PluginRegistry):
+class ServerPolicyRegistry(ServerRegistry):
     def server_policy(
             self,
             factory: Callable[[], ServerPolicy]) -> Callable[[], ServerPolicy]:
@@ -34,7 +34,7 @@ class ServerPolicyRegistry(PluginRegistry):
         return getattr(self, _SERVER_POLICY_FACTORY, None)
 
 
-class FlwrStrategyRegistry(PluginRegistry):
+class FlwrStrategyRegistry(ServerRegistry):
     def flwr_strategy(
             self, factory: Callable[[], Strategy]) -> Callable[[], Strategy]:
 
@@ -59,7 +59,7 @@ class FlwrStrategyRegistry(PluginRegistry):
         raise NotImplementedError()
 
 
-class ServerComponentRegistry(PluginRegistry):
+class ServerComponentRegistry(ServerRegistry):
     def configure_init(self, func):
         raise NotImplementedError()
 
