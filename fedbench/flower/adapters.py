@@ -1,4 +1,4 @@
-from typing import Iterable
+from collections.abc import Iterable
 
 from flwr.common import Message, MetricRecord, ArrayRecord, ConfigRecord
 from flwr.server import Grid

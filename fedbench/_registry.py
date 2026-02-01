@@ -1,5 +1,6 @@
 from abc import ABC
-from typing import Any, Callable, Self
+from collections.abc import Callable
+from typing import Any, Self
 
 from fedbench.common import MLRuntime
 from fedbench.errors import DuplicateComponentError

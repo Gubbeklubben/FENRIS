@@ -1,10 +1,11 @@
+from collections.abc import Callable
 from enum import Enum
-from typing import Callable
 
 from flwr.serverapp.strategy import Strategy
 
 from fedbench._registry import PluginRegistry
 from fedbench.server.server_policy import ServerPolicy
+
 
 _SERVER_POLICY_FACTORY = "_server_policy_factory"
 _FLWR_STRATEGY_FACTORY = "_flwr_strategy_factory"
