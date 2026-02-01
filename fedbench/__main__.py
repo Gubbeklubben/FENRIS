@@ -5,11 +5,6 @@ from typing import Annotated
 import typer
 
 from fedbench._registry import PluginRegistry
-from fedbench.errors import (
-    PluginNotFoundError,
-    PluginRegistryNotFoundError,
-    InvalidPluginRegistryError,
-)
 
 
 app = typer.Typer()
@@ -27,19 +22,12 @@ def _validate_locator(locator: str) -> str:
 
 
 def _load_registry(locator: str) -> PluginRegistry:
-    module, _, attr = locator.partition(":")
-    try:
-        module = importlib.import_module(module)
-    except ImportError as e:
-        raise PluginNotFoundError(f"{module}") from e
-    try:
-        registry = getattr(module, attr)
-    except AttributeError:
-        raise PluginRegistryNotFoundError(f"{module}.{attr}") from None
+    module_name, _, attr = locator.partition(":")
+    module = importlib.import_module(module_name)
 
+    registry = getattr(module, attr)
     if not isinstance(registry, PluginRegistry):
-        raise InvalidPluginRegistryError(
-            f"Invalid registry type{type(registry)}")
+        raise TypeError(f"Invalid registry type{type(registry)}")
 
     return registry
 

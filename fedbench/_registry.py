@@ -3,7 +3,6 @@ from collections.abc import Callable
 from typing import Any, Self
 
 from fedbench.common import MLRuntime
-from fedbench.errors import DuplicateComponentError
 
 
 class PluginRegistry(ABC):
@@ -21,8 +20,7 @@ class PluginRegistry(ABC):
 
         attr = getattr(self, attr_name, None)
         if attr is not None:
-            raise DuplicateComponentError(
-                f"{self}: {decorator_name} already registered")
+            raise ValueError(f"{self}: {decorator_name} already registered")
 
         setattr(self, attr_name, plugin)
         return plugin
