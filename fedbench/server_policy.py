@@ -1,0 +1,91 @@
+from abc import ABC, abstractmethod
+from collections.abc import Iterable
+
+from flwr.serverapp.strategy import Strategy
+
+from fedbench.common import (
+    MLRuntime,
+    ModelState,
+    TrainRequest,
+    EvalRequest,
+    TrainResponse,
+    EvalResponse, InitResponse,
+)
+
+
+class BaseServerPolicy(ABC):
+    @abstractmethod
+    def init(self, responses: Iterable[InitResponse]) -> ModelState:
+        pass
+
+
+class ServerPolicy(BaseServerPolicy):
+    @property
+    @abstractmethod
+    def ml_runtime(self) -> MLRuntime:
+        pass
+
+    @abstractmethod
+    def configure_train(
+            self,
+            server_round: int,
+            model_state: ModelState,
+            config: dict[str, bool | int | float | bytes],
+            client_ids: Iterable[int]) -> Iterable[TrainRequest]:
+        pass
+
+    @abstractmethod
+    def configure_evaluate(
+            self,
+            server_round: int,
+            model_state: ModelState,
+            config: dict[str, bool | int | float | bytes],
+            client_ids: Iterable[int]) -> Iterable[EvalRequest]:
+        pass
+
+    @abstractmethod
+    def aggregate_train(
+            self,
+            server_round: int,
+            results: Iterable[TrainResponse]) -> TrainResponse:
+        pass
+
+    @abstractmethod
+    def aggregate_evaluate(
+            self,
+            server_round: int,
+            results: Iterable[EvalResponse]) -> EvalResponse:
+        pass
+
+
+class NoopDefaultsPolicy(ServerPolicy, ABC):
+    def configure_train(
+            self,
+            server_round: int,
+            model_state: ModelState,
+            config: dict[str, bool | int | float | bytes],
+            client_ids: Iterable[int]) -> Iterable[TrainRequest]:
+
+        return []
+
+    def configure_evaluate(
+            self,
+            server_round: int,
+            model_state: ModelState,
+            config: dict[str, bool | int | float | bytes],
+            client_ids: Iterable[int]) -> Iterable[EvalRequest]:
+
+        return []
+
+    def aggregate_evaluate(
+            self,
+            server_round: int,
+            results: Iterable[EvalResponse]) -> EvalResponse | None:
+
+        return None
+
+
+class FlwrStrategyDelegatePolicy(BaseServerPolicy):
+    @abstractmethod
+    def flwr_strategy_factory(self) -> Strategy:
+        pass

@@ -1,0 +1,4 @@
+[project]
+name = "fedbench"
+version = "0.0.1"
+description = "An Extensible Benchmarking Framework for Federated Synthetic Tabular Data Generators"

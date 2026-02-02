@@ -1,0 +1,7 @@
+[project]
+name = "fedbench_example"
+version = "0.0.1"
+description = "A simple example demonstrating intended usage"
+
+[project.entry-points."fedbench.algorithms"]
+fed_awesome="example.fed_awesome:FedAwesome"

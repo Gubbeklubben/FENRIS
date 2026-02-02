@@ -11,7 +11,7 @@ if TYPE_CHECKING:
     import torch
 
 
-type MLRuntimeWeights = list[NDArray] | dict[str, torch.Tensor]
+type ModelState = list[NDArray] | dict[str, torch.Tensor]
 
 
 class MLRuntime(Enum):
@@ -20,26 +20,40 @@ class MLRuntime(Enum):
 
 
 @dataclass(frozen=True)
-class TrainPlan:
-    node_id: int
-    ml_runtime_weights: MLRuntimeWeights
+class InitRequest:
+    client_id: int
     config: dict[str, bool | int | float | bytes ]
 
 
 @dataclass(frozen=True)
-class TrainResult:
-    ml_runtime_weights: MLRuntimeWeights
+class InitResponse:
+    client_id: int
+    statistics: dict[str, list[NDArray]]
+
+
+@dataclass(frozen=True)
+class TrainRequest:
+    client_id: int
+    model_state: ModelState
+    config: dict[str, bool | int | float | bytes ]
+
+
+@dataclass(frozen=True)
+class TrainResponse:
+    client_id: int
+    model_state: ModelState
     metrics: dict[str, float]
     num_examples: int
 
 
 @dataclass(frozen=True)
-class EvalPlan:
-    node_id: int
-    ml_runtime_weights: MLRuntimeWeights
+class EvalRequest:
+    client_id: int
+    model_state: ModelState
     config: dict[str, bool | int | float | bytes ]
 
 
 @dataclass(frozen=True)
-class EvalResult:
+class EvalResponse:
+    client_id: int
     metrics: dict[str, float]
