@@ -22,6 +22,3 @@ class FedAwesomeServerPolicy(FlwrStrategyDelegatePolicy):
 
     def flwr_strategy_factory(self) -> Strategy:
         return FedAvg()
-
-
-instance = FedAwesome()
