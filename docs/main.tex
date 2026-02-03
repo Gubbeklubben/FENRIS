@@ -1,0 +1,199 @@
+\documentclass{article}
+\usepackage{amsmath}
+\usepackage{geometry}
+\usepackage[colorlinks=true, linkcolor=blue, urlcolor=blue]{hyperref}
+\usepackage{enumitem}
+\usepackage{csquotes}
+\geometry{a4paper, margin=1in}
+\usepackage[style=apa,backend=biber]{biblatex}
+\addbibresource{sources.bib}
+
+\title{An Extensible Benchmarking Framework for Federated
+Synthetic Tabular Data Generators}
+\author{Thomas Stavik Lønning \and Alexander Benjamin Rød Opedal \and Ken Solbakken Remen \and Trond Thorsteinsson \and Bård Linga}
+\date{\today}
+
+\begin{document}
+\raggedbottom
+\maketitle
+\tableofcontents
+\newpage
+
+\section{Introduction}
+Hello FedBench! Have you been BenchFed?
+
+\section{Background}
+
+\subsection{Federated Learning}
+In machine learning, the main approach that has been used in the past
+is to collect data on a central server, and then use machine learning
+algorithms to train some model on the data. In Federated Learning (FL),
+rather than moving the data to the training, the training
+is moved to the data \parencite{flower_tutorial}.
+In a typical client-server architecture, locally trained model updates
+are then sent back to the server for aggregation, and this is repeated
+until the global model converges. FL thus enhances privacy by keeping
+potentially sensitive data local to the owning device.
+
+\subsection{The Flower framework}
+In the words of \cite{fed_frameworks}, \enquote{a FL framework provides the
+infrastructure support to build collaborative machine learning
+models across multiple devices, servers, or entities without
+transferring raw data to a central location. Instead, the models
+are trained locally on individual devices, servers or entities
+and only the model updates are exchanged and aggregated to
+create a global model or centralized model.}
+
+Flower \parencite{flower_article} is a FL framework written in python, and designed to be
+scalable, client-agnostic, communication-agnostic, privacy-agnostic
+and flexible. In Flower, global logic, such
+as client selection, configuration, parameter update aggregation,
+and federated or centralized model evaluation is expressed through
+Flower's \textit{Strategy} abstraction. A concrete \textit{Strategy}
+implementation represents a single FL algorithm, and Flower provides
+tested reference implementations of many popular algorithms.
+\parencite{flower_article}
+
+Local logic can be expressed using the high-level \textit{Client}
+abstraction, but it is also possible to integrate with Flower at the
+protocol level, meaning you can in theory implement clients in
+virtually any programming language.
+\parencite{flower_article}
+
+Built into Flower is a Virtual Client Engine (VCE), a tool that
+enables virtualization of Flower Clients, which in turn enables
+large scale single-machine or multiple-machine experiments.
+\parencite{flower_article}
+
+\subsection{Evaluation Metrics}
+The use of synthetic data in high-risk AI applications related to
+human health warrants rigorous data quality assessment. \cite{metrics}
+conducted a comprehensive literature review on the quality evaluation
+metrics within the scope of synthetic tabular healthcare data, and
+highlighted the need for objective evaluation standards.
+They define five relevant quality dimensions:
+\begin{itemize}[label=--]
+  \item \textbf{Similarity}: The similarity between the synthetic and
+    real dataset, and the ability to mimic statistical characteristics and
+    patterns of the original dataset.
+  \item \textbf{Usability}: The usability of inferences drawn from
+    the synthetic data.
+  \item \textbf{Privacy}: The risk of re-identification for individuals
+    from the original dataset.
+  \item \textbf{Fairness}: Underrepresentation of certain groups that
+    may lead to unfair use. Transparency of the generation process and output.
+  \item \textbf{Carbon footprint and computational complexity}: Resource
+    use for preprocessing, model training, and inference.
+\end{itemize}
+
+A critical goal of this thesis is to provide concrete, reusable implementations
+covering most, if not all of these dimensions, and thus provide a basis for
+standardized evaluation of federated synthetic data generators.
+
+\section{Project description and objectives}
+
+\subsection{Background and motivation}
+
+\subsection{Problem statement}
+
+\subsection{Objectives and research questions}
+
+\subsection{Scope, assumptions, and limitations}
+
+\section{Related work}
+
+\subsection{Centralized synthetic tabular data generation}
+
+\subsection{Federated learning for tabular data}
+
+\subsection{Federated synthetic tabular data generation}
+
+\subsection{How synthetic data is evaluated}
+
+\section{System design: FedBench}
+
+\subsection{Design goals}
+
+\subsection{Architecture overview}
+
+\subsection{Core modules}
+\subsubsection{Orchestration layer (Flower)}
+\subsubsection{Data layer (loading, preprocessing, partitioning)}
+\subsubsection{Generator layer (interfaces and implementations)}
+\subsubsection{Evaluation layer (metrics, attacks, and reporting)}
+\subsubsection{Experiment configuration, logging, and reproducibility}
+
+\subsection{Extensibility and API design}
+\subsubsection{Abstract base classes and required methods}
+\subsubsection{Registration and discovery of generators}
+
+\section{Data}
+
+\subsection{Datasets}
+\subsubsection{UCI Heart Disease}
+\subsubsection{Breast Cancer Wisconsin}
+\subsubsection{NCCTG Lung Cancer}
+
+\subsection{Preprocessing and feature handling}
+
+\subsection{Federated partitioning schemes}
+\subsubsection{Horizontal partitioning (Fed-TGAN)}
+\subsubsection{Vertical partitioning (VT-GAN)}
+
+\section{Methods}
+
+\subsection{Federated synthetic data generators}
+\subsubsection{Fed-TGAN}
+\subsubsection{VT-GAN (GTV)}
+\subsubsection{FedTabDiff}
+
+\subsection{Experimental protocol}
+\subsubsection{Federated learning setup (clients, rounds, aggregation)}
+\subsubsection{Hyperparameters and tuning strategy}
+\subsubsection{Compute environment}
+
+\subsection{Evaluation methodology}
+\subsubsection{Fidelity and utility (TSTR, similarity, correlations)}
+\subsubsection{Privacy (membership/attribute inference, DP accounting)}
+\subsubsection{Fairness (demographic parity, equalized odds)}
+\subsubsection{Scalability (runtime, communication overhead, compute footprint)}
+
+\section{Implementation}
+
+\subsection{Framework implementation details}
+
+\subsection{Integration of reference generators}
+
+\subsection{How to extend the framework (short guide)}
+
+\section{Results}
+
+\subsection{Fidelity and utility results}
+
+\subsection{Privacy results}
+
+\subsection{Fairness results}
+
+\subsection{Scalability results}
+
+\section{Discussion}
+
+\subsection{Summary of findings}
+
+\subsection{Trade-offs and recommendations}
+
+\subsection{Threats to validity}
+
+\section{Conclusion and future work}
+
+\subsection{Conclusion}
+
+\subsection{Future work}
+
+\appendix
+\section{Appendix}
+\subsection{Reproducibility checklist}
+
+\printbibliography
+
+\end{document}
