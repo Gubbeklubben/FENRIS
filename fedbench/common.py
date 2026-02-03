@@ -12,6 +12,10 @@ if TYPE_CHECKING:
 
 
 type ModelState = list[NDArray] | dict[str, torch.Tensor]
+type ConfigDict = dict[
+    str, str | bool | int | float | bytes | list[str] | list[bool] | list[int]
+    | list[float] | list[bytes]] | None
+type MetricsDict = dict[str, int | float | list[int] | list[float]] | None
 
 
 class MLRuntime(Enum):
@@ -22,27 +26,27 @@ class MLRuntime(Enum):
 @dataclass(frozen=True)
 class InitRequest:
     client_id: int
-    config: dict[str, bool | int | float | bytes ]
+    config: ConfigDict
 
 
 @dataclass(frozen=True)
 class InitResponse:
     client_id: int
-    statistics: dict[str, list[NDArray]]
+    statistics: dict[str, list[NDArray]] | None
 
 
 @dataclass(frozen=True)
 class TrainRequest:
     client_id: int
     model_state: ModelState
-    config: dict[str, bool | int | float | bytes ]
+    config: ConfigDict
 
 
 @dataclass(frozen=True)
 class TrainResponse:
     client_id: int
-    model_state: ModelState
-    metrics: dict[str, float]
+    model_state: ModelState | None
+    metrics: dict[str, float] | None
     num_examples: int
 
 
@@ -50,10 +54,10 @@ class TrainResponse:
 class EvalRequest:
     client_id: int
     model_state: ModelState
-    config: dict[str, bool | int | float | bytes ]
+    config: ConfigDict
 
 
 @dataclass(frozen=True)
 class EvalResponse:
     client_id: int
-    metrics: dict[str, float]
+    metrics: dict[str, float] | None

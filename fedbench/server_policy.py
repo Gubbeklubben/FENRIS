@@ -47,14 +47,15 @@ class ServerPolicy(BaseServerPolicy):
     def aggregate_train(
             self,
             server_round: int,
-            results: Iterable[TrainResponse]) -> TrainResponse:
+            results: Iterable[TrainResponse]
+    ) -> tuple[ModelState | None, dict[str, float] | None]:
         pass
 
     @abstractmethod
     def aggregate_evaluate(
             self,
             server_round: int,
-            results: Iterable[EvalResponse]) -> EvalResponse:
+            results: Iterable[EvalResponse]) -> dict[str, float] | None:
         pass
 
 
@@ -80,7 +81,7 @@ class NoopDefaultsPolicy(ServerPolicy, ABC):
     def aggregate_evaluate(
             self,
             server_round: int,
-            results: Iterable[EvalResponse]) -> EvalResponse | None:
+            results: Iterable[EvalResponse]) -> dict[str, float] | None:
 
         return None
 

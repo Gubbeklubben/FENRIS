@@ -2,6 +2,7 @@ import typer
 
 from fedbench._plugins import algorithms, load_algorithm
 
+
 app = typer.Typer()
 
 
@@ -18,11 +19,11 @@ def list_algorithms() -> None:
 @app.command()
 def run(
         algorithm_name: str,
-        num_nodes: int = typer.Option(default=3)) -> None:
+        num_clients: int = typer.Option(default=3)) -> None:
 
     alg = load_algorithm(algorithm_name)
-    print(alg)
-    #run_simulation(server_app, client_app, 10)
+    print(f"algorithm: {alg}, num_nodes: {num_clients}")
+    #run_simulation(server_app, client_app, num_clients)
 
 
 if __name__ == "__main__":
