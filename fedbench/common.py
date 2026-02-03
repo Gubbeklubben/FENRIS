@@ -46,7 +46,7 @@ class TrainRequest:
 class TrainResponse:
     client_id: int
     model_state: ModelState | None
-    metrics: dict[str, float] | None
+    metrics: MetricsDict
     num_examples: int
 
 
@@ -60,4 +60,4 @@ class EvalRequest:
 @dataclass(frozen=True)
 class EvalResponse:
     client_id: int
-    metrics: dict[str, float] | None
+    metrics: MetricsDict
