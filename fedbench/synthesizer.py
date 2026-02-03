@@ -29,7 +29,7 @@ class Synthesizer(ABC):
         pass
 
     @abstractmethod
-    def init(self, request: InitRequest) -> InitResponse | None:
+    def init(self, request: InitRequest) -> InitResponse:
         pass
 
     @abstractmethod
@@ -37,10 +37,10 @@ class Synthesizer(ABC):
         pass
 
     @abstractmethod
-    def evaluate(self, request: EvalRequest) -> EvalResponse | None:
+    def evaluate(self, request: EvalRequest) -> EvalResponse:
         pass
 
-    # TODO! Figure out signature...
+    # TODO! Figure out signature, this is the method for generating data.
     @abstractmethod
     def sample(self):
         pass

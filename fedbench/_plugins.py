@@ -11,5 +11,16 @@ def algorithms() -> Iterable[str]:
 
 
 def load_algorithm(name: str):
-    return _ALGORITHM_ENTRY_POINTS[name].load()
+    factory =  _ALGORITHM_ENTRY_POINTS[name].load()
+    return factory()
+
+
+def load_server_policy_factory(algorithm_name: str):
+    algorithm = load_algorithm(algorithm_name)
+    return algorithm.server_policy_factory
+
+
+def load_synthesizer_factory(algorithm_name: str):
+    algorithm = load_algorithm(algorithm_name)
+    return algorithm.synthesizer_factory
 
