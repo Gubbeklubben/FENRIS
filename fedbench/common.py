@@ -14,8 +14,8 @@ if TYPE_CHECKING:
 type ModelState = list[NDArray] | dict[str, torch.Tensor]
 type ConfigDict = dict[
     str, str | bool | int | float | bytes | list[str] | list[bool] | list[int]
-    | list[float] | list[bytes]] | None
-type MetricsDict = dict[str, int | float | list[int] | list[float]] | None
+    | list[float] | list[bytes]]
+type MetricsDict = dict[str, int | float | list[int] | list[float]]
 
 
 class MLRuntime(Enum):
@@ -26,7 +26,7 @@ class MLRuntime(Enum):
 @dataclass(frozen=True)
 class InitRequest:
     client_id: int
-    config: ConfigDict
+    config: ConfigDict | None
 
 
 @dataclass(frozen=True)
@@ -39,14 +39,14 @@ class InitResponse:
 class TrainRequest:
     client_id: int
     model_state: ModelState
-    config: ConfigDict
+    config: ConfigDict | None
 
 
 @dataclass(frozen=True)
 class TrainResponse:
     client_id: int
     model_state: ModelState | None
-    metrics: MetricsDict
+    metrics: MetricsDict | None
     num_examples: int
 
 
@@ -54,10 +54,10 @@ class TrainResponse:
 class EvalRequest:
     client_id: int
     model_state: ModelState
-    config: ConfigDict
+    config: ConfigDict | None
 
 
 @dataclass(frozen=True)
 class EvalResponse:
     client_id: int
-    metrics: MetricsDict
+    metrics: MetricsDict | None
