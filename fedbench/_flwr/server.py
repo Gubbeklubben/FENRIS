@@ -1,7 +1,6 @@
 import time
-from logging import INFO
+
 from flwr.common import Context, Message, RecordDict, ConfigRecord, ArrayRecord
-from flwr.common import log
 from flwr.server import Grid
 from flwr.serverapp import ServerApp
 from flwr.serverapp.strategy import Strategy
@@ -16,7 +15,7 @@ from fedbench.server_policy import (
 )
 
 
-def _get_strategy(server_policy: BaseServerPolicy) -> Strategy:
+def get_strategy(server_policy: BaseServerPolicy) -> Strategy:
     # python >= 3.10
     match server_policy:
         case ServerPolicy():
@@ -27,7 +26,7 @@ def _get_strategy(server_policy: BaseServerPolicy) -> Strategy:
             raise TypeError(f"Unknown server policy type {server_policy}")
 
 
-def _to_init_response(message: Message) -> InitResponse:
+def to_init_response(message: Message) -> InitResponse:
     record = message.content.array_records["init"]
     return InitResponse(
         client_id=message.metadata.src_node_id,
@@ -37,7 +36,6 @@ def _to_init_response(message: Message) -> InitResponse:
 
 # Capture commandline args in a closure as we can not easily
 # inject into Context (?). Re-consider other more robust approaches later.
-
 def make_server_app(
         algorithm_name: str,
         num_clients: int) -> ServerApp:
@@ -80,11 +78,11 @@ def make_server_app(
         replies = grid.send_and_receive(init_messages)
 
         init_model_state = server_policy.init(
-            _to_init_response(msg) for msg in replies
+            to_init_response(msg) for msg in replies
         )
 
         # Start federation loop
-        strategy = _get_strategy(server_policy)
+        strategy = get_strategy(server_policy)
         strategy.start(
             grid=grid,
             initial_arrays=ArrayRecord(init_model_state),

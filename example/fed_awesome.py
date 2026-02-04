@@ -38,9 +38,6 @@ class FedAwesomeServerPolicy(FlwrStrategyDelegatePolicy):
 
 
 class FedAwesomeSynthesizer(Synthesizer):
-    def __init__(self):
-        self._model_state = None
-
     @property
     def ml_runtime(self) -> MLRuntime:
         return MLRuntime.NUMPY
@@ -51,15 +48,14 @@ class FedAwesomeSynthesizer(Synthesizer):
 
     @log_calls(__name__)
     def init(self, request: InitRequest) -> InitResponse:
-        return InitResponse(
-            request.client_id,
-            {"whatever": np.array([1, 2, 3])})
+        return request.create_response({"whatever": np.array([1, 2, 3])})
 
+    @log_calls(__name__)
     def train(self, request: TrainRequest) -> TrainResponse:
-        return TrainResponse(request.client_id, self._model_state, None, 1)
+        return request.create_response(request.model_state, None, 1)
 
     def evaluate(self, request: EvalRequest) -> EvalResponse:
-        return EvalResponse(request.client_id, None)
+        return request.create_response(None)
 
     def sample(self):
         raise NotImplementedError()

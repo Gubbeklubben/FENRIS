@@ -21,16 +21,6 @@ class Synthesizer(ABC):
     def ml_runtime(self) -> MLRuntime:
         pass
 
-    @property
-    @abstractmethod
-    def model_state(self) -> ModelState:
-        pass
-
-    @model_state.setter
-    @abstractmethod
-    def model_state(self, model_state: ModelState) -> None:
-        pass
-
     @abstractmethod
     def init(self, request: InitRequest) -> InitResponse:
         pass
@@ -39,6 +29,10 @@ class Synthesizer(ABC):
     def train(self, request: TrainRequest) -> TrainResponse:
         pass
 
+    # As per meeting 04.02. If the metrics computations are to be
+    # implemented client side as a first, I am thinking this method
+    # should be entirely under our control, and dropped from the public
+    # interface. It is all not 100% clear to me yet.
     @abstractmethod
     def evaluate(self, request: EvalRequest) -> EvalResponse:
         pass

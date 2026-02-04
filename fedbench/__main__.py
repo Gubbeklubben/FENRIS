@@ -2,9 +2,9 @@ import typer
 from flwr.simulation import run_simulation
 
 # noinspection PyProtectedMember
-from fedbench._flwr.client import app as client_app
+from fedbench._flwr import client_app
 # noinspection PyProtectedMember
-from fedbench._flwr.server import make_server_app
+from fedbench._flwr import make_server_app
 from fedbench._plugins import algorithms, load_algorithm
 from fedbench.algorithm import Algorithm
 

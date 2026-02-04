@@ -54,6 +54,9 @@ class InitRequest:
     client_id: int
     config: ConfigDict | None
 
+    def create_response(self, statistics: dict[str, NDArray]) -> InitResponse:
+        return InitResponse(self.client_id, statistics)
+
 
 @dataclass(frozen=True)
 class InitResponse:
@@ -66,6 +69,14 @@ class TrainRequest:
     client_id: int
     model_state: ModelState
     config: ConfigDict | None
+
+    def create_response(
+            self,
+            model_state: ModelState | None,
+            metrics: MetricsDict | None,
+            num_examples: int) -> TrainResponse:
+
+        return TrainResponse(self.client_id, model_state, metrics, num_examples)
 
 
 @dataclass(frozen=True)
@@ -81,6 +92,9 @@ class EvalRequest:
     client_id: int
     model_state: ModelState
     config: ConfigDict | None
+
+    def create_response(self, metrics: MetricsDict | None) -> EvalResponse:
+        return EvalResponse(self.client_id, metrics)
 
 
 @dataclass(frozen=True)

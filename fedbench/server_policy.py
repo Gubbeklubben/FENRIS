@@ -1,6 +1,5 @@
 from abc import ABC, abstractmethod
 from collections.abc import Iterable
-from socket import send_fds
 
 from flwr.serverapp.strategy import Strategy
 
