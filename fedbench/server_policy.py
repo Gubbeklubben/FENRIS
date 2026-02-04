@@ -1,5 +1,6 @@
 from abc import ABC, abstractmethod
 from collections.abc import Iterable
+from socket import send_fds
 
 from flwr.serverapp.strategy import Strategy
 
@@ -14,6 +15,9 @@ from fedbench.common import (
 
 
 class BaseServerPolicy(ABC):
+    def __repr__(self):
+        return f"<{self.__class__.__name__}>"
+
     @abstractmethod
     def init(self, responses: Iterable[InitResponse]) -> ModelState:
         pass

@@ -2,10 +2,10 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from enum import Enum
-from logging import INFO
+from logging import DEBUG, INFO
 from typing import TYPE_CHECKING
 
-from flwr.common.logger import log
+from flwr.common.logger import log as _flwr_log
 from numpy.typing import NDArray
 
 # Avoid importing torch at runtime
@@ -16,15 +16,22 @@ if TYPE_CHECKING:
 _BOX_DRAWING = "\u251c\u2500\u2500"
 
 
-# Quick and dirty
+def log(header: str, message_lines: tuple[str, ...], level=INFO):
+    _flwr_log(level, header)
+    for line in message_lines:
+        _flwr_log(level, f"\t{_BOX_DRAWING} {line}")
+
+
+# Quick and dirty, set and export env variable FLWR_LOG_LEVEL="DEBUG" to enable.
 def log_calls(modulename):
     def decorator(func):
         def wrapper(*args, **kwargs):
-            log(INFO, f"{modulename}: Calling {func.__name__}")
-            log(INFO, f"\t{_BOX_DRAWING} args: {args}")
-            log(INFO, f"\t{_BOX_DRAWING} kwargs: {kwargs}")
+            _flwr_log(DEBUG, f"{modulename}: Calling {func.__name__}")
+            _flwr_log(DEBUG, f"\t{_BOX_DRAWING} args: {args}")
+            _flwr_log(DEBUG, f"\t{_BOX_DRAWING} kwargs: {kwargs}")
             ret = func(*args, **kwargs)
-            log(INFO, f"\t{_BOX_DRAWING} return value: {ret}\n")
+            _flwr_log(DEBUG, f"\t{_BOX_DRAWING} return value: {ret}")
+            _flwr_log(DEBUG, "")
             return ret
         return wrapper
     return decorator

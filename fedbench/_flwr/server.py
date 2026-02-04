@@ -36,7 +36,7 @@ def _to_init_response(message: Message) -> InitResponse:
 
 
 # Capture commandline args in a closure as we can not easily
-# inject into Context. Re-consider other more robust approaches later.
+# inject into Context (?). Re-consider other more robust approaches later.
 
 def make_server_app(
         algorithm_name: str,
@@ -57,7 +57,6 @@ def make_server_app(
         # - Call strategy.start, inject config from either cmdline or elsewhere.
         # - ...
 
-        log(INFO, f"{__name__}: main({grid}, {context})")
         factory = load_server_policy_factory(algorithm_name)
         server_policy = factory()
         config: ConfigDict = {"algorithm-name": algorithm_name}
@@ -65,7 +64,6 @@ def make_server_app(
 
         # Wait for clients to connect.
         # Approach ripped from: https://github.com/adap/flower/blob/main/examples/federated-kaplan-meier-fitter/examplefkm/server_app.py
-        # We may want a configurable min_connected_clients param later.
         client_ids = list(grid.get_node_ids())
         while len(client_ids) < num_clients:
             time.sleep(1)

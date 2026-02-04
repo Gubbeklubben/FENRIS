@@ -5,6 +5,9 @@ from fedbench.synthesizer import Synthesizer
 
 
 class Algorithm(ABC):
+    def __repr__(self):
+        return f"<{self.__class__.__name__}>"
+
     @abstractmethod
     def server_policy_factory(self) -> BaseServerPolicy:
         pass

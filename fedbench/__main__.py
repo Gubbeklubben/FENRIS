@@ -1,13 +1,12 @@
 import typer
 from flwr.simulation import run_simulation
 
-from fedbench.algorithm import Algorithm
-from fedbench._plugins import algorithms, load_algorithm
-# noinspection PyProtectedMember
-from fedbench._flwr.server import make_server_app
 # noinspection PyProtectedMember
 from fedbench._flwr.client import app as client_app
-
+# noinspection PyProtectedMember
+from fedbench._flwr.server import make_server_app
+from fedbench._plugins import algorithms, load_algorithm
+from fedbench.algorithm import Algorithm
 
 app = typer.Typer()
 

@@ -20,9 +20,6 @@ from fedbench.synthesizer import Synthesizer
 
 
 class FedAwesome(Algorithm):
-    def __repr__(self):
-        return f"{self.__class__.__name__}()"
-
     def synthesizer_factory(self) -> Synthesizer:
         return FedAwesomeSynthesizer()
 
@@ -31,12 +28,9 @@ class FedAwesome(Algorithm):
 
 
 class FedAwesomeServerPolicy(FlwrStrategyDelegatePolicy):
-    def __repr__(self):
-        return f"{self.__class__.__name__}()"
-
     @log_calls(__name__)
     def init(self, responses: Iterable[InitResponse]) -> ModelState:
-        return [np.ndarray([1, 2, 3]), np.ndarray([3, 2, 1])]
+        return [np.array([1, 2, 3]), np.array([3, 2, 1])]
 
     @log_calls(__name__)
     def flwr_strategy_factory(self) -> Strategy:
@@ -46,9 +40,6 @@ class FedAwesomeServerPolicy(FlwrStrategyDelegatePolicy):
 class FedAwesomeSynthesizer(Synthesizer):
     def __init__(self):
         self._model_state = None
-
-    def __repr__(self):
-        return f"{self.__class__.__name__}()"
 
     @property
     def ml_runtime(self) -> MLRuntime:
@@ -62,7 +53,7 @@ class FedAwesomeSynthesizer(Synthesizer):
     def init(self, request: InitRequest) -> InitResponse:
         return InitResponse(
             request.client_id,
-            {"whatever": np.ndarray([1, 2, 3])})
+            {"whatever": np.array([1, 2, 3])})
 
     def train(self, request: TrainRequest) -> TrainResponse:
         return TrainResponse(request.client_id, self._model_state, None, 1)

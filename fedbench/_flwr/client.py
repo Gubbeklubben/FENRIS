@@ -1,3 +1,6 @@
+from logging import DEBUG
+from typing import cast
+
 from flwr.clientapp import ClientApp
 from flwr.common import (
     Message,
@@ -6,40 +9,45 @@ from flwr.common import (
     ArrayRecord,
     MetricRecord,
     Array,
+    ConfigRecord,
 )
 
 from fedbench._plugins import load_synthesizer_factory
-from fedbench.common import InitRequest
+from fedbench.common import InitRequest, log
+from fedbench.synthesizer import Synthesizer
 
 app = ClientApp()
 _synthesizer_factory = None
 
 
+def _get_synthesizer(config: ConfigRecord) -> Synthesizer:
+    global _synthesizer_factory
+    if _synthesizer_factory is None:
+        # noinspection PyUnnecessaryCast
+        algorithm_name: str = cast(str, config["algorithm-name"])
+        _synthesizer_factory = load_synthesizer_factory(algorithm_name)
+    return _synthesizer_factory()
+
+
 @app.query("init")
 def init(message: Message, context: Context) -> Message:
     config = message.content.config_records["config"]
-    algorithm_name = str(config["algorithm-name"])
-
-    global _synthesizer_factory
-    _synthesizer_factory = load_synthesizer_factory(algorithm_name)
-    synthesizer = _synthesizer_factory()
-
+    synthesizer = _get_synthesizer(config)
     init_response = synthesizer.init(
         InitRequest(message.metadata.dst_node_id, None)
     )
-    if init_response.statistics is None:
-        return Message(
-            content=RecordDict(),
-            reply_to=message
+    content = RecordDict()
+    if init_response.statistics is not None:
+        record = ArrayRecord(
+            {k: Array(ndarray)
+            for k, ndarray in init_response.statistics.items()}
         )
-    statistics = ArrayRecord(
-        {k: Array(ndarray) for k, ndarray in init_response.statistics.items()}
-    )
+        content["init"] = record
+
     return Message(
-        content=RecordDict({"init": statistics}),
+        content=content,
         reply_to=message
     )
-
 
 @app.train()
 def train(message: Message, context: Context) -> Message:
@@ -49,6 +57,13 @@ def train(message: Message, context: Context) -> Message:
     # Call synthesizer.train
     # Get synthesizer weights / other relevant stuff
     # Convert to Flower Message and return it
+    config = message.content.config_records["config"]
+    synthesizer = _get_synthesizer(config)
+    log(
+        f"{__name__}.train:",
+        (f"Successfully created synthesizer: {synthesizer}",),
+        level=DEBUG
+    )
     arrays = ArrayRecord()
     metrics = MetricRecord({"num-examples": 1})
     return Message(
@@ -59,6 +74,13 @@ def train(message: Message, context: Context) -> Message:
 
 @app.evaluate()
 def evaluate(message: Message, context: Context) -> Message:
+    config = message.content.config_records["config"]
+    synthesizer = _get_synthesizer(config)
+    log(
+        f"{__name__}.evaluate:",
+        (f"Successfully created synthesizer: {synthesizer}",),
+        level=DEBUG
+    )
     metrics = MetricRecord({"num-examples": 1})
     return Message(
         content=RecordDict({"metrics": metrics}),
