@@ -42,10 +42,6 @@ class FedAwesomeSynthesizer(Synthesizer):
     def ml_runtime(self) -> MLRuntime:
         return MLRuntime.NUMPY
 
-    @property
-    def model_state(self) -> ModelState:
-        return self._model_state
-
     @log_calls(__name__)
     def init(self, request: InitRequest) -> InitResponse:
         return request.create_response({"whatever": np.array([1, 2, 3])})

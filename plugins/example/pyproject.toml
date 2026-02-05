@@ -6,7 +6,6 @@ requires-python = ">=3.12,<4.0"
 dependencies = [
     "flwr (>=1.25.0,<2.0.0)",
     "numpy (>=2.4.2,<3.0.0)",
-    "fedbench @ file:///home/trond/courses/DATA3900/FedBench/core"
 ]
 
 
@@ -19,14 +18,19 @@ fed_awesome="fed_awesome.fed_awesome:FedAwesome"
 
 [dependency-groups]
 dev = [
-    "mypy (>=1.19.1,<2.0.0)"
+    "mypy (>=1.19.1,<2.0.0)",
 ]
 
 [tool.poetry]
 packages = [{include = "fed_awesome"}]
 
 [tool.poetry.dependencies]
-fedbench = {develop = true}
 
 [tool.mypy]
 mypy_path = ["../../core"]
+ignore_missing_imports = true
+
+[[tool.mypy.overrides]]
+module = "torch.*"
+follow_imports = "skip"
+follow_imports_for_stubs = true
