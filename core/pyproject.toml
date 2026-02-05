@@ -1,0 +1,37 @@
+[project]
+name = "fedbench"
+version = "0.1.0"
+description = "An Extensible Benchmarking Framework for Federated Synthetic Tabular Data Generators"
+authors = [
+    {name = "trondthorsteinsson",email = "trondthorsteinsson@gmail.com"}
+]
+license = {text = "MIT"}
+requires-python = ">=3.12,<4.0"
+dependencies = [
+    "flwr[simulation] (>=1.25.0,<2.0.0)",
+    "typer (>=0.12.5,<0.21.0)",
+    "numpy (>=2.4.2,<3.0.0)"
+]
+
+
+[build-system]
+requires = ["poetry-core>=2.0.0,<3.0.0"]
+build-backend = "poetry.core.masonry.api"
+
+
+[tool.poetry]
+packages = [{include = "fedbench"}]
+
+[dependency-groups]
+dev = [
+    "mypy (>=1.19.1,<2.0.0)",
+    "pytest (>=9.0.2,<10.0.0)",
+]
+
+[tool.mypy]
+ignore_missing_imports = true
+
+[[tool.mypy.overrides]]
+module = "torch.*"
+follow_imports = "skip"
+follow_imports_for_stubs = true
