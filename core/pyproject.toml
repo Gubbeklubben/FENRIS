@@ -5,7 +5,7 @@ description = "An Extensible Benchmarking Framework for Federated Synthetic Tabu
 authors = [
     {name = "trondthorsteinsson",email = "trondthorsteinsson@gmail.com"}
 ]
-license = {text = "MIT"}
+license = "MIT"
 requires-python = ">=3.12,<4.0"
 dependencies = [
     "flwr[simulation] (>=1.25.0,<2.0.0)",
