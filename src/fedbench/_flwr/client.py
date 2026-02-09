@@ -1,6 +1,5 @@
 from logging import DEBUG
 from typing import cast
-from numpy.typing import NDArray
 
 from flwr.clientapp import ClientApp
 from flwr.common import (
@@ -12,11 +11,12 @@ from flwr.common import (
     Array,
     ConfigRecord,
 )
+from numpy.typing import NDArray
 
-from fedbench._plugins import load_synthesizer_factory
-from fedbench.common import InitRequest, log, MLRuntime, TrainRequest
-from fedbench.synthesizer import Synthesizer
 from fedbench._flwr.common import from_array_record
+from fedbench.algorithms import load_factory as load_algorithm_factory
+from fedbench.algorithms.synthesizer import Synthesizer
+from fedbench.common import InitRequest, log, TrainRequest
 
 app = ClientApp()
 synthesizer_factory = None
@@ -28,12 +28,17 @@ def to_array_record(statistics: dict[str, NDArray]) -> ArrayRecord:
 
 def get_synthesizer(config: ConfigRecord | None = None) -> Synthesizer:
     global synthesizer_factory
+
     if synthesizer_factory is None:
         if config is None:
-            raise ValueError("Can not load synthesizer factory without config.")
+            raise ValueError("Can not load synthesizer without config.")
+
         # noinspection PyUnnecessaryCast
         algorithm_name: str = cast(str, config["algorithm-name"])
-        synthesizer_factory = load_synthesizer_factory(algorithm_name)
+        algorithm_factory = load_algorithm_factory(algorithm_name)
+        algorithm = algorithm_factory()
+        synthesizer_factory = algorithm.synthesizer_factory
+
     return synthesizer_factory()
 
 
@@ -41,8 +46,9 @@ def get_synthesizer(config: ConfigRecord | None = None) -> Synthesizer:
 def init(message: Message, context: Context) -> Message:
     config = message.content.config_records["config"]
     synthesizer = get_synthesizer(config)
-    response = synthesizer.init(InitRequest(message.metadata.dst_node_id, None))
-
+    response = synthesizer.initialize(
+        InitRequest(message.metadata.dst_node_id, None)
+    )
     content = RecordDict()
     if response.statistics is not None:
         record = to_array_record(response.statistics)
@@ -71,7 +77,7 @@ def train(message: Message, context: Context) -> Message:
     response = synthesizer.train(request)
 
     content = RecordDict()
-    # flwr requires "num-examples" to be present
+    # flwr requires "num-examples" to be presentFr
     metrics = MetricRecord({"num-examples": response.num_examples})
 
     if response.model_state is not None:

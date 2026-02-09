@@ -3,27 +3,10 @@ import time
 from flwr.common import Context, Message, RecordDict, ConfigRecord, ArrayRecord
 from flwr.server import Grid
 from flwr.serverapp import ServerApp
-from flwr.serverapp.strategy import Strategy
+from flwr.serverapp.strategy import FedAvg
 
-from fedbench._flwr.server_policy_adapter import ServerPolicyAdapter
-from fedbench._plugins import load_server_policy_factory
+from fedbench.algorithms import load_factory as load_algorithm_factory
 from fedbench.common import InitResponse, ConfigDict
-from fedbench.server_policy import (
-    BaseServerPolicy,
-    ServerPolicy,
-    FlwrStrategyDelegatePolicy
-)
-
-
-def get_strategy(server_policy: BaseServerPolicy) -> Strategy:
-    # python >= 3.10
-    match server_policy:
-        case ServerPolicy():
-            return ServerPolicyAdapter(server_policy)
-        case FlwrStrategyDelegatePolicy():
-            return server_policy.flwr_strategy_factory()
-        case _:
-            raise TypeError(f"Unknown server policy type {server_policy}")
 
 
 def to_init_response(message: Message) -> InitResponse:
@@ -55,8 +38,6 @@ def make_server_app(
         # - Call strategy.start, inject config from either cmdline or elsewhere.
         # - ...
 
-        factory = load_server_policy_factory(algorithm_name)
-        server_policy = factory()
         config: ConfigDict = {"algorithm-name": algorithm_name}
         init_messages: list[Message] = []
 
@@ -77,12 +58,14 @@ def make_server_app(
             ))
         replies = grid.send_and_receive(init_messages)
 
-        init_model_state = server_policy.init(
+        factory = load_algorithm_factory(algorithm_name)
+        algorithm = factory()
+        init_model_state = algorithm.server_initialize(
             to_init_response(msg) for msg in replies
         )
 
         # Start federation loop
-        strategy = get_strategy(server_policy)
+        strategy = FedAvg()
         strategy.start(
             grid=grid,
             initial_arrays=ArrayRecord(init_model_state),

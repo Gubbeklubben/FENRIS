@@ -4,14 +4,16 @@ from flwr.common import Message, MetricRecord, ArrayRecord, ConfigRecord
 from flwr.server import Grid
 from flwr.serverapp.strategy import Strategy as FlwrStrategy
 
-from fedbench.server_policy import ServerPolicy
+from fedbench.algorithms.algorithm import Algorithm
+from fedbench.common import log_calls
 
 
-# Adapt ServerPolicy implementations to Flower.
-class ServerPolicyAdapter(FlwrStrategy):
-    def __init__(self, server_policy: ServerPolicy) -> None:
-        self._server_policy = server_policy
+# Adapt server side logic to Flower.
+class Strategy(FlwrStrategy):
+    def __init__(self, algorithm: Algorithm) -> None:
+        self._algorithm = algorithm
 
+    @log_calls
     def configure_train(
             self, server_round: int,
             arrays: ArrayRecord,
@@ -19,6 +21,7 @@ class ServerPolicyAdapter(FlwrStrategy):
             grid: Grid) -> Iterable[Message]:
         pass
 
+    @log_calls
     def aggregate_train(
             self,
             server_round: int,
@@ -26,19 +29,22 @@ class ServerPolicyAdapter(FlwrStrategy):
     ) -> tuple[ArrayRecord | None, MetricRecord | None]:
         pass
 
+    @log_calls
     def configure_evaluate(
             self,
             server_round: int,
             arrays: ArrayRecord,
             config: ConfigRecord,
             grid: Grid) -> Iterable[Message]:
-        pass
+        return ()
 
+    @log_calls
     def aggregate_evaluate(
             self,
             server_round: int,
             replies: Iterable[Message]) -> MetricRecord | None:
-        pass
+        return None
 
+    @log_calls
     def summary(self) -> None:
-        pass
+        return None
