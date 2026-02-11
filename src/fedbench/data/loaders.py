@@ -42,7 +42,12 @@ def load_csv(
     if custom_encodings:
         for col, dtype in custom_encodings.items():
             if col in df.columns:
-                df[col] = df[col].astype(dtype)
+                try:
+                    df[col] = df[col].astype(dtype) # type: ignore[arg-type]
+                except Exception as exc:
+                    raise ValueError(
+                        f"Failed to cast column '{col}' to dtype '{dtype}': {exc}"
+                    ) from exc
 
     # Infer schema (handles both numeric and categorical types)
     schema = infer_schema(df)

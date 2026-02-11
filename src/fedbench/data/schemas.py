@@ -3,13 +3,15 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import Tuple, Literal
 
+Kind = Literal["continuous", "categorical", "binary", "integer"]
+
 # --------------------------------------------------------------------------- #
 # Column → keeps the column name (string) and a broad Semantic *kind*
 # --------------------------------------------------------------------------- #
 @dataclass(frozen=True)
 class ColumnSchema:
     name: str
-    kind: Literal["continuous", "categorical", "binary", "integer"]
+    kind: Kind
 
 # --------------------------------------------------------------------------- #
 # Table keeps an ordered tuple of ColumnSchema objects
