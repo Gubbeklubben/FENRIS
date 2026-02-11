@@ -1,10 +1,8 @@
 import pathlib
 import pandas as pd
 import pytest
-from fedbench.data import loaders, partitioners, infer_schema
-from fedbench.data.partitioners.horizontal_partition import deterministic_shard
-from fedbench.data.partitioners.partitioned_dataset import PartitionedDataset
-from fedbench.data.schemas import ColumnSchema
+from fedbench.data import loaders
+from fedbench.data.partitioned_dataset import PartitionedDataset
 
 TEST_CSV = pathlib.Path(__file__).parent / "fixtures/sample.csv"
 
@@ -34,12 +32,6 @@ def test_load_csv_and_schema(sample_df, tmp_path):
         "binary",
         "categorical",
     ]
-
-def test_horizontal_partition(sample_df):
-    shards = deterministic_shard(sample_df, 2, seed=42)
-    assert len(shards) == 2
-    # check that rows are distributed but shuffling deterministic
-    assert shards[0].iloc[0]["id"] == 4  # deterministic assignment
 
 def test_iid_partitioning(sample_df):
     ds = PartitionedDataset.using_iid_partitioning(sample_df, 2)
