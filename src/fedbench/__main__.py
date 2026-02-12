@@ -4,7 +4,7 @@ from typing import Annotated
 import typer
 from flwr.simulation import run_simulation
 
-import fedbench.algorithms as algorithms
+import fedbench.synthesizers as algorithms
 # noinspection PyProtectedMember
 from fedbench._flwr import client_app
 # noinspection PyProtectedMember
@@ -27,8 +27,8 @@ def show_algorithms(
                 help="Show locators for the factories used to create "
                      "algorithm instances.")] = False) -> None:
 
-    for name, locator in itertools.chain(algorithms.builtins(),
-                                         algorithms.plugins()):
+    for name, locator in itertools.chain(synthesizers.builtins(),
+                                         synthesizers.plugins()):
         print(name, end="")
         print(f": {locator}" if include_locator else "")
 

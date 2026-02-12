@@ -1,9 +1,8 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from enum import Enum
 from logging import DEBUG, INFO
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 from flwr.common.logger import log as _flwr_log
 from numpy.typing import NDArray
@@ -11,6 +10,62 @@ from numpy.typing import NDArray
 # Avoid importing torch at runtime
 if TYPE_CHECKING:
     import torch
+
+
+type Arrays = list[NDArray] | dict[str, torch.Tensor]
+type MetricDict = dict[str, int | float | list[int] | list[float]]
+type ConfigDict = dict[str, str | bool | int | float | bytes
+    | list[str] | list[bool] | list[int] | list[float] | list[bytes]]
+
+
+class MessageContent:
+    def __init__(self) -> None:
+        self._arrays = {}
+        self._objects = {}
+        self._metrics = {}
+        self._config = {}
+
+    @property
+    def arrays(self) -> dict[str, Arrays]:
+        return self._arrays
+
+    @property
+    def objects(self) -> dict[str, Any]:
+        return self._objects
+
+    @property
+    def metrics(self) -> dict[str, MetricDict]:
+        return self._metrics
+
+    @property
+    def config(self) -> dict[str, ConfigDict]:
+        return self._config
+
+    def is_empty(self):
+        return (not self._arrays
+                and not self._objects
+                and not self._metrics
+                and not self._config)
+
+    def add_arrays(self, key: str, arrays: Arrays) -> None:
+        if key in self._arrays:
+            raise ValueError(f"Arrays with key '{key}' already exist.")
+        self._arrays[key] = arrays
+
+    def add_objects(self, key: str, objects: dict[str, Any]) -> None:
+        if key in self._objects:
+            raise ValueError(f"Objects with key '{key}' already exist.")
+        self._objects[key] = objects
+
+    def add_metrics(self, key: str, metrics: MetricDict) -> None:
+        if key in self._metrics:
+            raise ValueError(f"Metrics with key '{key}' already exist.")
+        self._metrics[key] = metrics
+
+    def add_config(self, key: str, config: ConfigDict) -> None:
+        if key in self._config:
+            raise ValueError(f"Config with key '{key}' already exist.")
+        self._config[key] = config
 
 
 _BOX_DRAWING = "\u251c\u2500\u2500"
@@ -35,55 +90,3 @@ def log_calls(modulename):
             return ret
         return wrapper
     return decorator
-
-
-type ModelState = list[NDArray] | dict[str, torch.Tensor]
-type ConfigDict = dict[
-    str, str | bool | int | float | bytes | list[str] | list[bool] | list[int]
-    | list[float] | list[bytes]]
-type MetricsDict = dict[str, int | float | list[int] | list[float]]
-
-
-class MLRuntime(Enum):
-    NUMPY = "numpy"
-    TORCH = "torch"
-
-
-@dataclass(frozen=True)
-class InitRequest:
-    client_id: int
-    config: ConfigDict | None
-
-    def create_response(
-            self,
-            statistics: dict[str, NDArray] | None) -> InitResponse:
-        return InitResponse(self.client_id, statistics)
-
-
-@dataclass(frozen=True)
-class InitResponse:
-    client_id: int
-    statistics: dict[str, NDArray] | None
-
-
-@dataclass(frozen=True)
-class TrainRequest:
-    client_id: int
-    model_state: ModelState
-    config: ConfigDict | None
-
-    def create_response(
-            self,
-            model_state: ModelState | None,
-            metrics: MetricsDict | None,
-            num_examples: int) -> TrainResponse:
-
-        return TrainResponse(self.client_id, model_state, metrics, num_examples)
-
-
-@dataclass(frozen=True)
-class TrainResponse:
-    client_id: int
-    model_state: ModelState | None
-    metrics: MetricsDict | None
-    num_examples: int

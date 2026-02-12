@@ -6,27 +6,20 @@ from flwr.common import (
     Message,
     Context,
     RecordDict,
-    ArrayRecord,
     MetricRecord,
-    Array,
     ConfigRecord,
 )
-from numpy.typing import NDArray
+from pandas import DataFrame
 
-from fedbench._flwr.common import from_array_record
-from fedbench.algorithms import load_factory as load_algorithm_factory
-from fedbench.algorithms.synthesizer import Synthesizer
-from fedbench.common import InitRequest, log, TrainRequest
+from fedbench._flwr.serde import from_flwr_message, to_flwr_message
+from fedbench.synthesizers import load_factory as load_algorithm_factory
+from fedbench.synthesizers.synthesizer import ClientComponent
 
 app = ClientApp()
 synthesizer_factory = None
 
 
-def to_array_record(statistics: dict[str, NDArray]) -> ArrayRecord:
-    return ArrayRecord({k: Array(ndarray) for k, ndarray in statistics.items()})
-
-
-def get_synthesizer(config: ConfigRecord | None = None) -> Synthesizer:
+def get_synthesizer(config: ConfigRecord | None = None) -> ClientComponent:
     global synthesizer_factory
 
     if synthesizer_factory is None:
@@ -46,18 +39,9 @@ def get_synthesizer(config: ConfigRecord | None = None) -> Synthesizer:
 def init(message: Message, context: Context) -> Message:
     config = message.content.config_records["config"]
     synthesizer = get_synthesizer(config)
-    response = synthesizer.initialize(
-        InitRequest(message.metadata.dst_node_id, None)
-    )
-    content = RecordDict()
-    if response.statistics is not None:
-        record = to_array_record(response.statistics)
-        content["init"] = record
-
-    return Message(
-        content=content,
-        reply_to=message
-    )
+    request = decode(message)
+    response = synthesizer.init(request)
+    return to_flwr_message(response, message_type="init", reply_to=message)
 
 @app.train()
 def train(message: Message, context: Context) -> Message:
@@ -67,31 +51,9 @@ def train(message: Message, context: Context) -> Message:
     # Get synthesizer weights / other relevant stuff
     # Convert to Flower Message and return it
     synthesizer = get_synthesizer()
-    arrays = message.content.array_records["arrays"]
-
-    request = TrainRequest(
-        client_id=message.metadata.dst_node_id,
-        model_state=from_array_record(arrays, synthesizer.ml_runtime),
-        config=None
-    )
-    response = synthesizer.train(request)
-
-    content = RecordDict()
-    # flwr requires "num-examples" to be presentFr
-    metrics = MetricRecord({"num-examples": response.num_examples})
-
-    if response.model_state is not None:
-        content["arrays"] = ArrayRecord(response.model_state)
-
-    if response.metrics is not None:
-        for k, v in response.metrics.items():
-            metrics[k] = v
-
-    content["metrics"] = metrics
-    return Message(
-        content=content,
-        reply_to=message
-    )
+    request = decode(message)
+    response = synthesizer.train(request, DataFrame())
+    return to_flwr_message(response, message_type="train", reply_to=message)
 
 
 @app.evaluate()

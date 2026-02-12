@@ -4,15 +4,15 @@ from collections.abc import Callable
 from dataclasses import dataclass
 from importlib.metadata import entry_points
 
-from fedbench.algorithms.algorithm import Algorithm
+from fedbench.synthesizers.synthesizer import ServerComponent
 
-# Registry for builtin algorithms. Manually maintained, and maps name
+# Registry for builtin synthesizers. Manually maintained, and maps name
 # to locator, in the interest of lazy imports.
 _builtins = {
     "fed_smoke": f"{__package__}.fed_smoke:FedSmoke",
 }
 
-# Let users develop their algorithms in independent packages
+# Let users develop their synthesizers in independent packages
 # without tinkering around inside the framework core. Note that plugins
 # are fully trusted code.
 _plugins = entry_points(group=__package__)
@@ -22,9 +22,9 @@ _plugins = entry_points(group=__package__)
 class AlgorithmFactory:
     name: str
     locator: str
-    factory: Callable[..., Algorithm]
+    factory: Callable[..., ServerComponent]
 
-    def __call__(self, *args, **kwargs) -> Algorithm:
+    def __call__(self, *args, **kwargs) -> ServerComponent:
         return self.factory(*args, **kwargs)
 
 

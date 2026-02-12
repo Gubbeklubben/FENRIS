@@ -5,16 +5,11 @@ from flwr.server import Grid
 from flwr.serverapp import ServerApp
 from flwr.serverapp.strategy import FedAvg
 
-from fedbench.algorithms import load_factory as load_algorithm_factory
-from fedbench.common import InitResponse, ConfigDict
-
-
-def to_init_response(message: Message) -> InitResponse:
-    record = message.content.array_records["init"]
-    return InitResponse(
-        client_id=message.metadata.src_node_id,
-        statistics={k: arr.numpy() for k, arr in record.items()},
-    )
+from fedbench.common import MessageContent
+from fedbench.synthesizers import (
+    load_factory as load_synthesizer_factory,
+    ServerComponent
+)
 
 
 # Capture commandline args in a closure as we can not easily
@@ -38,7 +33,7 @@ def make_server_app(
         # - Call strategy.start, inject config from either cmdline or elsewhere.
         # - ...
 
-        config: ConfigDict = {"algorithm-name": algorithm_name}
+        config: Extras = {"algorithm-name": algorithm_name}
         init_messages: list[Message] = []
 
         # Wait for clients to connect.
@@ -58,9 +53,9 @@ def make_server_app(
             ))
         replies = grid.send_and_receive(init_messages)
 
-        factory = load_algorithm_factory(algorithm_name)
+        factory = load_synthesizer_factory(algorithm_name)
         algorithm = factory()
-        init_model_state = algorithm.server_initialize(
+        init_model_state = algorithm.aggregate_init(
             to_init_response(msg) for msg in replies
         )
 
