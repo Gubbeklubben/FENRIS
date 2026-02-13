@@ -25,7 +25,7 @@ def _dumps(obj: Any, protocol: str) -> bytes:
         case _NonArrayProtocol.PICKLE:
             return pickle.dumps(obj)
         case _NonArrayProtocol.MSGPACK:
-            return msgpack.dumps(obj)
+            return cast(bytes, msgpack.dumps(obj))
         case _:
             raise ValueError(f"Unsupported protocol: {protocol}")
 

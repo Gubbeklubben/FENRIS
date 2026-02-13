@@ -60,7 +60,7 @@ class FedbenchStrategy:
             from_flwr(reply) for reply in replies
         )
 
-    def evaluate(self, grid: Grid):
+    def evaluate(self, grid: Grid):  # type: ignore[no-untyped-def]
         pass
 
     def start(

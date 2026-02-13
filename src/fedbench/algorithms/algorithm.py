@@ -11,7 +11,8 @@ class Aggregator(ABC):
 
     An instance lives for one entire simulation.
     """
-    def __repr__(self):
+
+    def __repr__(self) -> str:
         return f"<{self.__class__.__name__}>"
 
     @property
@@ -42,7 +43,7 @@ class Synthesizer(ABC):
 
     Instances live and die inside one training or evaluation round.
     """
-    def __repr__(self):
+    def __repr__(self) -> str:
         return f"<{self.__class__.__name__}>"
 
     @property

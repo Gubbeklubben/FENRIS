@@ -86,6 +86,6 @@ def _load_plugin(name: str) -> RegisteredAlgorithm | None:
 
 def _is_valid_locator(locator: str) -> bool:
     module, _, attr = locator.partition(":")
-    def valid(s):
+    def valid(s: str) -> bool:
         return s.isidentifier() and not keyword.iskeyword(s)
     return all(valid(m) for m in module.split(".")) and valid(attr)
