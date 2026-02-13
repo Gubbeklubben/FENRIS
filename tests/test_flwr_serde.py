@@ -6,21 +6,21 @@ import pytest
 from flwr.common import Message, RecordDict, ArrayRecord
 
 # noinspection PyProtectedMember
-from fedbench._flwr.serde import to_flwr_message, from_flwr_message
-from fedbench.common import MessageContent
+from fedbench._flwr.serde import to_flwr, from_flwr
+from fedbench.common import Update
 
 _RNG = np.random.default_rng(42)
 
 
 def test_to_flwr_empty():
-    msg_content = MessageContent()
-    flwr_message = to_flwr_message(
-        msg_content,
+    update = Update()
+    flwr_message = to_flwr(
+        update,
         message_type="train",
         dst_node_id=1
     )
-    assert not flwr_message.content, ("Empty MessageContent -> non-empty flwr "
-                                      "Message")
+    assert update.is_empty()
+    assert not flwr_message.content, "Empty Update -> non-empty flwr Message"
 
 
 def test_from_flwr_empty():
@@ -29,9 +29,9 @@ def test_from_flwr_empty():
         dst_node_id=1,
         content=RecordDict()
     )
-    msg_content = from_flwr_message(flwr_message)
-    assert msg_content.is_empty(), ("Empty flwr Message -> non-empty "
-                                    "MessageContent")
+    update = from_flwr(flwr_message)
+    assert not flwr_message.content
+    assert update.is_empty(), "Empty flwr Message -> non-empty Update"
 
 
 @pytest.fixture
@@ -42,11 +42,11 @@ def make_random_ndarrays() -> Callable[[], list[np.ndarray]]:
 
 
 def test_to_flwr_single_array_group(make_random_ndarrays) -> None:
-    msg_content = MessageContent()
+    update = Update()
     orig = make_random_ndarrays()
-    msg_content.add_arrays("test-arrays", orig)
-    flwr_message = to_flwr_message(
-        msg_content,
+    update.arrays["test-arrays"] = orig
+    flwr_message = to_flwr(
+        update,
         message_type="train",
         dst_node_id=1
     )
@@ -62,20 +62,20 @@ def test_from_flwr_single_array_group(make_random_ndarrays) -> None:
         dst_node_id=1,
         content=RecordDict({"test-arrays": ArrayRecord(orig)})
     )
-    msg_content = from_flwr_message(flwr_message)
-    retrieved = msg_content.arrays["test-arrays"]
+    update = from_flwr(flwr_message)
+    retrieved = update.arrays["test-arrays"]
     for idx, arr in enumerate(orig):
         assert np.array_equal(arr, retrieved[idx]), "Arrays not equal"
 
 
 def test_to_flwr_multiple_array_groups(make_random_ndarrays) -> None:
-    msg_content = MessageContent()
+    update = Update()
     orig1 = make_random_ndarrays()
     orig2 = make_random_ndarrays()
-    msg_content.add_arrays("test-arrays1", orig1)
-    msg_content.add_arrays("test-arrays2", orig2)
-    flwr_message = to_flwr_message(
-        msg_content,
+    update.arrays["test-arrays1"] = orig1
+    update.arrays["test-arrays2"] = orig2
+    flwr_message = to_flwr(
+        update,
         message_type="train",
         dst_node_id=1
     )
@@ -100,9 +100,9 @@ def test_from_flwr_multiple_array_groups(make_random_ndarrays) -> None:
             "test-arrays2": ArrayRecord(orig2),
         })
     )
-    msg_content = from_flwr_message(flwr_message)
-    retrieved1 = msg_content.arrays["test-arrays1"]
-    retrieved2 = msg_content.arrays["test-arrays2"]
+    update = from_flwr(flwr_message)
+    retrieved1 = update.arrays["test-arrays1"]
+    retrieved2 = update.arrays["test-arrays2"]
 
     for idx, arr in enumerate(orig1):
         assert np.array_equal(arr, retrieved1[idx]), "Arrays not equal"
@@ -122,17 +122,17 @@ class PickleMe:
 
 
 def test_single_object_pickle():
-    msg_content = MessageContent()
+    update = Update()
     orig = PickleMe("Some Name")
-    msg_content.add_objects("test-objects", {"pickle-me": orig})
-    flwr_message = to_flwr_message(
-        msg_content,
+    update.objects["test-objects"] = {"pickle-me": orig}
+    flwr_message = to_flwr(
+        update,
         message_type="train",
         dst_node_id=1,
         non_array_protocol="pickle",
         allow_pickle=True
     )
-    decoded_content = from_flwr_message(
+    decoded_content = from_flwr(
         flwr_message,
         allow_pickle=True
     )
@@ -144,26 +144,26 @@ def test_single_object_pickle():
 
 
 def test_metrics_single_group_all_types():
-    msg_content = MessageContent()
+    update = Update()
     metrics = {
         "int": 1,
         "float": 1.1,
         "list[int]": [1, 2, 3],
         "list[float]": [1.1, 2.2, 3.3],
     }
-    msg_content.add_metrics("test-metrics", metrics)
-    flwr_message = to_flwr_message(
-        msg_content,
+    update.metrics["test-metrics"] = metrics
+    flwr_message = to_flwr(
+        update,
         message_type="train",
         dst_node_id=1,
     )
-    decoded_content = from_flwr_message(flwr_message)
+    decoded_content = from_flwr(flwr_message)
     assert decoded_content.metrics["test-metrics"] == metrics
 
 
-def test_config_single_group_all_types():
-    msg_content = MessageContent()
-    config = {
+def test_extras_single_group_all_types():
+    update = Update()
+    extras = {
         "int": 1,
         "float": 1.1,
         "list[int]": [1, 2, 3],
@@ -175,13 +175,13 @@ def test_config_single_group_all_types():
         "str": "Hello!",
         "list[str]": ["1", "2", "3"],
     }
-    msg_content.add_config("test-config", config)
-    flwr_message = to_flwr_message(
-        msg_content,
+    update.extras["test-extras"] = extras
+    flwr_message = to_flwr(
+        update,
         message_type="train",
         dst_node_id=1,
     )
-    decoded_content = from_flwr_message(flwr_message)
-    assert decoded_content.config["test-config"] == config
+    decoded_content = from_flwr(flwr_message)
+    assert decoded_content.extras["test-extras"] == extras
 
 

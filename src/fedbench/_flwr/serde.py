@@ -12,7 +12,7 @@ from flwr.common import (
     RecordDict
 )
 
-from fedbench.common import MessageContent
+from fedbench.common import Update, Objects
 
 
 class _NonArrayProtocol(StrEnum):
@@ -40,15 +40,14 @@ def _loads(data: bytes, protocol: str) -> Any:
             raise ValueError(f"Unsupported protocol: {protocol}")
 
 
-def _objects_to_arrays(
-        objects: dict[str, Any],
+def objects_to_arrays(
+        objects: Objects,
         protocol: str,
         allow_pickle: bool) -> dict[str, Array]:
 
-    if protocol == "pickle" and not allow_pickle:
-        raise RuntimeError(
-            f"'allow_pickle' is False, refusing to pickle {objects}"
-        )
+    if protocol == _NonArrayProtocol.PICKLE and not allow_pickle:
+        raise RuntimeError(f"allow_pickle is False, refusing to"
+                           f"pickle {objects}")
     arrays = {}
     for key, value in objects.items():
         data = _dumps(value, protocol)
@@ -62,13 +61,13 @@ def _objects_to_arrays(
     return arrays
 
 
-def _arrays_to_objects(
+def arrays_to_objects(
         arrays: ArrayRecord,
         protocol: str,
-        allow_pickle: bool) -> dict[str, Any]:
+        allow_pickle: bool) -> Objects:
 
-    if protocol == "pickle" and not allow_pickle:
-        raise RuntimeError("'allow_pickle' is False, refusing to unpickle data")
+    if protocol == _NonArrayProtocol.PICKLE and not allow_pickle:
+        raise RuntimeError("allow_pickle is False, refusing to unpickle data")
 
     objects = {}
     for key, value in arrays.items():
@@ -76,8 +75,8 @@ def _arrays_to_objects(
     return objects
 
 
-def to_flwr_message(
-        msg_content: MessageContent,
+def to_flwr(
+        update: Update,
         message_type: str | None = None,
         dst_node_id: int = None,
         reply_to: Message = None,
@@ -89,36 +88,37 @@ def to_flwr_message(
             raise ValueError("Either dst_node_id or reply_to is required")
 
         if message_type is None:
-            raise ValueError("message_type required when reply_to is None'")
+            raise ValueError("message_type required when reply_to is None")
+
+    if update.objects and not non_array_protocol:
+        raise ValueError("non_array_protocol required to send non array objects")
 
     rdict = RecordDict()
     na_records = []
 
-    for key, arrays in msg_content.arrays.items():
+    for key, arrays in update.arrays.items():
         rdict[key] = ArrayRecord(arrays)
 
-    for key, objects in msg_content.objects.items():
-        if non_array_protocol is None:
-            raise ValueError(
-                "non_array_protocol is required when sending non array "
-                "objects"
-            )
+    for key, objects in update.objects.items():
         rdict[key] = ArrayRecord(
-            _objects_to_arrays(objects, non_array_protocol, allow_pickle)
+            objects_to_arrays(
+                objects,
+                non_array_protocol,
+                allow_pickle)
         )
         na_records.append(key)
+
+    for key, metrics in update.metrics.items():
+        rdict[key] = MetricRecord(metrics)
+
+    for key, extras in update.extras.items():
+        rdict[key] = ConfigRecord(extras)
 
     if na_records:
         rdict[f"{__package__}.metadata"] = ConfigRecord({
             "na-proto": non_array_protocol,
             "na-records": na_records,
         })
-
-    for key, metrics in msg_content.metrics.items():
-        rdict[key] = MetricRecord(metrics)
-
-    for key, config in msg_content.config.items():
-        rdict[key] = ConfigRecord(config)
 
     if reply_to is not None:
         return Message(content=rdict, reply_to=reply_to)
@@ -130,10 +130,10 @@ def to_flwr_message(
     )
 
 
-def from_flwr_message(
+def from_flwr(
         message: Message,
         arrays_decode_spec: dict[str, str] = None,
-        allow_pickle: bool = False) -> MessageContent:
+        allow_pickle: bool = False) -> Update:
 
     def get_arrays_decode_spec(k: str) -> str:
         if arrays_decode_spec is None:
@@ -141,36 +141,34 @@ def from_flwr_message(
         return arrays_decode_spec.get(k, "numpy")
 
     rdict = message.content
-    msg_content = MessageContent()
+    update = Update()
+    metadata = rdict.config_records.get(f"{__package__}.metadata", {})
+    na_proto = metadata.get("na-proto", None)
+    na_records = metadata.get("na-records", ())
 
-    try:
-        metadata = rdict.config_records[f"{__package__}.metadata"]
-    except KeyError:
-        na_proto = None
-        na_records = []
-    else:
-        na_proto = metadata["na-proto"]
-        na_records = metadata["na-records"]
+    if na_records and na_proto is None:
+        raise RuntimeError(f"Message contains non array records, but no"
+                           f"corresponding protocol")
 
     for key, arrays in rdict.array_records.items():
         if key in na_records:
-            objects = _arrays_to_objects(
+            objects = arrays_to_objects(
                 arrays,
                 na_proto,
                 allow_pickle
             )
-            msg_content.add_objects(key, objects)
+            update.objects[key] = objects
         else:
             decode_spec = get_arrays_decode_spec(key)
             if decode_spec == "torch":
-                msg_content.add_arrays(key, arrays.to_torch_state_dict())
+                update.arrays[key] = arrays.to_torch_state_dict()
             else:
-                msg_content.add_arrays(key, arrays.to_numpy_ndarrays())
+                update.arrays[key] = arrays.to_numpy_ndarrays()
 
     for key, metrics in rdict.metric_records.items():
-        msg_content.add_metrics(key, dict(metrics))
+        update.metrics[key] = dict(metrics)
 
-    for key, config in rdict.config_records.items():
-        msg_content.add_config(key, dict(config))
+    for key, extras in rdict.config_records.items():
+        update.extras[key] = dict(extras)
 
-    return msg_content
+    return update

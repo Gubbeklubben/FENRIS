@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from logging import DEBUG, INFO
 from typing import TYPE_CHECKING, Any
 
@@ -12,60 +12,25 @@ if TYPE_CHECKING:
     import torch
 
 
-type Arrays = list[NDArray] | dict[str, torch.Tensor]
-type MetricDict = dict[str, int | float | list[int] | list[float]]
-type ConfigDict = dict[str, str | bool | int | float | bytes
-    | list[str] | list[bool] | list[int] | list[float] | list[bytes]]
+type Arrays  = list[NDArray] | dict[str, torch.Tensor]
+type Objects = dict[str, Any]
+type Metrics = dict[str, int | float | list[int] | list[float]]
+type Extras  = dict[str, str | bool | int | float | bytes
+               | list[str] | list[bool] | list[int] | list[float] | list[bytes]]
 
 
-class MessageContent:
-    def __init__(self) -> None:
-        self._arrays = {}
-        self._objects = {}
-        self._metrics = {}
-        self._config = {}
+@dataclass(frozen=True)  # Can not replace top level dicts once created
+class Update:
+    arrays: dict[str, Arrays] = field(default_factory=dict)
+    objects: dict[str, Objects] = field(default_factory=dict)
+    metrics: dict[str, Metrics] = field(default_factory=dict)
+    extras: dict[str, Extras] = field(default_factory=dict)
 
-    @property
-    def arrays(self) -> dict[str, Arrays]:
-        return self._arrays
-
-    @property
-    def objects(self) -> dict[str, Any]:
-        return self._objects
-
-    @property
-    def metrics(self) -> dict[str, MetricDict]:
-        return self._metrics
-
-    @property
-    def config(self) -> dict[str, ConfigDict]:
-        return self._config
-
-    def is_empty(self):
-        return (not self._arrays
-                and not self._objects
-                and not self._metrics
-                and not self._config)
-
-    def add_arrays(self, key: str, arrays: Arrays) -> None:
-        if key in self._arrays:
-            raise ValueError(f"Arrays with key '{key}' already exist.")
-        self._arrays[key] = arrays
-
-    def add_objects(self, key: str, objects: dict[str, Any]) -> None:
-        if key in self._objects:
-            raise ValueError(f"Objects with key '{key}' already exist.")
-        self._objects[key] = objects
-
-    def add_metrics(self, key: str, metrics: MetricDict) -> None:
-        if key in self._metrics:
-            raise ValueError(f"Metrics with key '{key}' already exist.")
-        self._metrics[key] = metrics
-
-    def add_config(self, key: str, config: ConfigDict) -> None:
-        if key in self._config:
-            raise ValueError(f"Config with key '{key}' already exist.")
-        self._config[key] = config
+    def is_empty(self) -> bool:
+        return (not self.arrays
+                and not self.objects
+                and not self.metrics
+                and not self.extras)
 
 
 _BOX_DRAWING = "\u251c\u2500\u2500"
