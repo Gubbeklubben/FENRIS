@@ -1,58 +1,56 @@
 import importlib
 import keyword
-from collections.abc import Callable
+from collections.abc import Callable, Iterable
 from dataclasses import dataclass
 from importlib.metadata import entry_points
 
-from fedbench.synthesizers.synthesizer import ServerComponent
+from fedbench.algorithms.algorithm import (
+    Algorithm,
+    Aggregator,
+    Synthesizer,
+)
 
-# Registry for builtin synthesizers. Manually maintained, and maps name
+# Registry for builtin algorithms. Manually maintained, and maps name
 # to locator, in the interest of lazy imports.
 _builtins = {
     "fed_smoke": f"{__package__}.fed_smoke:FedSmoke",
 }
 
-# Let users develop their synthesizers in independent packages
+# Let users develop their algorithms in independent packages
 # without tinkering around inside the framework core. Note that plugins
 # are fully trusted code.
 _plugins = entry_points(group=__package__)
 
 
 @dataclass(frozen=True)
-class AlgorithmFactory:
+class RegisteredAlgorithm:
     name: str
     locator: str
-    factory: Callable[..., ServerComponent]
-
-    def __call__(self, *args, **kwargs) -> ServerComponent:
-        return self.factory(*args, **kwargs)
+    cls: type[Algorithm]
 
 
-def builtins():
+def builtins() -> Iterable[tuple[str, str]]:
     yield from _builtins.items()
 
 
-def plugins():
+def plugins() -> Iterable[tuple[str, str]]:
     for e in _plugins:
         yield e.name, e.value
 
 
-def load_factory(name: str) -> AlgorithmFactory:
-    factory = _load_builtin(name)
+def load_algorithm(name: str) -> RegisteredAlgorithm:
+    registered_alg = _load_builtin(name)
 
-    if factory is None:
-        factory = _load_plugin(name)
+    if registered_alg is None:
+        registered_alg = _load_plugin(name)
 
-    if factory is None:
+    if registered_alg is None:
         raise ValueError(f"No such algorithm '{name}'")
 
-    if not callable(factory.factory):
-        raise TypeError(f"'{factory.locator}' is not callable")
-
-    return factory
+    return registered_alg
 
 
-def _load_builtin(name: str) -> AlgorithmFactory | None:
+def _load_builtin(name: str) -> RegisteredAlgorithm | None:
     try:
         locator = _builtins[name]
     except KeyError:
@@ -68,19 +66,19 @@ def _load_builtin(name: str) -> AlgorithmFactory | None:
         raise ValueError(
             f"Bad locator '{locator}' in builtin algorithm registry")
 
-    return AlgorithmFactory(
+    return RegisteredAlgorithm(
         name,
         locator,
         getattr(module, attr))
 
 
-def _load_plugin(name: str) -> AlgorithmFactory | None:
+def _load_plugin(name: str) -> RegisteredAlgorithm | None:
     try:
         entry_point = _plugins[name]
     except KeyError:
         return None
 
-    return AlgorithmFactory(
+    return RegisteredAlgorithm(
         name,
         entry_point.value,
         entry_point.load())

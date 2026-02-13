@@ -1,9 +1,15 @@
-import fedbench.synthesizers as synthesizers
-from fedbench.synthesizers.synthesizer import Synthesizer
+from fedbench.algorithms import Algorithm, builtins, load_algorithm, \
+    Synthesizer, Aggregator
 
 
-def test_builtins_produce_synthesizers() -> None:
-    for name, _ in synthesizers.builtins():
-        factory = synthesizers.load_factory(name)
-        instance = factory()
-        assert isinstance(instance, Synthesizer), "Not a Synthesizer instance"
+def test_builtin_factories() -> None:
+    for name, _ in builtins():
+        algorithm_meta = load_algorithm(name)
+        algorithm = algorithm_meta.cls
+        assert issubclass(algorithm, Algorithm)
+
+        synthesizer = algorithm.synthesizer_factory()
+        assert isinstance(synthesizer, Synthesizer)
+
+        aggregator = algorithm.aggregator_factory()
+        assert isinstance(aggregator, Aggregator)

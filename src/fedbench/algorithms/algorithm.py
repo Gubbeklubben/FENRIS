@@ -1,14 +1,13 @@
 from abc import ABC, abstractmethod
 from collections.abc import Iterable
-from typing import Any
 
 from pandas import DataFrame
 
-from fedbench.common import Arrays, MessageContent
+from fedbench.common import Update
 
 
-class ServerComponent(ABC):
-    """Server side synthesizer component.
+class Aggregator(ABC):
+    """Server side algorithm component.
 
     An instance lives for one entire simulation.
     """
@@ -22,26 +21,24 @@ class ServerComponent(ABC):
     # noinspection PyMethodMayBeStatic,PyUnusedLocal
     def configure_init(
             self,
-            client_ids: Iterable[int]) -> Iterable[MessageContent]:
+            client_ids: Iterable[int]) -> Iterable[tuple[int, Update]]:
         return ()
 
-    # noinspection PyMethodMayBeStatic,PyUnusedLocal
+    @abstractmethod
     def aggregate_init(
             self,
-            replies: Iterable[MessageContent]
-    ) -> tuple[Arrays | None, dict[str, Any] | None]:
-        return None, None
+            replies: Iterable[Update]) -> Update:
+        pass
 
     @abstractmethod
     def aggregate_train(
             self,
-            replies: Iterable[MessageContent]
-    ) -> tuple[Arrays | None, dict[str, Any] | None]:
+            replies: Iterable[Update]) -> Update:
         pass
 
 
-class ClientComponent(ABC):
-    """Client side synthesizer component.
+class Synthesizer(ABC):
+    """Client side algorithm component.
 
     Instances live and die inside one training or evaluation round.
     """
@@ -53,35 +50,37 @@ class ClientComponent(ABC):
         return None
 
     # noinspection PyMethodMayBeStatic,PyUnusedLocal
-    def init(self, request: MessageContent) -> MessageContent:
-        return MessageContent()
+    def init(self, request: Update) -> Update:
+        return Update()
 
     @abstractmethod
     def train(
             self,
-            request: MessageContent,
-            data: DataFrame) -> MessageContent:
+            request: Update,
+            data: DataFrame) -> Update:
         pass
 
     @abstractmethod
     def sample(
             self,
-            request: MessageContent,
+            request: Update,
             num_rows: int,
             seed: int) -> DataFrame:
         pass
 
 
-class Synthesizer(ABC):
-    @property
-    def non_array_protocols(self) -> tuple[str, ...]:
-        return ()
+class Algorithm(ABC):
+    # TODO! Should be allowed to return a collection of acceptable choices
+    @staticmethod
+    def requires_non_array_protocol() -> str | None:
+        return None
 
-    @property
+    @staticmethod
     @abstractmethod
-    def server_factory(self) -> ServerComponent:
+    def aggregator_factory() -> Aggregator:
         pass
 
+    @staticmethod
     @abstractmethod
-    def client_factory(self) -> ClientComponent:
+    def synthesizer_factory() -> Synthesizer:
         pass

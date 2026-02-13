@@ -1,15 +1,9 @@
-import time
-
-from flwr.common import Context, Message, RecordDict, ConfigRecord, ArrayRecord
+from flwr.common import Message, Context, RecordDict
 from flwr.server import Grid
 from flwr.serverapp import ServerApp
-from flwr.serverapp.strategy import FedAvg
 
-from fedbench.common import MessageContent
-from fedbench.synthesizers import (
-    load_factory as load_synthesizer_factory,
-    ServerComponent
-)
+from fedbench._flwr.strategy import FedbenchStrategy
+from fedbench.algorithms import load_algorithm
 
 
 # Capture commandline args in a closure as we can not easily
@@ -33,36 +27,8 @@ def make_server_app(
         # - Call strategy.start, inject config from either cmdline or elsewhere.
         # - ...
 
-        config: Extras = {"algorithm-name": algorithm_name}
-        init_messages: list[Message] = []
+        algorithm = load_algorithm(algorithm_name)
+        strategy = FedbenchStrategy(algorithm)
+        strategy.start(grid, num_clients)
 
-        # Wait for clients to connect.
-        # Approach ripped from: https://github.com/adap/flower/blob/main/examples/federated-kaplan-meier-fitter/examplefkm/server_app.py
-        client_ids = list(grid.get_node_ids())
-        while len(client_ids) < num_clients:
-            time.sleep(1)
-            client_ids = list(grid.get_node_ids())
-
-        # Initialization
-        for client_id in client_ids:
-            init_messages.append(
-                Message(
-                dst_node_id=client_id,
-                message_type="query.init",  # routed to client_app.query("init")
-                content=RecordDict({"config": ConfigRecord(config)}),
-            ))
-        replies = grid.send_and_receive(init_messages)
-
-        factory = load_synthesizer_factory(algorithm_name)
-        algorithm = factory()
-        init_model_state = algorithm.aggregate_init(
-            to_init_response(msg) for msg in replies
-        )
-
-        # Start federation loop
-        strategy = FedAvg()
-        strategy.start(
-            grid=grid,
-            initial_arrays=ArrayRecord(init_model_state),
-        )
     return app

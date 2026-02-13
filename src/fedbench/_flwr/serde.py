@@ -1,6 +1,6 @@
 import pickle
 from enum import StrEnum
-from typing import Any
+from typing import Any, cast
 
 import msgpack
 from flwr.common import (
@@ -78,10 +78,10 @@ def arrays_to_objects(
 def to_flwr(
         update: Update,
         message_type: str | None = None,
-        dst_node_id: int = None,
-        reply_to: Message = None,
+        dst_node_id: int | None = None,
+        reply_to: Message | None = None,
         non_array_protocol: str | None = None,
-        allow_pickle: bool = False) -> Message:
+        allow_pickle: bool = True) -> Message:
 
     if reply_to is None:
         if dst_node_id is None:
@@ -90,7 +90,7 @@ def to_flwr(
         if message_type is None:
             raise ValueError("message_type required when reply_to is None")
 
-    if update.objects and not non_array_protocol:
+    if update.objects and non_array_protocol is None:
         raise ValueError("non_array_protocol required to send non array objects")
 
     rdict = RecordDict()
@@ -100,10 +100,11 @@ def to_flwr(
         rdict[key] = ArrayRecord(arrays)
 
     for key, objects in update.objects.items():
+        # noinspection PyUnnecessaryCast
         rdict[key] = ArrayRecord(
             objects_to_arrays(
                 objects,
-                non_array_protocol,
+                cast(str, non_array_protocol),
                 allow_pickle)
         )
         na_records.append(key)
@@ -115,25 +116,27 @@ def to_flwr(
         rdict[key] = ConfigRecord(extras)
 
     if na_records:
+        # noinspection PyUnnecessaryCast
         rdict[f"{__package__}.metadata"] = ConfigRecord({
-            "na-proto": non_array_protocol,
+            "na-proto": cast(str, non_array_protocol),
             "na-records": na_records,
         })
 
     if reply_to is not None:
         return Message(content=rdict, reply_to=reply_to)
 
+    # noinspection PyUnnecessaryCast
     return Message(
-        message_type=message_type,
-        dst_node_id=dst_node_id,
         content=rdict,
+        message_type=cast(str, message_type),
+        dst_node_id=cast(int, dst_node_id)
     )
 
 
 def from_flwr(
         message: Message,
-        arrays_decode_spec: dict[str, str] = None,
-        allow_pickle: bool = False) -> Update:
+        arrays_decode_spec: dict[str, str] | None = None,
+        allow_pickle: bool = True) -> Update:
 
     def get_arrays_decode_spec(k: str) -> str:
         if arrays_decode_spec is None:
@@ -142,9 +145,12 @@ def from_flwr(
 
     rdict = message.content
     update = Update()
-    metadata = rdict.config_records.get(f"{__package__}.metadata", {})
+    metadata = rdict.config_records.get(
+        f"{__package__}.metadata", ConfigRecord()
+    )
     na_proto = metadata.get("na-proto", None)
-    na_records = metadata.get("na-records", ())
+    # noinspection PyUnnecessaryCast
+    na_records = cast(list[str], metadata.get("na-records", []))
 
     if na_records and na_proto is None:
         raise RuntimeError(f"Message contains non array records, but no"
@@ -152,9 +158,10 @@ def from_flwr(
 
     for key, arrays in rdict.array_records.items():
         if key in na_records:
+            # noinspection PyUnnecessaryCast
             objects = arrays_to_objects(
                 arrays,
-                na_proto,
+                cast(str, na_proto),
                 allow_pickle
             )
             update.objects[key] = objects
