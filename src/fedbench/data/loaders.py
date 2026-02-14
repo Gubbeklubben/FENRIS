@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import pandas as pd
 from pandas import DataFrame
-from typing import Tuple
+from typing import Tuple, Literal
 from pathlib import Path
 
 from .schemas import TableSchema, ColumnSchema
@@ -15,7 +15,7 @@ def load_csv(
     file_path: str | Path,
     *,
     header: bool = True,
-    custom_encodings: dict[str, str] | None = None,
+    custom_encodings: dict[str, Literal["float", "int", "object"]] | None = None,
 ) -> Tuple[DataFrame, TableSchema]:
     """
     Load a CSV file into a DataFrame and return a stabile TableSchema.
@@ -43,7 +43,8 @@ def load_csv(
         for col, dtype in custom_encodings.items():
             if col in df.columns:
                 try:
-                    df[col] = df[col].astype(dtype) # type: ignore[arg-type]
+                    # noinspection PyTypeChecker
+                    df[col] = df[col].astype(dtype)
                 except Exception as exc:
                     raise ValueError(
                         f"Failed to cast column '{col}' to dtype '{dtype}': {exc}"

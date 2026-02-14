@@ -12,7 +12,9 @@ dependencies = [
     "typer (>=0.12.5,<0.21.0)",
     "numpy (>=2.4.2,<3.0.0)",
     "pandas (>=3.0.0,<4.0.0)",
-    "pandas-stubs (>=3.0.0,<3.1.0)"
+    "pandas-stubs (>=3.0.0,<3.1.0)",
+    "flwr-datasets (>=0.6.0,<0.7.0)",
+    "datasets (>=4.5.0,<5.0.0)"
 ]
 
 [build-system]
