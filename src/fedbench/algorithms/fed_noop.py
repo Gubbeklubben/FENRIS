@@ -15,17 +15,17 @@ _bullshit_state = {
 }
 
 
-class FedSmoke(Algorithm):
-    @staticmethod
-    def requires_non_array_protocol() -> str | None:
+class FedNoop(Algorithm):
+    @classmethod
+    def requires_non_array_protocol(cls) -> str | None:
         return "pickle"
 
-    @staticmethod
-    def aggregator_factory() -> Aggregator:
+    @classmethod
+    def create_aggregator(cls) -> Aggregator:
         return FedSmokeAggregator()
 
-    @staticmethod
-    def synthesizer_factory() -> Synthesizer:
+    @classmethod
+    def create_synthesizer(cls) -> Synthesizer:
         return FedSmokeSynthesizer()
 
 

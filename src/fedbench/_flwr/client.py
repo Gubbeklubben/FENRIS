@@ -10,7 +10,7 @@ from flwr.common import (
 from pandas import DataFrame
 
 from fedbench._flwr.serde import from_flwr, to_flwr
-from fedbench.algorithms import load_algorithm
+from fedbench.algorithms import registry as alg_registry
 from fedbench.algorithms.algorithm import Synthesizer
 
 app = ClientApp()
@@ -27,9 +27,9 @@ def create_synthesizer(config: ConfigRecord | None = None) -> Synthesizer:
 
         # noinspection PyUnnecessaryCast
         name: str = cast(str, config["algorithm-name"])
-        algorithm = load_algorithm(name)
-        synthesizer_factory = algorithm.cls.synthesizer_factory
-        na_protocol = algorithm.cls.requires_non_array_protocol()
+        algorithm = alg_registry.load(name)
+        synthesizer_factory = algorithm.create_synthesizer
+        na_protocol = algorithm.requires_non_array_protocol()
 
     return synthesizer_factory()
 

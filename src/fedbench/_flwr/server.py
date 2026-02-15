@@ -3,7 +3,7 @@ from flwr.server import Grid
 from flwr.serverapp import ServerApp
 
 from fedbench._flwr.strategy import FedbenchStrategy
-from fedbench.algorithms import load_algorithm
+from fedbench.algorithms import registry as alg_registry
 
 
 # Capture commandline args in a closure as we can not easily
@@ -27,8 +27,8 @@ def make_server_app(
         # - Call strategy.start, inject config from either cmdline or elsewhere.
         # - ...
 
-        algorithm = load_algorithm(algorithm_name)
-        strategy = FedbenchStrategy(algorithm)
+        algorithm = alg_registry.load(algorithm_name)
+        strategy = FedbenchStrategy(algorithm, algorithm_name)
         strategy.start(grid, num_clients)
 
     return app

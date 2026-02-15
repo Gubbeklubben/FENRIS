@@ -1,0 +1,15 @@
+from dataclasses import dataclass, field
+from pathlib import Path
+
+
+@dataclass(frozen=True)
+class Config:
+    algorithm_name: str
+    dataset: Path
+    outputdir: Path
+    num_clients: int = 3
+    num_rounds: int = 3
+    seed: int = 1337
+    num_synthetic_rows: int | None = None
+    target_col: str | None = None
+    sensitive_cols: tuple[str, ...] = field(default_factory=tuple)

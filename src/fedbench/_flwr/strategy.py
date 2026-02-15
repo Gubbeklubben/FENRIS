@@ -7,15 +7,16 @@ from flwr.common import MetricRecord, ArrayRecord, ConfigRecord, Message
 from flwr.server import Grid
 
 from fedbench._flwr.serde import from_flwr, to_flwr
-from fedbench.algorithms import RegisteredAlgorithm
+from fedbench.algorithms import Algorithm
 from fedbench.common import log, Update
 
 
 class FedbenchStrategy:
-    def __init__(self, algorithm: RegisteredAlgorithm) -> None:
+    def __init__(self, algorithm: type[Algorithm], algorithm_name: str) -> None:
         self._algorithm = algorithm
-        self._na_protocol = algorithm.cls.requires_non_array_protocol()
-        self._synth_aggregator = algorithm.cls.aggregator_factory()
+        self._algorithm_name = algorithm_name
+        self._na_protocol = algorithm.requires_non_array_protocol()
+        self._synth_aggregator = algorithm.create_aggregator()
         self._prev_aggr_update: Update | None = None
 
     def init(self, grid: Grid, num_clients: int) -> Update:
@@ -98,7 +99,7 @@ class FedbenchStrategy:
     def _inject_config(self, messages: Iterable[Message]) -> Iterable[Message]:
         for message in messages:
             message.content["fedbench.config"] = ConfigRecord({
-                "algorithm-name": self._algorithm.name,
+                "algorithm-name": self._algorithm_name,
             })
             yield message
 

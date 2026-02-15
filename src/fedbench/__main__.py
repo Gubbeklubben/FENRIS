@@ -1,4 +1,3 @@
-import itertools
 from typing import Annotated
 
 import typer
@@ -8,7 +7,7 @@ from flwr.simulation import run_simulation
 from fedbench._flwr import client_app
 # noinspection PyProtectedMember
 from fedbench._flwr import make_server_app
-from fedbench.algorithms import builtins, plugins
+from fedbench.algorithms import registry as alg_registry
 
 app = typer.Typer()
 
@@ -27,9 +26,9 @@ def show_algorithms(
                 help="Show locators for the factories used to create "
                      "algorithm instances.")] = False) -> None:
 
-    for name, locator in itertools.chain(builtins(), plugins()):
-        print(name, end="")
-        print(f": {locator}" if include_locator else "")
+    for metadata in alg_registry:
+        print(metadata.name, end="")
+        print(f": {metadata.locator}" if include_locator else "")
 
 
 @app.command()

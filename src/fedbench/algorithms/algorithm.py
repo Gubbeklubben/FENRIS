@@ -72,16 +72,16 @@ class Synthesizer(ABC):
 
 class Algorithm(ABC):
     # TODO! Should be allowed to return a collection of acceptable choices
-    @staticmethod
-    def requires_non_array_protocol() -> str | None:
+    @classmethod
+    def requires_non_array_protocol(cls) -> str | None:
         return None
 
-    @staticmethod
+    @classmethod
     @abstractmethod
-    def aggregator_factory() -> Aggregator:
+    def create_aggregator(cls) -> Aggregator:
         pass
 
-    @staticmethod
+    @classmethod
     @abstractmethod
-    def synthesizer_factory() -> Synthesizer:
+    def create_synthesizer(cls) -> Synthesizer:
         pass
