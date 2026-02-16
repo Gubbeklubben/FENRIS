@@ -3,7 +3,7 @@ import keyword
 from collections.abc import Callable
 from dataclasses import dataclass
 from importlib.metadata import entry_points
-from typing import Iterator, Literal
+from typing import Any, Iterator, Literal, cast
 
 
 @dataclass(frozen=True)
@@ -14,9 +14,16 @@ class Metadata:
 
 
 class Registry[T]:
-    def __init__(self, group: str, validator: Callable[[T], T]) -> None:
+    def __init__(
+            self,
+            group: str,
+            validator: Callable[[T], T] | None = None) -> None:
+
+        def default_validator(value: T) -> T:
+            return value
+
         self._group = group
-        self._validator = validator
+        self._validator = validator or default_validator
         self._builtins: dict[str, str] = {}
         self._entry_points = entry_points(group=group)
 
@@ -53,15 +60,16 @@ class Registry[T]:
         except KeyError:
             return None
 
-        module_name, _, attr = locator.partition(":")
+        module_name, _, qualifier = locator.partition(":")
         module = importlib.import_module(module_name)
 
-        if not hasattr(module, attr):
-            raise ValueError(
-                f"Bad locator '{locator}' in builtin algorithm registry")
+        value: Any = module
+        for attr in qualifier.split("."):
+            if not hasattr(value, attr):
+                raise ValueError(f"Bad locator '{locator}' in {self}")
+            value = getattr(value, attr)
 
-        value = getattr(module, attr)
-        return self._validator(value)
+        return self._validator(cast(T, value))
 
     def _load_plugin(self, name: str) -> T | None:
         try:
@@ -74,7 +82,16 @@ class Registry[T]:
 
 
 def _is_valid_locator(locator: str) -> bool:
-    module, _, attr = locator.partition(":")
+    module, _, qualifier = locator.partition(":")
+
     def valid(s: str) -> bool:
         return s.isidentifier() and not keyword.iskeyword(s)
-    return all(valid(m) for m in module.split(".")) and valid(attr)
+
+    if not all(valid(m) for m in module.split(".")):
+        return False
+
+    if not all(valid(q) for q in qualifier.split(".")):
+        return False
+
+    return True
+

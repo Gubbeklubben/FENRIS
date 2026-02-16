@@ -1,22 +1,18 @@
-from __future__ import annotations
+from pathlib import Path
+from typing import Literal
 
 import pandas as pd
 from pandas import DataFrame
-from typing import Tuple, Literal
-from pathlib import Path
 
-from .schemas import TableSchema, ColumnSchema
-from .infer_schema import infer_schema
+from fedbench.data.schemas import TableSchema, infer_schema
 
-# --------------------------------------------------------------------------- #
-# Public API: load_csv
-# --------------------------------------------------------------------------- #
+
 def load_csv(
     file_path: str | Path,
     *,
     header: bool = True,
     custom_encodings: dict[str, Literal["float", "int", "object"]] | None = None,
-) -> Tuple[DataFrame, TableSchema]:
+) -> tuple[DataFrame, TableSchema]:
     """
     Load a CSV file into a DataFrame and return a stabile TableSchema.
 
