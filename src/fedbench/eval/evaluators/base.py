@@ -1,13 +1,10 @@
 import re
 from abc import ABC, abstractmethod
-from typing import Dict
 
-from ..context import EvalContext
+from fedbench.eval.context import EvalContext
 
 
 class Evaluator(ABC):
-    """Base class for all evaluators."""
-
     @abstractmethod
     @property
     def category(self):

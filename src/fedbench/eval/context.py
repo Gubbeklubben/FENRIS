@@ -1,6 +1,4 @@
-# fed_synth_bench/eval/context.py
 from dataclasses import dataclass
-from typing import Optional, Sequence
 import pandas as pd
 
 from fedbench.data.schemas import TableSchema
@@ -12,12 +10,11 @@ class EvalContext:
 
     # real data
     train_df: pd.DataFrame
-    test_df: Optional[pd.DataFrame]
+    test_df: pd.DataFrame | None
 
     # synthetic data
     synthetic_df: pd.DataFrame
 
-    # optional metadata
-    target_column: Optional[str] = None
-    sensitive_columns: Optional[Sequence[str]] = None
-    seed: int = 0
+    seed: int
+    target_column: str | None
+    sensitive_columns: tuple[str] | None = None
