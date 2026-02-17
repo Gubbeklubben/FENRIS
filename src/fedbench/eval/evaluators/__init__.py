@@ -31,6 +31,30 @@ _registries[Category.FIDELITY].add_builtin(
     "mean_abs_diff",
     f"{__package__}.fidelity:MeanAbsDiffEvaluator"
 )
+_registries[Category.FIDELITY].add_builtin(
+    "std_abs_diff",
+    f"{__package__}.fidelity:StdAbsDiffEvaluator"
+)
+_registries[Category.FIDELITY].add_builtin(
+    "categorical_tv_mean",
+    f"{__package__}.fidelity:CategoricalTvMeanEvaluator"
+)
+_registries[Category.FIDELITY].add_builtin(
+    "corr_fro_diff",
+    f"{__package__}.fidelity:CorrFroDiffEvaluator"
+)
+_registries[Category.FIDELITY].add_builtin(
+    "ks_mean",
+    f"{__package__}.fidelity:KsMeanEvaluator"
+)
+_registries[Category.FIDELITY].add_builtin(
+    "wasserstein_mean",
+    f"{__package__}.fidelity:WassersteinMeanEvaluator"
+)
+_registries[Category.FIDELITY].add_builtin(
+    "t_stat_mean_abs",
+    f"{__package__}.fidelity:TStatMeanAbsEvaluator"
+)
 
 registries: Mapping[str, Registry[type[Evaluator]]] = MappingProxyType(_registries)
 

@@ -1,3 +1,4 @@
+import pprint
 from logging import INFO
 from typing import cast
 
@@ -104,5 +105,5 @@ class FedbenchStrategy:
         log(
             self.__class__.__name__,
             ("Federation loop complete.",
-            str(self._per_client_metrics)),
+            pprint.pformat(self._per_client_metrics)),
             level=INFO)
