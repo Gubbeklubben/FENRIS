@@ -1,68 +1,53 @@
+from dataclasses import dataclass
 from typing import cast
 
 from flwr.clientapp import ClientApp
 from flwr.common import (
     Message,
     Context,
-    RecordDict, ConfigRecord, MetricRecord,
+    RecordDict,
+    ConfigRecord,
+    MetricRecord,
 )
-from pandas.core.interchange.dataframe_protocol import DataFrame
 
-from fedbench.flwr.serde import make_serde
-from fedbench.algorithms import (
-    Algorithm,
-    Synthesizer,
-    registry as algorithm_reg
-)
+from fedbench.algorithms import Algorithm, registry as algorithm_reg
 from fedbench.config import Config
-from fedbench.data import PartitionedDataset, load_csv, TableSchema
+from fedbench.data import PartitionedDataset, load_csv
 from fedbench.data.partitioners import registry as partitioner_reg
 from fedbench.eval.context import EvalContext
 from fedbench.eval.suite import EvaluationSuite
+from fedbench.flwr.serde import make_serde
+
 
 app = ClientApp()
 
-config: Config | None = None
-algorithm: type[Algorithm] | None = None
-dataset: PartitionedDataset | None = None
+
+@dataclass(frozen=True)
+class ClientContext:
+    config: Config
+    algorithm: type[Algorithm]
+    dataset: PartitionedDataset
+
+client_ctx: ClientContext | None = None
 
 
-def load_train_partition(context: Context) -> DataFrame:
-    if dataset is None:
-        raise RuntimeError(
-            "Can not load train partition when dataset is not loaded."
-        )
+def require_client_ctx() -> tuple[Config, type[Algorithm], PartitionedDataset]:
+    if client_ctx is None:
+        raise RuntimeError("Client not configured.")
+    return client_ctx.config, client_ctx.algorithm, client_ctx.dataset
+
+
+def get_partition_id(flwr_context: Context) -> int:
     # noinspection PyUnnecessaryCast
-    partition_id: int = cast(int, context.node_config["partition-id"])
-    return dataset.load_train_partition(partition_id)
-
-
-def load_test_partition(context: Context) -> DataFrame:
-    if dataset is None:
-        raise RuntimeError(
-            "Can not load test partition when dataset is not loaded."
-        )
-    # noinspection PyUnnecessaryCast
-    partition_id: int = cast(int, context.node_config["partition-id"])
-    return dataset.load_test_partition(partition_id)
-
-
-def create_synthesizer() -> Synthesizer:
-    if algorithm is None:
-        raise RuntimeError(
-            "Can not create synthesizer when algorithm is not loaded."
-        )
-    return algorithm.create_synthesizer()
+    return cast(int, flwr_context.node_config["partition-id"])
 
 
 @app.query("configure")
-def configure(message: Message, context: Context) -> Message:
-    global config
-    cfg_record: ConfigRecord = message.content.config_records["config"]
+def configure(flwr_message: Message, flwr_context: Context) -> Message:
+    cfg_record: ConfigRecord = flwr_message.content.config_records["config"]
     # noinspection PyUnnecessaryCast
     config = Config.parse_jsons(cast(str, cfg_record["jsons"]))
 
-    global dataset
     df, schema = load_csv(config.data.dataset)
     partitioner_factory = partitioner_reg.load(config.data.partitioner)
     partitioner = partitioner_factory(**config.data.partitioner_kwargs)
@@ -73,53 +58,64 @@ def configure(message: Message, context: Context) -> Message:
         test_size=config.test_size,
         seed=config.seed
     )
-    global algorithm
     algorithm = algorithm_reg.load(config.algorithm)
 
-    return Message(content=RecordDict(), reply_to=message)
+    global client_ctx
+    client_ctx = ClientContext(config, algorithm, dataset)
+
+    return Message(content=RecordDict(), reply_to=flwr_message)
 
 
 @app.query("init")
-def init(message: Message, context: Context) -> Message:
-    train_df = load_train_partition(context)
-    synthesizer = create_synthesizer()
-    # noinspection PyUnnecessaryCast
+def init(flwr_message: Message, flwr_context: Context) -> Message:
+    partition_id = get_partition_id(flwr_context)
+    config, algorithm, dataset = require_client_ctx()
+    train_df = dataset.load_train_partition(partition_id)
+
+    synthesizer = algorithm.create_synthesizer()
     serializer, deserializer = make_serde(
-        cast(Config, config).allow_pickle,
+        config.allow_pickle,
         synthesizer.arrays_to_ml_framework_map
     )
-    request = deserializer(message)
+    request = deserializer(flwr_message)
     reply = synthesizer.init(request, train_df)
-    return serializer(update=reply, reply_to=message)
+    return serializer(update=reply, reply_to=flwr_message)
 
 
 @app.train()
-def train(message: Message, context: Context) -> Message:
-    train_df = load_train_partition(context)
-    synthesizer = create_synthesizer()
-    # noinspection PyUnnecessaryCast
+def train(flwr_message: Message, flwr_context: Context) -> Message:
+    partition_id = get_partition_id(flwr_context)
+    config, algorithm, dataset = require_client_ctx()
+    train_df = dataset.load_train_partition(partition_id)
+
+    synthesizer = algorithm.create_synthesizer()
     serializer, deserializer = make_serde(
-        cast(Config, config).allow_pickle,
+        config.allow_pickle,
         synthesizer.arrays_to_ml_framework_map
     )
-    request = deserializer(message)
+    request = deserializer(flwr_message)
     reply = synthesizer.train(request, train_df)
-    return serializer(update=reply, reply_to=message)
+    return serializer(update=reply, reply_to=flwr_message)
 
 
 @app.evaluate()
-def evaluate(message: Message, context: Context) -> Message:
-    train_df = load_train_partition(context)
-    test_df = load_test_partition(context)
-    synthesizer = create_synthesizer()
-    # noinspection PyUnnecessaryCast
+def evaluate(flwr_message: Message, flwr_context: Context) -> Message:
+    partition_id = get_partition_id(flwr_context)
+    config, algorithm, dataset = require_client_ctx()
+    train_df = dataset.load_train_partition(partition_id)
+    test_df = dataset.load_test_partition(partition_id)
+
+    synthesizer = algorithm.create_synthesizer()
     serializer, deserializer = make_serde(
-        cast(Config, config).allow_pickle,
+        config.allow_pickle,
         synthesizer.arrays_to_ml_framework_map
     )
-    request = deserializer(message)
-    synthetic_df = synthesizer.sample(request, config.num_synthetic_rows, config.seed)
-
+    request = deserializer(flwr_message)
+    synthetic_df = synthesizer.sample(
+        request,
+        config.num_synthetic_rows or len(train_df),
+        config.seed
+    )
     # noinspection PyUnnecessaryCast
     eval_ctx = EvalContext(
         train_df=train_df,
@@ -128,11 +124,15 @@ def evaluate(message: Message, context: Context) -> Message:
         seed=config.seed,
         target_column=config.data.target_col,
         sensitive_columns=config.data.sensitive_cols,
-        schema=cast(TableSchema, dataset.schema),
+        schema=dataset.schema,
     )
-
     eval_suite = EvaluationSuite.default()
     #eval_suite = EvaluationSuite.with_evaluator_categories(config.metrics.run_categories)
-    metrics = MetricRecord(eval_suite.evaluate(eval_ctx))
+    metrics = MetricRecord()
+    for key, value in eval_suite.evaluate(eval_ctx).items():
+        metrics[key] = value
 
-    return Message(content=RecordDict({"metrics": metrics}), reply_to=message)
+    return Message(
+        content=RecordDict({"metrics": metrics}),
+        reply_to=flwr_message
+    )
