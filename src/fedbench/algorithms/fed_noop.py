@@ -17,10 +17,6 @@ _bullshit_state = {
 
 class FedNoop(Algorithm):
     @classmethod
-    def requires_non_array_protocol(cls) -> str | None:
-        return "pickle"
-
-    @classmethod
     def create_aggregator(cls) -> Aggregator:
         return FedSmokeAggregator()
 

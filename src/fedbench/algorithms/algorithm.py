@@ -4,7 +4,6 @@ from collections.abc import Iterable
 from pandas import DataFrame
 
 from fedbench.common import Update
-from fedbench.data import TableSchema
 
 
 class Aggregator(ABC):
@@ -17,7 +16,7 @@ class Aggregator(ABC):
         return f"<{self.__class__.__name__}>"
 
     @property
-    def arrays_decode_spec(self) -> dict[str, str] | None:
+    def arrays_to_ml_framework_map(self) -> dict[str, str] | None:
         return None
 
     # noinspection PyMethodMayBeStatic,PyUnusedLocal
@@ -48,7 +47,7 @@ class Synthesizer(ABC):
         return f"<{self.__class__.__name__}>"
 
     @property
-    def arrays_decode_spec(self) -> dict[str, str] | None:
+    def arrays_to_ml_framework_map(self) -> dict[str, str] | None:
         return None
 
     # noinspection PyMethodMayBeStatic,PyUnusedLocal
@@ -75,11 +74,6 @@ class Synthesizer(ABC):
 
 
 class Algorithm(ABC):
-    # TODO! Should be allowed to return a collection of acceptable choices
-    @classmethod
-    def requires_non_array_protocol(cls) -> str | None:
-        return None
-
     @classmethod
     @abstractmethod
     def create_aggregator(cls) -> Aggregator:

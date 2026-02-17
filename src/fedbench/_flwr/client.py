@@ -8,7 +8,7 @@ from flwr.common import (
 )
 from pandas.core.interchange.dataframe_protocol import DataFrame
 
-from fedbench._flwr.serde import from_flwr, to_flwr
+from fedbench._flwr.serde import make_serde
 from fedbench.algorithms import (
     Algorithm,
     Synthesizer,
@@ -70,27 +70,29 @@ def configure(message: Message, context: Context) -> Message:
 @app.query("init")
 def init(message: Message, context: Context) -> Message:
     data = load_train_partition(context)
-    request = from_flwr(message)
     synthesizer = create_synthesizer()
+    # noinspection PyUnnecessaryCast
+    serializer, deserializer = make_serde(
+        cast(Config, config).allow_pickle,
+        synthesizer.arrays_to_ml_framework_map
+    )
+    request = deserializer(message)
     reply = synthesizer.init(request, data)
-
-    return to_flwr(
-        update=reply,
-        reply_to=message,
-        non_array_protocol=algorithm.requires_non_array_protocol())
+    return serializer(update=reply, reply_to=message)
 
 
 @app.train()
 def train(message: Message, context: Context) -> Message:
     data = load_train_partition(context)
-    request = from_flwr(message)
     synthesizer = create_synthesizer()
+    # noinspection PyUnnecessaryCast
+    serializer, deserializer = make_serde(
+        cast(Config, config).allow_pickle,
+        synthesizer.arrays_to_ml_framework_map
+    )
+    request = deserializer(message)
     reply = synthesizer.train(request, data)
-
-    return to_flwr(
-        update=reply,
-        reply_to=message,
-        non_array_protocol=algorithm.requires_non_array_protocol())
+    return serializer(update=reply, reply_to=message)
 
 
 @app.evaluate()

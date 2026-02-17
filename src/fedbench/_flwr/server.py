@@ -6,6 +6,7 @@ from flwr.common import Context, Message, ConfigRecord, RecordDict
 from flwr.server import Grid
 from flwr.serverapp import ServerApp
 
+from fedbench._flwr.serde import make_serde
 from fedbench._flwr.strategy import FedbenchStrategy
 from fedbench.algorithms import Algorithm, registry as algorithm_reg
 from fedbench.common import log
@@ -47,10 +48,16 @@ def make_server_app(config: Config) -> ServerApp:
         log(__name__, (f"All clients configured.", ), level=INFO)
 
         algorithm: type[Algorithm] = algorithm_reg.load(config.algorithm)
+        aggregator = algorithm.create_aggregator()
+        serializer, deserializer = make_serde(
+            config.allow_pickle,
+            aggregator.arrays_to_ml_framework_map
+        )
         strategy = FedbenchStrategy(
-            algorithm.create_aggregator(),
-            algorithm.requires_non_array_protocol(),
-            config.num_rounds
+            aggregator,
+            config.num_rounds,
+            serializer,
+            deserializer,
         )
         strategy.start(grid)
 

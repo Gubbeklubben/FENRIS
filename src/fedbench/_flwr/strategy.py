@@ -3,7 +3,7 @@ from typing import cast
 
 from flwr.server import Grid
 
-from fedbench._flwr.serde import from_flwr, to_flwr
+from fedbench._flwr.serde import FlwrSerializer, FlwrDeserializer
 from fedbench.algorithms import Aggregator
 from fedbench.common import log, Update
 
@@ -12,22 +12,23 @@ class FedbenchStrategy:
     def __init__(
             self,
             synth_aggregator: Aggregator,
-            na_protocol: str,
-            num_rounds: int) -> None:
+            num_rounds: int,
+            flwr_serializer: FlwrSerializer,
+            flwr_deserializer: FlwrDeserializer) -> None:
 
         self._synth_aggregator = synth_aggregator
-        self._na_protocol = na_protocol
         self._num_rounds = num_rounds
+        self._flwr_serializer = flwr_serializer
+        self._flwr_deserializer = flwr_deserializer
         self._prev_aggr_update: Update | None = None
 
     def init(self, grid: Grid) -> Update:
         # noinspection PyUnnecessaryCast
         requests = (
-            to_flwr(
+            self._flwr_serializer(
                 cast(Update, self._prev_aggr_update),
                 message_type="init",
-                dst_node_id=cid,
-                non_array_protocol=self._na_protocol
+                dst_node_id=cid
             )
             for cid, update in
             self._synth_aggregator.configure_init(grid.get_node_ids())
@@ -35,23 +36,22 @@ class FedbenchStrategy:
         replies = grid.send_and_receive(requests)
 
         return self._synth_aggregator.aggregate_init(
-            from_flwr(reply) for reply in replies
+            self._flwr_deserializer(reply) for reply in replies
         )
 
     def train(self, grid: Grid) -> Update:
         # noinspection PyUnnecessaryCast
         requests = (
-            to_flwr(
+            self._flwr_serializer(
                 cast(Update, self._prev_aggr_update),
                 message_type="train",
-                dst_node_id=cid,
-                non_array_protocol=self._na_protocol
+                dst_node_id=cid
             ) for cid in grid.get_node_ids()
         )
         replies = grid.send_and_receive(requests)
 
         return self._synth_aggregator.aggregate_train(
-            from_flwr(reply) for reply in replies
+            self._flwr_deserializer(reply) for reply in replies
         )
 
     def evaluate(self, grid: Grid):  # type: ignore[no-untyped-def]

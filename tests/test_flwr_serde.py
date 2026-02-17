@@ -1,37 +1,32 @@
-from collections.abc import Callable
 import random
+from collections.abc import Callable
 
 import numpy as np
 import pytest
 from flwr.common import Message, RecordDict, ArrayRecord
 
 # noinspection PyProtectedMember
-from fedbench._flwr.serde import to_flwr, from_flwr
+from fedbench._flwr.serde import make_serializer, make_deserializer
 from fedbench.common import Update
 
 _RNG = np.random.default_rng(42)
 
 
-def test_to_flwr_empty():
-    update = Update()
-    flwr_message = to_flwr(
-        update,
+def test_empty():
+    orig = Update()
+    serializer = make_serializer(allow_pickle=False)
+    flwr_message = serializer(
+        orig,
         message_type="train",
         dst_node_id=1
     )
-    assert update.is_empty()
-    assert not flwr_message.content, "Empty Update -> non-empty flwr Message"
-
-
-def test_from_flwr_empty():
-    flwr_message = Message(
-        message_type="train",
-        dst_node_id=1,
-        content=RecordDict()
+    deserializer = make_deserializer(
+        allow_pickle=False,
+        arrays_to_ml_framework_map=None
     )
-    update = from_flwr(flwr_message)
-    assert not flwr_message.content
-    assert update.is_empty(), "Empty flwr Message -> non-empty Update"
+    deserialized = deserializer(flwr_message)
+    assert orig.is_empty()
+    assert deserialized.is_empty()
 
 
 @pytest.fixture
@@ -45,7 +40,8 @@ def test_to_flwr_single_array_group(make_random_ndarrays) -> None:
     update = Update()
     orig = make_random_ndarrays()
     update.arrays["test-arrays"] = orig
-    flwr_message = to_flwr(
+    serializer = make_serializer(allow_pickle=False)
+    flwr_message = serializer(
         update,
         message_type="train",
         dst_node_id=1
@@ -57,12 +53,16 @@ def test_to_flwr_single_array_group(make_random_ndarrays) -> None:
 
 def test_from_flwr_single_array_group(make_random_ndarrays) -> None:
     orig = make_random_ndarrays()
+    deserializer = make_deserializer(
+        allow_pickle=False,
+        arrays_to_ml_framework_map=None
+    )
     flwr_message = Message(
         message_type="train",
         dst_node_id=1,
         content=RecordDict({"test-arrays": ArrayRecord(orig)})
     )
-    update = from_flwr(flwr_message)
+    update = deserializer(flwr_message)
     retrieved = update.arrays["test-arrays"]
     for idx, arr in enumerate(orig):
         assert np.array_equal(arr, retrieved[idx]), "Arrays not equal"
@@ -74,7 +74,9 @@ def test_to_flwr_multiple_array_groups(make_random_ndarrays) -> None:
     orig2 = make_random_ndarrays()
     update.arrays["test-arrays1"] = orig1
     update.arrays["test-arrays2"] = orig2
-    flwr_message = to_flwr(
+
+    serializer = make_serializer(allow_pickle=False)
+    flwr_message = serializer(
         update,
         message_type="train",
         dst_node_id=1
@@ -100,7 +102,11 @@ def test_from_flwr_multiple_array_groups(make_random_ndarrays) -> None:
             "test-arrays2": ArrayRecord(orig2),
         })
     )
-    update = from_flwr(flwr_message)
+    deserializer = make_deserializer(
+        allow_pickle=False,
+        arrays_to_ml_framework_map=None
+    )
+    update = deserializer(flwr_message)
     retrieved1 = update.arrays["test-arrays1"]
     retrieved2 = update.arrays["test-arrays2"]
 
@@ -125,16 +131,18 @@ def test_single_object_pickle():
     update = Update()
     orig = PickleMe("Some Name")
     update.objects["test-objects"] = {"pickle-me": orig}
-    flwr_message = to_flwr(
+    serializer = make_serializer(allow_pickle=True)
+    flwr_message = serializer(
         update,
         message_type="train",
-        dst_node_id=1,
-        non_array_protocol="pickle",
-        allow_pickle=True
+        dst_node_id=1
     )
-    decoded_content = from_flwr(
-        flwr_message,
-        allow_pickle=True
+    deserializer = make_deserializer(
+        allow_pickle=True,
+        arrays_to_ml_framework_map=None
+    )
+    decoded_content = deserializer(
+        flwr_message
     )
     unpickled = decoded_content.objects["test-objects"]["pickle-me"]
     assert isinstance(unpickled, PickleMe), "Not a PickleMe instance"
@@ -152,12 +160,17 @@ def test_metrics_single_group_all_types():
         "list[float]": [1.1, 2.2, 3.3],
     }
     update.metrics["test-metrics"] = metrics
-    flwr_message = to_flwr(
+    serializer = make_serializer(allow_pickle=False)
+    flwr_message = serializer(
         update,
         message_type="train",
         dst_node_id=1,
     )
-    decoded_content = from_flwr(flwr_message)
+    deserializer = make_deserializer(
+        allow_pickle=False,
+        arrays_to_ml_framework_map=None
+    )
+    decoded_content = deserializer(flwr_message)
     assert decoded_content.metrics["test-metrics"] == metrics
 
 
@@ -176,12 +189,17 @@ def test_extras_single_group_all_types():
         "list[str]": ["1", "2", "3"],
     }
     update.extras["test-extras"] = extras
-    flwr_message = to_flwr(
+    serializer = make_serializer(allow_pickle=False)
+    flwr_message = serializer(
         update,
         message_type="train",
         dst_node_id=1,
     )
-    decoded_content = from_flwr(flwr_message)
+    deserializer = make_deserializer(
+        allow_pickle=False,
+        arrays_to_ml_framework_map=None
+    )
+    decoded_content = deserializer(flwr_message)
     assert decoded_content.extras["test-extras"] == extras
 
 

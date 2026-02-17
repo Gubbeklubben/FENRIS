@@ -76,6 +76,7 @@ def _build_minimal_example_config(
             partitioner="iid-partitioner",
             partitioner_kwargs={"num_partitions": num_clients},
         ),
+        allow_pickle=True
     )
 
 

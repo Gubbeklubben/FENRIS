@@ -1,8 +1,6 @@
 import pickle
-from enum import StrEnum
-from typing import Any, cast
+from typing import Protocol, cast
 
-import msgpack
 from flwr.common import (
     Message,
     Array,
@@ -15,167 +13,150 @@ from flwr.common import (
 from fedbench.common import Update, Objects
 
 
-class _NonArrayProtocol(StrEnum):
-    PICKLE = "pickle"
-    MSGPACK = "msgpack"
+METADATA_KEY = f"{__package__}.metadata"
 
 
-def _dumps(obj: Any, protocol: str) -> bytes:
-    match protocol:
-        case _NonArrayProtocol.PICKLE:
-            return pickle.dumps(obj)
-        case _NonArrayProtocol.MSGPACK:
-            return cast(bytes, msgpack.dumps(obj))
-        case _:
-            raise ValueError(f"Unsupported protocol: {protocol}")
+class FlwrSerializer(Protocol):
+    def __call__(
+            self,
+            update: Update,
+            message_type: str | None = None,
+            dst_node_id: int | None = None,
+            reply_to: Message | None = None) -> Message:
+        pass
 
 
-def _loads(data: bytes, protocol: str) -> Any:
-    match protocol:
-        case _NonArrayProtocol.PICKLE:
-            return pickle.loads(data)
-        case _NonArrayProtocol.MSGPACK:
-            return msgpack.loads(data)
-        case _:
-            raise ValueError(f"Unsupported protocol: {protocol}")
+class FlwrDeserializer(Protocol):
+    def __call__(self, message: Message) -> Update:
+        pass
 
 
-def objects_to_arrays(
-        objects: Objects,
-        protocol: str,
-        allow_pickle: bool) -> dict[str, Array]:
+def make_serde(
+        allow_pickle: bool,
+        arrays_to_ml_framework_map: dict[str, str] | None
+) -> tuple[FlwrSerializer, FlwrDeserializer]:
 
-    if protocol == _NonArrayProtocol.PICKLE and not allow_pickle:
-        raise RuntimeError(f"allow_pickle is False, refusing to"
-                           f"pickle {objects}")
+    return (
+        make_serializer(allow_pickle),
+        make_deserializer(allow_pickle, arrays_to_ml_framework_map)
+    )
+
+
+def make_serializer(allow_pickle: bool) -> FlwrSerializer:
+    def serializer(
+            update: Update,
+            message_type: str | None = None,
+            dst_node_id: int | None = None,
+            reply_to: Message | None = None) -> Message:
+
+        if update.objects and not allow_pickle:
+            raise RuntimeError(
+                f"Refusing to pickle objects: allow_pickle={allow_pickle}"
+            )
+        if reply_to is None:
+            if dst_node_id is None:
+                raise ValueError("Either dst_node_id or reply_to is required.")
+
+            if message_type is None:
+                raise ValueError("message_type required when reply_to is None.")
+
+        rdict = RecordDict()
+        pickle_records = []
+
+        for key, arrays in update.arrays.items():
+            rdict[key] = ArrayRecord(arrays)
+
+        for key, objects in update.objects.items():
+            # noinspection PyUnnecessaryCast
+            rdict[key] = ArrayRecord(_pickle_objects(objects))
+            pickle_records.append(key)
+
+        for key, metrics in update.metrics.items():
+            rdict[key] = MetricRecord(metrics)
+
+        for key, extras in update.extras.items():
+            rdict[key] = ConfigRecord(extras)
+
+        _inject_metadata(rdict, pickle_records)
+
+        if reply_to is not None:
+            return Message(content=rdict, reply_to=reply_to)
+
+        # noinspection PyUnnecessaryCast
+        return Message(
+            content=rdict,
+            message_type=cast(str, message_type),
+            dst_node_id=cast(int, dst_node_id)
+        )
+    return serializer
+
+
+def make_deserializer(
+        allow_pickle: bool,
+        arrays_to_ml_framework_map: dict[str, str] | None) -> FlwrDeserializer:
+
+    arrays_to_ml_framework_map = arrays_to_ml_framework_map or {}
+
+    def deserializer(message: Message) -> Update:
+        rdict = message.content
+        update = Update()
+
+        pickle_records = _extract_metadata(rdict)
+        if pickle_records and not allow_pickle:
+            raise RuntimeError(
+                f"Refusing to unpickle arrays: allow_pickle={allow_pickle}"
+            )
+        for key, arrays in rdict.array_records.items():
+            if key in pickle_records:
+                # noinspection PyUnnecessaryCast
+                objects = _unpickle_arrays(arrays)
+                update.objects[key] = objects
+            else:
+                ml_framework = arrays_to_ml_framework_map.get(key, "numpy")
+                if ml_framework == "torch":
+                    update.arrays[key] = arrays.to_torch_state_dict()
+                else:
+                    update.arrays[key] = arrays.to_numpy_ndarrays()
+
+        for key, metrics in rdict.metric_records.items():
+            update.metrics[key] = dict(metrics)
+
+        for key, extras in rdict.config_records.items():
+            update.extras[key] = dict(extras)
+
+        return update
+    return deserializer
+
+
+def _pickle_objects(objects: Objects) -> dict[str, Array]:
     arrays = {}
     for key, value in objects.items():
-        data = _dumps(value, protocol)
+        data = pickle.dumps(value)
         # Send the bytes as a 1d uint8 ndarray
         arr = Array(
             dtype="uint8",
             shape=(len(data),),
-            stype=protocol,  # Will, and should make f.ex. arr.numpy() raise err
+            stype="pickle",  # Will, and should make f.ex. arr.numpy() raise err
             data=data)
         arrays[key] = arr
     return arrays
 
 
-def arrays_to_objects(
-        arrays: ArrayRecord,
-        protocol: str,
-        allow_pickle: bool) -> Objects:
-
-    if protocol == _NonArrayProtocol.PICKLE and not allow_pickle:
-        raise RuntimeError("allow_pickle is False, refusing to unpickle data")
-
+def _unpickle_arrays(arrays: ArrayRecord) -> Objects:
     objects = {}
     for key, value in arrays.items():
-        objects[key] = _loads(value.data, protocol)
+        objects[key] = pickle.loads(value.data)
     return objects
 
 
-def to_flwr(
-        update: Update,
-        message_type: str | None = None,
-        dst_node_id: int | None = None,
-        reply_to: Message | None = None,
-        non_array_protocol: str | None = None,
-        allow_pickle: bool = True) -> Message:
+def _inject_metadata(rdict: RecordDict, pickle_records: list[str]) -> None:
+    cfg_record = ConfigRecord({"pickle-records": pickle_records})
+    rdict.config_records[METADATA_KEY] = cfg_record
 
-    if reply_to is None:
-        if dst_node_id is None:
-            raise ValueError("Either dst_node_id or reply_to is required")
 
-        if message_type is None:
-            raise ValueError("message_type required when reply_to is None")
-
-    if update.objects and non_array_protocol is None:
-        raise ValueError("non_array_protocol required to send non array objects")
-
-    rdict = RecordDict()
-    na_records = []
-
-    for key, arrays in update.arrays.items():
-        rdict[key] = ArrayRecord(arrays)
-
-    for key, objects in update.objects.items():
-        # noinspection PyUnnecessaryCast
-        rdict[key] = ArrayRecord(
-            objects_to_arrays(
-                objects,
-                cast(str, non_array_protocol),
-                allow_pickle)
-        )
-        na_records.append(key)
-
-    for key, metrics in update.metrics.items():
-        rdict[key] = MetricRecord(metrics)
-
-    for key, extras in update.extras.items():
-        rdict[key] = ConfigRecord(extras)
-
-    if na_records:
-        # noinspection PyUnnecessaryCast
-        rdict[f"{__package__}.metadata"] = ConfigRecord({
-            "na-proto": cast(str, non_array_protocol),
-            "na-records": na_records,
-        })
-
-    if reply_to is not None:
-        return Message(content=rdict, reply_to=reply_to)
-
+def _extract_metadata(rdict: RecordDict) -> list[str]:
+    cfg_record = rdict.config_records.pop(METADATA_KEY, None)
+    if cfg_record is None:
+        return []
     # noinspection PyUnnecessaryCast
-    return Message(
-        content=rdict,
-        message_type=cast(str, message_type),
-        dst_node_id=cast(int, dst_node_id)
-    )
-
-
-def from_flwr(
-        message: Message,
-        arrays_decode_spec: dict[str, str] | None = None,
-        allow_pickle: bool = True) -> Update:
-
-    def get_arrays_decode_spec(k: str) -> str:
-        if arrays_decode_spec is None:
-            return "numpy"
-        return arrays_decode_spec.get(k, "numpy")
-
-    rdict = message.content
-    update = Update()
-    metadata = rdict.config_records.get(
-        f"{__package__}.metadata", ConfigRecord()
-    )
-    na_proto = metadata.get("na-proto", None)
-    # noinspection PyUnnecessaryCast
-    na_records = cast(list[str], metadata.get("na-records", []))
-
-    if na_records and na_proto is None:
-        raise RuntimeError(f"Message contains non array records, but no"
-                           f"corresponding protocol")
-
-    for key, arrays in rdict.array_records.items():
-        if key in na_records:
-            # noinspection PyUnnecessaryCast
-            objects = arrays_to_objects(
-                arrays,
-                cast(str, na_proto),
-                allow_pickle
-            )
-            update.objects[key] = objects
-        else:
-            decode_spec = get_arrays_decode_spec(key)
-            if decode_spec == "torch":
-                update.arrays[key] = arrays.to_torch_state_dict()
-            else:
-                update.arrays[key] = arrays.to_numpy_ndarrays()
-
-    for key, metrics in rdict.metric_records.items():
-        update.metrics[key] = dict(metrics)
-
-    for key, extras in rdict.config_records.items():
-        update.extras[key] = dict(extras)
-
-    return update
+    return cast(list[str], cfg_record["pickle-records"])
