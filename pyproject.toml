@@ -3,7 +3,11 @@ name = "fedbench"
 version = "0.1.0"
 description = "An Extensible Benchmarking Framework for Federated Synthetic Tabular Data Generators"
 authors = [
-    {name = "trondthorsteinsson",email = "trondthorsteinsson@gmail.com"}
+    {name = "Trond Thorsteinsson", email = "trondthorsteinsson@gmail.com"},
+    {name = "Alexander Rød Opedal", email = "alexander@opedal.org"},
+    {name = "Bård Linga", email = "bardlinga@gmail.com"},
+    {name = "Ken Solbakken Remen", email = "kenremen@gmail.com"},
+    {name = "Thomas Stavik Lønning", email = "loenning1995@gmail.com"},
 ]
 license = "MIT"
 requires-python = ">=3.12,<4.0"
