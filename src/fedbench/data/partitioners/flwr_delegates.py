@@ -1,18 +1,17 @@
-from typing import Literal, Self, cast
+from typing import Literal, cast
 
 from datasets import Dataset
 from flwr_datasets.partitioner import (
-    Partitioner as FlwrPartitioner,
-    IidPartitioner
+    Partitioner as FlwrPartitioner, IidPartitioner
 )
 from pandas import DataFrame
 
-from fedbench.data.partitioner import Partitioner
+from fedbench.data.partitioners.partitioner import Partitioner
 
 
 class FlwrDelegatePartitioner(Partitioner):
     @classmethod
-    def with_iid_partitioner(cls, num_partitions: int) -> Self:
+    def with_iid_partitioner(cls, num_partitions: int) -> Partitioner:
         return cls(IidPartitioner(num_partitions))
 
     def __init__(self, flwr_partitioner: FlwrPartitioner):

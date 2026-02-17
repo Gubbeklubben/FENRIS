@@ -2,8 +2,9 @@ import pandas as pd
 import pytest
 
 from fedbench.data import loaders
-from fedbench.data import partitioner_registry
+from fedbench.data.partitioners import registry as partitioner_registry
 from fedbench.data.partitioned_dataset import PartitionedDataset
+from fedbench.data.schemas import infer_schema
 
 
 @pytest.fixture
@@ -36,6 +37,7 @@ def test_load_csv_and_schema(sample_df, tmp_path):
 def test_iid_partitioning(sample_df):
     ds = PartitionedDataset(
         sample_df,
+        infer_schema(sample_df),
         partitioner=partitioner_registry.load("iid-partitioner")(
             num_partitions=2
         ),

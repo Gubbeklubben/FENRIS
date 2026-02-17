@@ -1,34 +1,57 @@
-from flwr.common import Message, Context, RecordDict
+import time
+from collections.abc import Iterable
+from logging import INFO
+
+from flwr.common import Context, Message, ConfigRecord, RecordDict
 from flwr.server import Grid
 from flwr.serverapp import ServerApp
 
 from fedbench._flwr.strategy import FedbenchStrategy
-from fedbench.algorithms import registry as alg_registry
+from fedbench.algorithms import Algorithm, registry as algorithm_reg
+from fedbench.common import log
+from fedbench.config import Config
 
 
-# Capture commandline args in a closure as we can not easily
-# inject into Context (?). Re-consider other more robust approaches later.
-def make_server_app(
-        algorithm_name: str,
-        num_clients: int) -> ServerApp:
+def configure_clients(grid: Grid, config: Config) -> Iterable[Message]:
+    num_clients = config.num_clients
+    client_ids = list(grid.get_node_ids())
 
+    # Wait for clients to connect.
+    # https://github.com/adap/flower/blob/main/examples/federated-kaplan-meier-fitter/examplefkm/server_app.py
+    while len(client_ids) < num_clients:
+        time.sleep(1)
+        client_ids = list(grid.get_node_ids())
+
+    serialized_cfg = ConfigRecord({"jsons": config.jsons()})
+    messages = (
+        Message(
+            content=RecordDict({"config": serialized_cfg}),
+            message_type="query.configure",
+            dst_node_id=cid
+        ) for cid in client_ids
+    )
+    return grid.send_and_receive(messages)
+
+
+# Capture config in a closure as we can not easily inject into Context (?).
+def make_server_app(config: Config) -> ServerApp:
     app = ServerApp()
 
     @app.main()
     def main(grid: Grid, context: Context) -> None:
-        # The plan(ish):
-        # - Load and validate server policy if not already done.
-        # - Use grid.send_and_receive to send an init_request,
-        #   inject algorithm name in config to allow clients to import,
-        #   and then receive init responses.
-        # - Inject server_policy.init with init_responses to obtain, in any case
-        #   initial model state.
-        # - Resolve appropriate strategy, either an adapter or a flwr native.
-        # - Call strategy.start, inject config from either cmdline or elsewhere.
-        # - ...
+        for reply in configure_clients(grid, config):
+            if reply.has_error():
+                raise RuntimeError(
+                    f"Failed to configure all clients: {reply.error.reason}"
+                )
+        log(__name__, (f"All clients configured.", ), level=INFO)
 
-        algorithm = alg_registry.load(algorithm_name)
-        strategy = FedbenchStrategy(algorithm, algorithm_name)
-        strategy.start(grid, num_clients)
+        algorithm: type[Algorithm] = algorithm_reg.load(config.algorithm)
+        strategy = FedbenchStrategy(
+            algorithm.create_aggregator(),
+            algorithm.requires_non_array_protocol(),
+            config.num_rounds
+        )
+        strategy.start(grid)
 
     return app

@@ -4,6 +4,7 @@ from collections.abc import Iterable
 from pandas import DataFrame
 
 from fedbench.common import Update
+from fedbench.data import TableSchema
 
 
 class Aggregator(ABC):
@@ -51,7 +52,10 @@ class Synthesizer(ABC):
         return None
 
     # noinspection PyMethodMayBeStatic,PyUnusedLocal
-    def init(self, request: Update) -> Update:
+    def init(
+            self,
+            request: Update,
+            data: DataFrame) -> Update:
         return Update()
 
     @abstractmethod

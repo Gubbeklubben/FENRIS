@@ -4,62 +4,93 @@ from flwr.clientapp import ClientApp
 from flwr.common import (
     Message,
     Context,
-    RecordDict,
-    ConfigRecord,
+    RecordDict, ConfigRecord,
 )
-from pandas import DataFrame
+from pandas.core.interchange.dataframe_protocol import DataFrame
 
 from fedbench._flwr.serde import from_flwr, to_flwr
-from fedbench.algorithms import registry as alg_registry
-from fedbench.algorithms.algorithm import Synthesizer
+from fedbench.algorithms import (
+    Algorithm,
+    Synthesizer,
+    registry as algorithm_reg
+)
+from fedbench.config import Config
+from fedbench.data import PartitionedDataset, load_csv
+from fedbench.data.partitioners import registry as partitioner_reg
 
 app = ClientApp()
-synthesizer_factory = None
-na_protocol = None
+
+config: Config | None = None
+algorithm: type[Algorithm] | None = None
+dataset: PartitionedDataset | None = None
 
 
-def create_synthesizer(config: ConfigRecord | None = None) -> Synthesizer:
-    global synthesizer_factory, na_protocol
+def load_train_partition(context: Context) -> DataFrame:
+    if dataset is None:
+        raise RuntimeError(
+            "Can not load train partition when dataset is not loaded."
+        )
+    # noinspection PyUnnecessaryCast
+    partition_id: int = cast(int, context.node_config["partition-id"])
+    return dataset.load_train_partition(partition_id)
 
-    if synthesizer_factory is None:
-        if config is None:
-            raise ValueError("Can not load algorithm without config.")
 
-        # noinspection PyUnnecessaryCast
-        name: str = cast(str, config["algorithm-name"])
-        algorithm = alg_registry.load(name)
-        synthesizer_factory = algorithm.create_synthesizer
-        na_protocol = algorithm.requires_non_array_protocol()
+def create_synthesizer() -> Synthesizer:
+    if algorithm is None:
+        raise RuntimeError(
+            "Can not create synthesizer when algorithm is not loaded."
+        )
+    return algorithm.create_synthesizer()
 
-    return synthesizer_factory()
+
+@app.query("configure")
+def configure(message: Message, context: Context) -> Message:
+    global config
+    cfg_record: ConfigRecord = message.content.config_records["config"]
+    # noinspection PyUnnecessaryCast
+    config = Config.parse_jsons(cast(str, cfg_record["jsons"]))
+
+    global dataset
+    df, schema = load_csv(config.data.dataset)
+    partitioner_factory = partitioner_reg.load(config.data.partitioner)
+    partitioner = partitioner_factory(**config.data.partitioner_kwargs)
+    dataset = PartitionedDataset(
+        df=df,
+        schema=schema,
+        partitioner=partitioner,
+        test_size=config.test_size,
+        seed=config.seed
+    )
+    global algorithm
+    algorithm = algorithm_reg.load(config.algorithm)
+
+    return Message(content=RecordDict(), reply_to=message)
 
 
 @app.query("init")
 def init(message: Message, context: Context) -> Message:
-    config = message.content.config_records["fedbench.config"]
-    synthesizer = create_synthesizer(config)
+    data = load_train_partition(context)
     request = from_flwr(message)
-    reply = synthesizer.init(request)
+    synthesizer = create_synthesizer()
+    reply = synthesizer.init(request, data)
 
     return to_flwr(
         update=reply,
         reply_to=message,
-        non_array_protocol=na_protocol
-    )
+        non_array_protocol=algorithm.requires_non_array_protocol())
 
 
 @app.train()
 def train(message: Message, context: Context) -> Message:
-    config = message.content.config_records["fedbench.config"]
-    synthesizer = create_synthesizer(config)
+    data = load_train_partition(context)
     request = from_flwr(message)
-    reply = synthesizer.train(request, DataFrame())
+    synthesizer = create_synthesizer()
+    reply = synthesizer.train(request, data)
 
     return to_flwr(
         update=reply,
         reply_to=message,
-        non_array_protocol=na_protocol
-    )
+        non_array_protocol=algorithm.requires_non_array_protocol())
 
 
 @app.evaluate()

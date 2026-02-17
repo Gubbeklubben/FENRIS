@@ -37,8 +37,10 @@ class Update:
 _BOX_DRAWING = "\u251c\u2500\u2500"
 
 
-def log(header: str, message_lines: tuple[str, ...], level: int =INFO) -> None:
-    _flwr_log(level, header)
+def log(header: str, message_lines: tuple[str, ...], level: int = INFO) -> None:
+    if header:
+        _flwr_log(level, header)
+
     for line in message_lines:
         _flwr_log(level, f"\t{_BOX_DRAWING} {line}")
 
