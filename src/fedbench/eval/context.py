@@ -17,4 +17,4 @@ class EvalContext:
 
     seed: int
     target_column: str | None
-    sensitive_columns: tuple[str] | None = None
+    sensitive_columns: tuple[str, ...] | None = None

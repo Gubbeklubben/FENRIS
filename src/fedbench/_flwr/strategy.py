@@ -21,6 +21,7 @@ class FedbenchStrategy:
         self._flwr_serializer = flwr_serializer
         self._flwr_deserializer = flwr_deserializer
         self._prev_aggr_update: Update | None = None
+        self._per_client_metrics: dict[int, dict[str, float]] = {}
 
     def init(self, grid: Grid) -> Update:
         # noinspection PyUnnecessaryCast
@@ -54,8 +55,19 @@ class FedbenchStrategy:
             self._flwr_deserializer(reply) for reply in replies
         )
 
-    def evaluate(self, grid: Grid):  # type: ignore[no-untyped-def]
-        pass
+    def evaluate(self, grid: Grid) -> None:
+        # noinspection PyUnnecessaryCast
+        requests = (
+            self._flwr_serializer(
+                cast(Update, self._prev_aggr_update),
+                message_type="evaluate",
+                dst_node_id=cid
+            ) for cid in grid.get_node_ids()
+        )
+        for reply in grid.send_and_receive(requests):
+            client_id = reply.metadata.src_node_id
+            metrics = reply.content.metric_records["metrics"]
+            self._per_client_metrics[client_id] = dict(metrics)
 
     def start(self, grid: Grid) -> None:
         init_update = self.init(grid)
@@ -86,4 +98,11 @@ class FedbenchStrategy:
                  f"Algorithm state: {self._prev_aggr_update}",),
                 level=INFO
             )
-           # Evaluation...
+
+            self.evaluate(grid)
+
+        log(
+            self.__class__.__name__,
+            ("Federation loop complete.",
+            str(self._per_client_metrics)),
+            level=INFO)

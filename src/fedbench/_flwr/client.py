@@ -4,7 +4,7 @@ from flwr.clientapp import ClientApp
 from flwr.common import (
     Message,
     Context,
-    RecordDict, ConfigRecord,
+    RecordDict, ConfigRecord, MetricRecord,
 )
 from pandas.core.interchange.dataframe_protocol import DataFrame
 
@@ -15,8 +15,10 @@ from fedbench.algorithms import (
     registry as algorithm_reg
 )
 from fedbench.config import Config
-from fedbench.data import PartitionedDataset, load_csv
+from fedbench.data import PartitionedDataset, load_csv, TableSchema
 from fedbench.data.partitioners import registry as partitioner_reg
+from fedbench.eval.context import EvalContext
+from fedbench.eval.suite import EvaluationSuite
 
 app = ClientApp()
 
@@ -33,6 +35,16 @@ def load_train_partition(context: Context) -> DataFrame:
     # noinspection PyUnnecessaryCast
     partition_id: int = cast(int, context.node_config["partition-id"])
     return dataset.load_train_partition(partition_id)
+
+
+def load_test_partition(context: Context) -> DataFrame:
+    if dataset is None:
+        raise RuntimeError(
+            "Can not load test partition when dataset is not loaded."
+        )
+    # noinspection PyUnnecessaryCast
+    partition_id: int = cast(int, context.node_config["partition-id"])
+    return dataset.load_test_partition(partition_id)
 
 
 def create_synthesizer() -> Synthesizer:
@@ -69,7 +81,7 @@ def configure(message: Message, context: Context) -> Message:
 
 @app.query("init")
 def init(message: Message, context: Context) -> Message:
-    data = load_train_partition(context)
+    train_df = load_train_partition(context)
     synthesizer = create_synthesizer()
     # noinspection PyUnnecessaryCast
     serializer, deserializer = make_serde(
@@ -77,13 +89,13 @@ def init(message: Message, context: Context) -> Message:
         synthesizer.arrays_to_ml_framework_map
     )
     request = deserializer(message)
-    reply = synthesizer.init(request, data)
+    reply = synthesizer.init(request, train_df)
     return serializer(update=reply, reply_to=message)
 
 
 @app.train()
 def train(message: Message, context: Context) -> Message:
-    data = load_train_partition(context)
+    train_df = load_train_partition(context)
     synthesizer = create_synthesizer()
     # noinspection PyUnnecessaryCast
     serializer, deserializer = make_serde(
@@ -91,10 +103,36 @@ def train(message: Message, context: Context) -> Message:
         synthesizer.arrays_to_ml_framework_map
     )
     request = deserializer(message)
-    reply = synthesizer.train(request, data)
+    reply = synthesizer.train(request, train_df)
     return serializer(update=reply, reply_to=message)
 
 
 @app.evaluate()
 def evaluate(message: Message, context: Context) -> Message:
-    return Message(content=RecordDict(), reply_to=message)
+    train_df = load_train_partition(context)
+    test_df = load_test_partition(context)
+    synthesizer = create_synthesizer()
+    # noinspection PyUnnecessaryCast
+    serializer, deserializer = make_serde(
+        cast(Config, config).allow_pickle,
+        synthesizer.arrays_to_ml_framework_map
+    )
+    request = deserializer(message)
+    synthetic_df = synthesizer.sample(request, config.num_synthetic_rows, config.seed)
+
+    # noinspection PyUnnecessaryCast
+    eval_ctx = EvalContext(
+        train_df=train_df,
+        test_df=test_df,
+        synthetic_df=synthetic_df,
+        seed=config.seed,
+        target_column=config.data.target_col,
+        sensitive_columns=config.data.sensitive_cols,
+        schema=cast(TableSchema, dataset.schema),
+    )
+
+    eval_suite = EvaluationSuite.default()
+    #eval_suite = EvaluationSuite.with_evaluator_categories(config.metrics.run_categories)
+    metrics = MetricRecord(eval_suite.evaluate(eval_ctx))
+
+    return Message(content=RecordDict({"metrics": metrics}), reply_to=message)

@@ -5,15 +5,11 @@ import numpy as np
 from pandas import Series
 from scipy import stats
 
-from .base import Evaluator
-from ..context import EvalContext
+from fedbench.eval.context import EvalContext
+from fedbench.eval.evaluators import Evaluator
 
 
-class FidelityEvaluator(Evaluator, ABC):
-    pass
-
-
-class ReductionMetricEvaluator(FidelityEvaluator, ABC):
+class ReductionMetricEvaluator(Evaluator, ABC):
     def evaluate(self, ctx: EvalContext):
         numeric_columns = [c.name for c in ctx.schema.columns if c.kind in ("continuous", "integer")]
         if not numeric_columns:
@@ -44,7 +40,7 @@ class StdAbsDiffEvaluator(ReductionMetricEvaluator):
         return abs(r.std() - s.std())
 
 
-class SampleMetricEvaluator(FidelityEvaluator, ABC):
+class SampleMetricEvaluator(Evaluator, ABC):
     def evaluate(self, ctx: EvalContext):
         numeric_columns = [c.name for c in ctx.schema.columns if c.kind in ("continuous", "integer")]
         if not numeric_columns:
@@ -85,7 +81,7 @@ class TStatMeanAbsEvaluator(SampleMetricEvaluator):
         return abs(t_stat)
 
 
-class CategoricalTvMeanEvaluator(FidelityEvaluator):
+class CategoricalTvMeanEvaluator(Evaluator):
     def evaluate(self, ctx: EvalContext):
         categorical_columns = [c.name for c in ctx.schema.columns if c.kind in ("categorical", "binary")]
         if not categorical_columns:
@@ -103,7 +99,7 @@ class CategoricalTvMeanEvaluator(FidelityEvaluator):
         return float(np.mean(tvs))
 
 
-class CorrFroDiffEvaluator(FidelityEvaluator):
+class CorrFroDiffEvaluator(Evaluator):
     def evaluate(self, ctx: EvalContext):
         numeric_columns = [c.name for c in ctx.schema.columns if c.kind in ("continuous", "integer")]
         if len(numeric_columns) < 2:
