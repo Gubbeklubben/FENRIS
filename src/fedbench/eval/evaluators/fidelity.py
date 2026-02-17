@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 from abc import abstractmethod, ABC
 import numpy as np
 from pandas import Series
@@ -8,9 +10,7 @@ from ..context import EvalContext
 
 
 class FidelityEvaluator(Evaluator, ABC):
-    @property
-    def category(self):
-        return "fidelity"
+    pass
 
 
 class ReductionMetricEvaluator(FidelityEvaluator, ABC):

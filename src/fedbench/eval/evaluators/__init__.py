@@ -26,6 +26,12 @@ _registries: dict[str, Registry[type[Evaluator]]] = {
         validator=_validator,
     ) for category in Category
 }
+
+_registries[Category.FIDELITY].add_builtin(
+    "mean_abs_diff",
+    f"{__package__}.fidelity:MeanAbsDiffEvaluator"
+)
+
 registries: Mapping[str, Registry[type[Evaluator]]] = MappingProxyType(_registries)
 
 __all__ = [

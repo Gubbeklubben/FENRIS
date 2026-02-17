@@ -5,11 +5,6 @@ from fedbench.eval.context import EvalContext
 
 
 class Evaluator(ABC):
-    @abstractmethod
-    @property
-    def category(self):
-        ...
-
     @property
     def name(self):
         # Get class name
