@@ -4,9 +4,9 @@ from typing import cast
 
 from flwr.server import Grid
 
-from fedbench._flwr.serde import FlwrSerializer, FlwrDeserializer
+from fedbench.flwr.serde import FlwrSerializer, FlwrDeserializer
 from fedbench.algorithms import Aggregator
-from fedbench.common import log, Update
+from fedbench.common import log, Update, Metrics
 
 
 class FedbenchStrategy:
@@ -22,7 +22,7 @@ class FedbenchStrategy:
         self._flwr_serializer = flwr_serializer
         self._flwr_deserializer = flwr_deserializer
         self._prev_aggr_update: Update | None = None
-        self._per_client_metrics: dict[int, dict[str, float]] = {}
+        self._per_client_metrics: dict[int, Metrics] = {}
 
     def init(self, grid: Grid) -> Update:
         # noinspection PyUnnecessaryCast

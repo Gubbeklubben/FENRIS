@@ -6,7 +6,7 @@ import pytest
 from flwr.common import Message, RecordDict, ArrayRecord
 
 # noinspection PyProtectedMember
-from fedbench._flwr.serde import make_serializer, make_deserializer
+from fedbench.flwr.serde import make_serializer, make_deserializer
 from fedbench.common import Update
 
 _RNG = np.random.default_rng(42)

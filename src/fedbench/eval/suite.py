@@ -1,4 +1,4 @@
-from typing import Iterable, Dict
+from typing import Iterable, Dict, Self
 
 from fedbench.eval.context import EvalContext
 from fedbench.eval.evaluators import (
@@ -38,13 +38,13 @@ class EvaluationSuite:
         return metrics
 
     @classmethod
-    def default(cls):
+    def default(cls) -> Self:
         return cls.with_evaluator_categories([category.value for category in Category])
 
     @classmethod
-    def with_evaluator_categories(cls, categories: Iterable[str]):
+    def with_evaluator_categories(cls, categories: Iterable[str]) -> Self:
         return cls(_get_by_categories(categories))
 
     @classmethod
-    def with_evaluator_names(cls, names: Iterable[str]):
+    def with_evaluator_names(cls, names: Iterable[str]) -> Self:
         return cls(_get_by_names(names))

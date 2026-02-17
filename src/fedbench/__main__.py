@@ -5,9 +5,9 @@ import typer
 from flwr.simulation import run_simulation
 
 # noinspection PyProtectedMember
-from fedbench._flwr import client_app
+from fedbench.flwr import client_app
 # noinspection PyProtectedMember
-from fedbench._flwr import make_server_app
+from fedbench.flwr import make_server_app
 from fedbench.algorithms import registry as alg_registry
 from fedbench.config import Config
 from fedbench.config.config import DataConfig

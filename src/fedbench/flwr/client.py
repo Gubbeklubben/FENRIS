@@ -8,7 +8,7 @@ from flwr.common import (
 )
 from pandas.core.interchange.dataframe_protocol import DataFrame
 
-from fedbench._flwr.serde import make_serde
+from fedbench.flwr.serde import make_serde
 from fedbench.algorithms import (
     Algorithm,
     Synthesizer,
