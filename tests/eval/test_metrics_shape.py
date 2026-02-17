@@ -1,9 +1,10 @@
 from fedbench.eval.suite import EvaluationSuite
 
 def test_metrics_json_shape(eval_ctx):
-    suite = EvaluationSuite.default(
-        ["fidelity", "utility", "privacy"]
-    )
+    # suite = EvaluationSuite.default(
+    #     ["fidelity", "utility", "privacy"]
+    # )
+    suite = EvaluationSuite.all_fidelity_evaluators()
     out = suite.evaluate(eval_ctx)
 
     for k, v in out.items():

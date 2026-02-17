@@ -1,16 +1,14 @@
-from fedbench.eval.evaluators.base import Evaluator
+from fedbench.eval.evaluators.fidelity import FidelityEvaluator
 from fedbench.eval.suite import EvaluationSuite
 
 
-class Ev1(Evaluator):
-    name = "e1"
-    def _evaluate(self, ctx):
+class Ev1(FidelityEvaluator):
+    def evaluate(self, ctx):
         return {"x": 1}
 
 
-class Ev2(Evaluator):
-    name = "e2"
-    def _evaluate(self, ctx):
+class Ev2(FidelityEvaluator):
+    def evaluate(self, ctx):
         return {"y": 2}
 
 

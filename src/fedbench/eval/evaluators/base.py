@@ -1,3 +1,4 @@
+import re
 from abc import ABC, abstractmethod
 from typing import Dict
 
@@ -7,17 +8,25 @@ from ..context import EvalContext
 class Evaluator(ABC):
     """Base class for all evaluators."""
 
-    name: str  # e.g. "fidelity", "utility"
+    @abstractmethod
+    @property
+    def category(self):
+        ...
 
-    def evaluate(self, ctx: EvalContext) -> Dict[str, float]:
-        raw = self._evaluate(ctx)
-        out: Dict[str, float] = {}
+    @property
+    def name(self):
+        # Get class name
+        cls_name = self.__class__.__name__
 
-        for k, v in raw.items():
-            out[f"{self.name}.{k}"] = float(v) if v is not None else None
+        # Remove 'Evaluator' suffix
+        if not cls_name.endswith("Evaluator"):
+            raise ValueError("Evaluator implementations must have a name ending in 'Evaluator'.")
+        cls_name = cls_name[:-len("Evaluator")]
 
-        return out
+        # Convert CamelCase to snake_case
+        snake = re.sub(r'(?<!^)(?=[A-Z])', '_', cls_name).lower()
+        return snake
 
     @abstractmethod
-    def _evaluate(self, ctx: EvalContext) -> Dict[str, float]:
+    def evaluate(self, ctx: EvalContext) -> float:
         ...
