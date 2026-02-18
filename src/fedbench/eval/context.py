@@ -10,7 +10,7 @@ class EvalContext:
 
     # real data
     train_df: pd.DataFrame
-    test_df: pd.DataFrame | None
+    test_df: pd.DataFrame
 
     # synthetic data
     synthetic_df: pd.DataFrame

@@ -10,7 +10,7 @@ from fedbench.eval.evaluators import Evaluator
 
 
 class ReductionMetricEvaluator(Evaluator, ABC):
-    def evaluate(self, ctx: EvalContext):
+    def evaluate(self, ctx: EvalContext) -> float:
         numeric_columns = [c.name for c in ctx.schema.columns if c.kind in ("continuous", "integer")]
         if not numeric_columns:
             return np.nan
@@ -41,7 +41,7 @@ class StdAbsDiffEvaluator(ReductionMetricEvaluator):
 
 
 class SampleMetricEvaluator(Evaluator, ABC):
-    def evaluate(self, ctx: EvalContext):
+    def evaluate(self, ctx: EvalContext) -> float:
         numeric_columns = [c.name for c in ctx.schema.columns if c.kind in ("continuous", "integer")]
         if not numeric_columns:
             return np.nan
@@ -72,7 +72,7 @@ class KsMeanEvaluator(SampleMetricEvaluator):
 
 class WassersteinMeanEvaluator(SampleMetricEvaluator):
     def _calculate(self, r: Series[float], s: Series[float]) -> float:
-        return stats.wasserstein_distance(r, s) # type: ignore - method actually accepts 1D arrays in spite of signature
+        return stats.wasserstein_distance(r, s)
 
 
 class TStatMeanAbsEvaluator(SampleMetricEvaluator):
@@ -82,7 +82,7 @@ class TStatMeanAbsEvaluator(SampleMetricEvaluator):
 
 
 class CategoricalTvMeanEvaluator(Evaluator):
-    def evaluate(self, ctx: EvalContext):
+    def evaluate(self, ctx: EvalContext) -> float:
         categorical_columns = [c.name for c in ctx.schema.columns if c.kind in ("categorical", "binary")]
         if not categorical_columns:
             return np.nan
@@ -100,7 +100,7 @@ class CategoricalTvMeanEvaluator(Evaluator):
 
 
 class CorrFroDiffEvaluator(Evaluator):
-    def evaluate(self, ctx: EvalContext):
+    def evaluate(self, ctx: EvalContext) -> float:
         numeric_columns = [c.name for c in ctx.schema.columns if c.kind in ("continuous", "integer")]
         if len(numeric_columns) < 2:
             return np.nan
