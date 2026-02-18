@@ -23,22 +23,21 @@ class FlwrSerializer(Protocol):
             message_type: str | None = None,
             dst_node_id: int | None = None,
             reply_to: Message | None = None) -> Message:
-        pass
+        ...
 
 
 class FlwrDeserializer(Protocol):
-    def __call__(self, message: Message) -> Update:
-        pass
+    def __call__(
+            self,
+            message: Message,
+            arrays_to_ml_framework_map: dict[str, str] | None = None) -> Update:
+        ...
 
 
-def make_serde(
-        allow_pickle: bool,
-        arrays_to_ml_framework_map: dict[str, str] | None
-) -> tuple[FlwrSerializer, FlwrDeserializer]:
-
+def make_serde(allow_pickle: bool) -> tuple[FlwrSerializer, FlwrDeserializer]:
     return (
         make_serializer(allow_pickle),
-        make_deserializer(allow_pickle, arrays_to_ml_framework_map)
+        make_deserializer(allow_pickle)
     )
 
 
@@ -91,13 +90,12 @@ def make_serializer(allow_pickle: bool) -> FlwrSerializer:
     return serializer
 
 
-def make_deserializer(
-        allow_pickle: bool,
-        arrays_to_ml_framework_map: dict[str, str] | None) -> FlwrDeserializer:
+def make_deserializer(allow_pickle: bool) -> FlwrDeserializer:
+    def deserializer(
+            message: Message,
+            arrays_to_ml_framework_map: dict[str, str] | None = None) -> Update:
 
-    arrays_to_ml_framework_map = arrays_to_ml_framework_map or {}
-
-    def deserializer(message: Message) -> Update:
+        arrays_to_ml_framework_map = arrays_to_ml_framework_map or {}
         rdict = message.content
         update = Update()
 

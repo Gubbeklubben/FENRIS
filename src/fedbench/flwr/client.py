@@ -16,7 +16,7 @@ from fedbench.data import PartitionedDataset, load_csv
 from fedbench.data.partitioners import registry as partitioner_reg
 from fedbench.eval.context import EvalContext
 from fedbench.eval.suite import EvaluationSuite
-from fedbench.flwr.serde import make_serde
+from fedbench.flwr.serde import make_serde, FlwrSerializer, FlwrDeserializer
 
 
 app = ClientApp()
@@ -27,14 +27,20 @@ class ClientContext:
     config: Config
     algorithm: type[Algorithm]
     dataset: PartitionedDataset
+    to_flwr: FlwrSerializer
+    from_flwr: FlwrDeserializer
 
 client_ctx: ClientContext | None = None
 
 
-def require_client_ctx() -> tuple[Config, type[Algorithm], PartitionedDataset]:
+def require_client_ctx() -> tuple[Config, type[Algorithm], PartitionedDataset,
+        FlwrSerializer, FlwrDeserializer]:
+
     if client_ctx is None:
         raise RuntimeError("Client not configured.")
-    return client_ctx.config, client_ctx.algorithm, client_ctx.dataset
+
+    return (client_ctx.config, client_ctx.algorithm, client_ctx.dataset,
+            client_ctx.to_flwr, client_ctx.from_flwr)
 
 
 def get_partition_id(flwr_context: Context) -> int:
@@ -59,58 +65,54 @@ def configure(flwr_message: Message, flwr_context: Context) -> Message:
         seed=config.seed
     )
     algorithm = algorithm_reg.load(config.algorithm)
+    to_flwr, from_flwr = make_serde(config.allow_pickle)
 
     global client_ctx
-    client_ctx = ClientContext(config, algorithm, dataset)
-
+    client_ctx = ClientContext(
+        config=config,
+        algorithm=algorithm,
+        dataset=dataset,
+        to_flwr=to_flwr,
+        from_flwr=from_flwr
+    )
     return Message(content=RecordDict(), reply_to=flwr_message)
 
 
 @app.query("init")
 def init(flwr_message: Message, flwr_context: Context) -> Message:
     partition_id = get_partition_id(flwr_context)
-    config, algorithm, dataset = require_client_ctx()
+    config, algorithm, dataset, to_flwr, from_flwr = require_client_ctx()
     train_df = dataset.load_train_partition(partition_id)
 
     synthesizer = algorithm.create_synthesizer()
-    serializer, deserializer = make_serde(
-        config.allow_pickle,
-        synthesizer.arrays_to_ml_framework_map
-    )
-    request = deserializer(flwr_message)
+    request = from_flwr(flwr_message, synthesizer.arrays_to_ml_framework_map)
     reply = synthesizer.init(request, train_df)
-    return serializer(update=reply, reply_to=flwr_message)
+
+    return to_flwr(update=reply, reply_to=flwr_message)
 
 
 @app.train()
 def train(flwr_message: Message, flwr_context: Context) -> Message:
     partition_id = get_partition_id(flwr_context)
-    config, algorithm, dataset = require_client_ctx()
+    config, algorithm, dataset, to_flwr, from_flwr = require_client_ctx()
     train_df = dataset.load_train_partition(partition_id)
 
     synthesizer = algorithm.create_synthesizer()
-    serializer, deserializer = make_serde(
-        config.allow_pickle,
-        synthesizer.arrays_to_ml_framework_map
-    )
-    request = deserializer(flwr_message)
+    request = from_flwr(flwr_message, synthesizer.arrays_to_ml_framework_map)
     reply = synthesizer.train(request, train_df)
-    return serializer(update=reply, reply_to=flwr_message)
+
+    return to_flwr(update=reply, reply_to=flwr_message)
 
 
 @app.evaluate()
 def evaluate(flwr_message: Message, flwr_context: Context) -> Message:
     partition_id = get_partition_id(flwr_context)
-    config, algorithm, dataset = require_client_ctx()
+    config, algorithm, dataset, to_flwr, from_flwr = require_client_ctx()
     train_df = dataset.load_train_partition(partition_id)
     test_df = dataset.load_test_partition(partition_id)
 
     synthesizer = algorithm.create_synthesizer()
-    serializer, deserializer = make_serde(
-        config.allow_pickle,
-        synthesizer.arrays_to_ml_framework_map
-    )
-    request = deserializer(flwr_message)
+    request = from_flwr(flwr_message, synthesizer.arrays_to_ml_framework_map)
     synthetic_df = synthesizer.sample(
         request,
         config.num_synthetic_rows or len(train_df),

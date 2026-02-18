@@ -49,15 +49,13 @@ def make_server_app(config: Config) -> ServerApp:
 
         algorithm: type[Algorithm] = algorithm_reg.load(config.algorithm)
         aggregator = algorithm.create_aggregator()
-        serializer, deserializer = make_serde(
-            config.allow_pickle,
-            aggregator.arrays_to_ml_framework_map
-        )
+        to_flwr, from_flwr = make_serde(config.allow_pickle)
+        
         strategy = FedbenchStrategy(
             aggregator,
             config.num_rounds,
-            serializer,
-            deserializer,
+            to_flwr,
+            from_flwr,
         )
         strategy.start(grid)
 
