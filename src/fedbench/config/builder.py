@@ -62,8 +62,6 @@ def build_config(cli_input: dict[str, Any]) -> Config:
         metrics=metricscfg
     )
 
-
-
 def build_defaults_dict(config_class):
     return {
         f.name: f.default
