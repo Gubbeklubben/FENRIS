@@ -3,6 +3,9 @@ from dataclasses import dataclass, field, asdict
 from typing import Literal, Self
 
 
+type ConfigCls = type[DataConfig] | type[MetricsConfig] | type[Config]
+
+
 @dataclass(frozen=True)
 class DataConfig:
     dataset: str
@@ -16,7 +19,7 @@ class DataConfig:
 
 @dataclass(frozen=True)
 class MetricsConfig:
-    run_categories: tuple[str, ...] = ()
+    run_categories: tuple[str, ...] = field(default_factory=tuple)
     early_stop: bool = False
     stop_metric: str | None = None
     stop_mode: Literal["min", "max"] | None = None
