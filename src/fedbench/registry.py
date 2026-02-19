@@ -34,14 +34,12 @@ class Registry[T]:
         for e in self._entry_points:
             yield Metadata(name=e.name, locator=e.value, source="plugin")
 
-    def add_builtin(self, name: str, locator: str) -> None:
-        if not _is_valid_locator(locator):
-            raise ValueError(f"Invalid locator '{locator}'")
-        self._builtins[name] = locator
-
     @property
     def group(self) -> str:
         return self._group
+
+    def has_entry(self, name: str) -> bool:
+        return name in self._builtins or name in self._entry_points.names
 
     def load(self, name: str) -> T:
         value = self._load_builtin(name)
@@ -53,6 +51,11 @@ class Registry[T]:
             raise ValueError(f"No such entry: {name}.")
 
         return value
+
+    def add_builtin(self, name: str, locator: str) -> None:
+        if not _is_valid_locator(locator):
+            raise ValueError(f"Invalid locator '{locator}'")
+        self._builtins[name] = locator
 
     def _load_builtin(self, name: str) -> T | None:
         try:
