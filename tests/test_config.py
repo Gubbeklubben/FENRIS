@@ -15,6 +15,7 @@ def minimal_valid_cfg(tmp_path: Path, **overrides):
         "dataset": str(dataset),
         "algorithm": "fed_noop",
         "partitioner": "iid-partitioner",
+        "partitioner_kwargs": {"num_partitions": 3},
     }
     base.update(overrides)
     return base
@@ -75,13 +76,6 @@ def test_unsupported_category_raises(tmp_path):
 
 # --- numeric config validation --------------------------------------------
 
-@pytest.mark.parametrize("num_clients", [0, -1])
-def test_invalid_num_clients_raises(tmp_path, num_clients):
-    cfg = minimal_valid_cfg(tmp_path, num_clients=num_clients)
-
-    with pytest.raises(ValueError):
-        build_config(cfg)
-
 
 @pytest.mark.parametrize("num_rounds", [0, -5])
 def test_invalid_num_rounds_raises(tmp_path, num_rounds):
@@ -114,7 +108,7 @@ def test_default_outputdir_is_cwd_out(tmp_path, monkeypatch):
 
     config = build_config(cfg)
 
-    assert config.outputdir == tmp_path / "out"
+    assert config.outputdir == str(tmp_path / "out")
 
 
 def test_custom_outputdir_is_resolved(tmp_path):
@@ -123,7 +117,7 @@ def test_custom_outputdir_is_resolved(tmp_path):
 
     config = build_config(cfg)
 
-    assert config.outputdir == out.resolve()
+    assert config.outputdir == str(out.resolve())
 
 
 # --- positive sanity checks ------------------------------------------------
@@ -165,7 +159,6 @@ def test_static_defaults(tmp_path):
     cfg = minimal_valid_cfg(tmp_path)
     config = build_config(cfg)
 
-    assert config.data.partitioner_kwargs == {}
     assert config.data.target_col is None
     assert config.data.sensitive_cols == ()
 
@@ -179,7 +172,6 @@ def test_static_defaults(tmp_path):
     assert config.metrics.stop_eval_every is None
     assert config.metrics.stop_synthetic_rows is None
 
-    assert config.num_clients == 3
     assert config.num_rounds == 3
     assert config.test_size == 0.2
     assert config.seed == 42

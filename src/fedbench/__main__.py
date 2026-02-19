@@ -1,9 +1,11 @@
+import pprint
 from pathlib import Path
-from typing import Annotated
+from typing import Annotated, Literal
 
 import typer
 from flwr.simulation import run_simulation
 
+from fedbench.config.builder import build_config
 # noinspection PyProtectedMember
 from fedbench.flwr import client_app
 # noinspection PyProtectedMember
@@ -15,8 +17,16 @@ from fedbench.config.config import DataConfig
 app = typer.Typer()
 
 
+def parse_kwargs(value: str) -> dict[str, int]:
+    result = {}
+    for item in value.split(","):
+        key, val = item.split("=")
+        result[key] = int(val)
+    return result
+
+
 @app.command()
-def new(name: str):
+def new(name: str) -> None:
     pass
 
 
@@ -36,47 +46,44 @@ def list_algorithms(
 
 @app.command()
 def run(
-        algorithm: str,
-        dataset: str,
-        num_clients: int = typer.Option()) -> None:
+        algorithm: Annotated[str, typer.Argument()],
+        partitioner: Annotated[str, typer.Argument()],
+        dataset: Annotated[str, typer.Argument()],
+        algorithm_kwargs: Annotated[str | None, typer.Option(callback=parse_kwargs)] = None,
+        partitioner_kwargs: Annotated[str | None, typer.Option(callback=parse_kwargs)] = None,
+        target_col: Annotated[str | None, typer.Option()] = None,
+        sensitive_cols: Annotated[str | None, typer.Option()] = None,
 
-    config = _build_minimal_example_config(
-        algorithm=algorithm,
-        dataset=dataset,
-        num_clients=num_clients
-    )
+        run_categories: Annotated[str | None, typer.Option()] = None,
+        early_stop: Annotated[bool | None, typer.Option()] = None,
+        stop_metric: Annotated[str | None, typer.Option()] = None,
+        stop_mode: Annotated[Literal["min", "max"] | None, typer.Option()] = None,
+        stop_epsilon: Annotated[float | None, typer.Option()] = None,
+        stop_patience: Annotated[int | None, typer.Option()] = None,
+        stop_min_rounds: Annotated[int | None, typer.Option()] = None,
+        stop_eval_every: Annotated[int | None, typer.Option()] = None,
+        stop_synthetic_rows: Annotated[int | None, typer.Option()] = None,
+
+        num_rounds: Annotated[int | None, typer.Option()] = None,
+        test_size: Annotated[float | None, typer.Option()] = None,
+        seed: Annotated[int | None, typer.Option()] = None,
+        outputdir: Annotated[str | None, typer.Option()] = None,
+        num_synthetic_rows: Annotated[int | None, typer.Option()] = None,
+        allow_pickle: Annotated[bool | None, typer.Option()] = None,
+) -> None:
+
+    config_dict = {
+        key: value
+        for key, value in locals().items()
+        if value is not None
+    }
+
+    config = build_config(config_dict)
+
     run_simulation(
         make_server_app(config),
         client_app,
-        num_supernodes=num_clients,
-    )
-
-
-def _build_minimal_example_config(
-        algorithm: str,
-        dataset: str,
-        num_clients: int) -> Config:
-
-    dataset = Path(dataset).resolve()
-    if not dataset.exists():
-        raise ValueError(f"Dataset {dataset} does not exist.")
-
-    if not dataset.is_file():
-        raise ValueError(f"Dataset {dataset} is not a regular file.")
-
-    return Config(
-        algorithm=algorithm,
-        num_clients=num_clients,
-        num_rounds=3,
-        test_size=0.2,
-        seed=1337,
-        outputdir=str(Path.cwd().joinpath("out")),
-        data=DataConfig(
-            dataset=str(dataset),
-            partitioner="iid-partitioner",
-            partitioner_kwargs={"num_partitions": num_clients},
-        ),
-        allow_pickle=True
+        num_supernodes=config.num_clients,
     )
 
 

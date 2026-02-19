@@ -26,15 +26,19 @@ def build_config(cli_input: dict[str, Any]) -> Config:
     datacfg_combined["dataset"] = str(Path(datacfg_combined["dataset"]).resolve())
 
     if not cfg_combined["outputdir"]:
-        cfg_combined["outputdir"] = Path.cwd().joinpath("out")
+        cfg_combined["outputdir"] = str(Path.cwd().joinpath("out"))
     else:
-        cfg_combined["outputdir"] = Path(cfg_combined["outputdir"]).resolve()
+        cfg_combined["outputdir"] = str(Path(cfg_combined["outputdir"]).resolve())
 
     validate_all_configs(
         cfg_combined,
         datacfg_combined,
         metricscfg_combined,
     )
+
+    partitioner_factory = partitioner_registry.load(datacfg_combined["partitioner"])
+    partitioner = partitioner_factory(**datacfg_combined["partitioner_kwargs"])
+    cfg_combined["num_clients"] = partitioner.num_partitions
 
     cfg_combined["data"] = DataConfig(**datacfg_combined)
     cfg_combined["metrics"] = MetricsConfig(**metricscfg_combined)
@@ -63,9 +67,6 @@ def validate_config(config: Mapping[str, Any]) -> None:
     if not algorithms_registry.has_entry(config["algorithm"]):
         raise ValueError(f"Algorithm {config["algorithm"]} is not registered")
 
-    # TODO: for some partitioners, num_clients is not known in advance
-    if config["num_clients"] < 1:
-        raise ValueError(f"Number of clients {config["num_clients"]} is not supported")
     if config["num_rounds"] < 1:
         raise ValueError(f"Number of rounds {config["num_rounds"]} is not supported")
     if config["test_size"] <= 0 or config["test_size"] >= 1:
