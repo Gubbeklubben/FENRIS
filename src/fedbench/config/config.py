@@ -16,7 +16,7 @@ class DataConfig:
 
 @dataclass(frozen=True)
 class MetricsConfig:
-    run_categories: tuple[str, ...] = field(default_factory=tuple)
+    run_categories: tuple[str, ...] = ()
     early_stop: bool = False
     stop_metric: str | None = None
     stop_mode: Literal["min", "max"] | None = None
@@ -30,12 +30,12 @@ class MetricsConfig:
 @dataclass(frozen=True)
 class Config:
     algorithm: str
-    num_clients: int
-    num_rounds: int
-    test_size: float
-    seed: int
-    outputdir: str
     data: DataConfig
+    num_clients: int = 3
+    num_rounds: int = 3
+    test_size: float = 0.2
+    seed: int = 42
+    outputdir: str = ""
     num_synthetic_rows: int | None = None
     allow_pickle: bool = False
     metrics: MetricsConfig = field(default_factory=MetricsConfig)
