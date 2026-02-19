@@ -10,7 +10,7 @@ authors = [
     {name = "Thomas Stavik Lønning", email = "loenning1995@gmail.com"},
 ]
 license = "MIT"
-requires-python = ">=3.12,<4.0"
+requires-python = ">=3.12,<3.14"
 dependencies = [
     "flwr[simulation] (>=1.25.0,<2.0.0)",
     "typer (>=0.12.5,<0.21.0)",

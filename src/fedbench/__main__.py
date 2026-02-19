@@ -18,7 +18,11 @@ app = typer.Typer()
 
 
 def parse_kwargs(value: str) -> dict[str, int]:
+    if value is None:
+        return {}
+
     result = {}
+
     for item in value.split(","):
         key, val = item.split("=")
         result[key] = int(val)
