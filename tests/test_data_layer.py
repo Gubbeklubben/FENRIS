@@ -26,7 +26,6 @@ def test_load_csv_and_schema(sample_df, tmp_path):
 
     assert df.shape == sample_df.shape
     # schema is deterministic
-    print([c.kind for c in schema.columns] )
     assert [c.kind for c in schema.columns] == [
         "integer",
         "continuous",

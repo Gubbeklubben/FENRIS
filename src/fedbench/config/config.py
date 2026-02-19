@@ -3,6 +3,9 @@ from dataclasses import dataclass, field, asdict
 from typing import Literal, Self
 
 
+type ConfigCls = type[DataConfig] | type[MetricsConfig] | type[Config]
+
+
 @dataclass(frozen=True)
 class DataConfig:
     dataset: str
@@ -30,12 +33,15 @@ class MetricsConfig:
 @dataclass(frozen=True)
 class Config:
     algorithm: str
-    num_clients: int
-    num_rounds: int
-    test_size: float
-    seed: int
-    outputdir: str
     data: DataConfig
+    algorithm_kwargs: dict[
+        str, None | bool | str | float | int
+    ] = field(default_factory=dict)
+    num_clients: int = 3
+    num_rounds: int = 3
+    test_size: float = 0.2
+    seed: int = 42
+    outputdir: str = ""
     num_synthetic_rows: int | None = None
     allow_pickle: bool = False
     metrics: MetricsConfig = field(default_factory=MetricsConfig)
