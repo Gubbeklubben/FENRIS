@@ -25,7 +25,7 @@ app = ClientApp()
 @dataclass(frozen=True)
 class ClientContext:
     config: Config
-    algorithm: type[Algorithm]
+    algorithm: Algorithm
     dataset: PartitionedDataset
     to_flwr: FlwrSerializer
     from_flwr: FlwrDeserializer
@@ -33,7 +33,7 @@ class ClientContext:
 client_ctx: ClientContext | None = None
 
 
-def require_client_ctx() -> tuple[Config, type[Algorithm], PartitionedDataset,
+def require_client_ctx() -> tuple[Config, Algorithm, PartitionedDataset,
         FlwrSerializer, FlwrDeserializer]:
 
     if client_ctx is None:
@@ -55,8 +55,10 @@ def configure(flwr_message: Message, flwr_context: Context) -> Message:
     config = Config.parse_jsons(cast(str, cfg_record["jsons"]))
 
     df, schema = load_csv(config.data.dataset)
-    partitioner_factory = partitioner_reg.load(config.data.partitioner)
-    partitioner = partitioner_factory(**config.data.partitioner_kwargs)
+    partitioner = partitioner_reg.call(
+        config.data.partitioner,
+        **config.data.partitioner_kwargs
+    )
     dataset = PartitionedDataset(
         df=df,
         schema=schema,
@@ -64,7 +66,7 @@ def configure(flwr_message: Message, flwr_context: Context) -> Message:
         test_size=config.test_size,
         seed=config.seed
     )
-    algorithm = algorithm_reg.load(config.algorithm)
+    algorithm = algorithm_reg.call(config.algorithm)
     to_flwr, from_flwr = make_serde(config.allow_pickle)
 
     global client_ctx

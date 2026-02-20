@@ -12,8 +12,7 @@ def _get_by_categories(categories: Iterable[str]) -> Iterable[tuple[str, Evaluat
     for category in categories:
         registry = evaluator_regs[category]
         for metadata in registry:
-            factory = registry.load(metadata.name)
-            yield f"{category}.{metadata.name}", factory()
+            yield f"{category}.{metadata.name}", registry.call(metadata.name)
 
 
 def _get_by_names(names: Iterable[str]) -> Iterable[tuple[str, Evaluator]]:
@@ -23,8 +22,7 @@ def _get_by_names(names: Iterable[str]) -> Iterable[tuple[str, Evaluator]]:
 
         for metadata in registry:
             if metadata.name not in names: continue
-            factory = registry.load(metadata.name)
-            yield f"{category}.{metadata.name}", factory()
+            yield f"{category}.{metadata.name}", registry.call(metadata.name)
 
 
 class EvaluationSuite:

@@ -1,18 +1,10 @@
 from fedbench.algorithms.algorithm import Algorithm, Synthesizer, Aggregator
-from fedbench.registry import Registry
+from fedbench.registry import FactoryRegistry
 
 
-def _alg_validator(value: type[Algorithm]) -> type[Algorithm]:
-    if not issubclass(value, Algorithm):
-        raise TypeError(
-            f"The provided value {value} is not a subclass of {Algorithm}"
-        )
-    return value
-
-
-registry: Registry[type[Algorithm]] = Registry(
+registry: FactoryRegistry[Algorithm] = FactoryRegistry(
     group=__package__,
-    validator=_alg_validator
+    product_cls=Algorithm,
 )
 registry.add_builtin("fed_noop", f"{__package__}.fed_noop:FedNoop")
 

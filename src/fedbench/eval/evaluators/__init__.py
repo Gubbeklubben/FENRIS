@@ -3,7 +3,7 @@ from types import MappingProxyType
 from typing import Mapping
 
 from fedbench.eval.evaluators.base import Evaluator
-from fedbench.registry import Registry
+from fedbench.registry import FactoryRegistry
 
 
 class Category(StrEnum):
@@ -14,16 +14,11 @@ class Category(StrEnum):
     SCALABILITY = "scalability"
 
 
-def _validator(evaluator_cls: type[Evaluator]) -> type[Evaluator]:
-    if not issubclass(evaluator_cls, Evaluator):
-        raise TypeError(f"{evaluator_cls} must be a subclass of {Evaluator}")
-    return evaluator_cls
-
-
-_registries: dict[str, Registry[type[Evaluator]]] = {
-    category: Registry(
+_registries: dict[str, FactoryRegistry[Evaluator]] = {
+    category: FactoryRegistry(
         group=f"{__package__}.{category}",
-        validator=_validator,
+        product_cls=Evaluator,
+
     ) for category in Category
 }
 
@@ -56,7 +51,7 @@ _registries[Category.FIDELITY].add_builtin(
     f"{__package__}.fidelity:TStatMeanAbsEvaluator"
 )
 
-registries: Mapping[str, Registry[type[Evaluator]]] = MappingProxyType(_registries)
+registries: Mapping[str, FactoryRegistry[Evaluator]] = MappingProxyType(_registries)
 
 __all__ = [
     "Evaluator",
