@@ -1,18 +1,14 @@
-import pprint
-from pathlib import Path
 from typing import Annotated, Literal
 
 import typer
 from flwr.simulation import run_simulation
 
+from fedbench.algorithms import registry as algorithm_reg
 from fedbench.config.builder import build_config
 # noinspection PyProtectedMember
 from fedbench.flwr import client_app
 # noinspection PyProtectedMember
 from fedbench.flwr import make_server_app
-from fedbench.algorithms import registry as alg_registry
-from fedbench.config import Config
-from fedbench.config.config import DataConfig
 
 app = typer.Typer()
 
@@ -43,7 +39,7 @@ def list_algorithms(
                 help="Show locators for the factories used to create "
                      "algorithm instances.")] = False) -> None:
 
-    for metadata in alg_registry:
+    for metadata in algorithm_reg.metadata():
         print(metadata.name, end="")
         print(f": {metadata.locator}" if include_locator else "")
 
