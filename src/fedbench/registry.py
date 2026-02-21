@@ -1,10 +1,11 @@
 import importlib
-import inspect
 import keyword
-from collections.abc import Callable
 from dataclasses import dataclass
 from importlib.metadata import entry_points
-from typing import Any, Iterator, Literal, cast
+from logging import WARNING
+from typing import Any, Iterator, Literal
+
+from fedbench.common import log
 
 
 @dataclass(frozen=True)
@@ -15,52 +16,82 @@ class Metadata:
 
 
 class FactoryRegistry[T]:
-    def __init__(self, group: str, product_cls: type[Any]) -> None:
+    def __init__(self, group: str, product_cls: type[T]) -> None:
         self._group = group
+
+        if not isinstance(product_cls, type):
+            raise TypeError(f"product_cls must be a type.")
         self._product_cls = product_cls
+
         self._builtins: dict[str, str] = {}
-        self._entry_points = entry_points(group=group)
+        self._plugins: dict[str, importlib.metadata.EntryPoint] = {}
 
-    def __iter__(self) -> Iterator[Metadata]:
-        for k, v in self._builtins.items():
-            yield Metadata(name=k, locator=v, source="builtin")
+        for ep in entry_points(group=group):
+            if ep.name in self._plugins:
+                log(
+                    self.__class__.__name__,
+                    (f"Ignoring duplicate plugin '{ep.name}' from '{ep.value}'", ),
+                    level=WARNING
+                )
+            else:
+                self._plugins[ep.name] = ep
 
-        for e in self._entry_points:
-            yield Metadata(name=e.name, locator=e.value, source="plugin")
+    def __repr__(self) -> str:
+        return (f"{self.__class__.__name__}(group={self.group}, "
+                f"product_cls={self._product_cls})")
+
+    def __iter__(self) -> Iterator[str]:
+        yield from self._builtins.keys()
+        yield from self._plugins.keys()
+
+    def __contains__(self, name: str) -> bool:
+        return name in self._builtins or name in self._plugins
 
     @property
     def group(self) -> str:
         return self._group
 
-    def has_entry(self, name: str) -> bool:
-        return name in self._builtins or name in self._entry_points.names
-
     def add_builtin(self, name: str, locator: str) -> None:
-        if not _is_valid_locator(locator):
-            raise ValueError(f"Invalid locator '{locator}'")
+        if not _is_valid_factory_locator(locator):
+            raise ValueError(f"Invalid factory locator '{locator}'")
+
+        if name in self._builtins:
+            raise ValueError(f"Builtin factory '{name}' already registered.")
+
         self._builtins[name] = locator
 
     def call(self, name: str, **kwargs: Any) -> T:
         factory = self._load(name)
-        instance = factory(**kwargs)
 
+        if not callable(factory):
+            raise TypeError(f"{factory} is not callable.")
+
+        instance = factory(**kwargs)
         if not isinstance(instance, self._product_cls):
             raise TypeError(
                 f"Unexpected type {type(instance)} produced by factory {name}"
             )
-        # noinspection PyUnnecessaryCast
-        return cast(T, instance)
+        return instance
 
-    def _load(self, name: str) -> Callable[..., Any]:
+    def metadata(self) -> Iterator[Metadata]:
+        for k, v in self._builtins.items():
+            yield Metadata(name=k, locator=v, source="builtin")
+
+        for ep in self._plugins.values():
+            yield Metadata(name=ep.name, locator=ep.value, source="plugin")
+
+    def _load(self, name: str) -> Any:
         factory = self._load_builtin(name)
+
         if factory is None:
             factory = self._load_plugin(name)
 
         if factory is None:
-            raise ValueError(f"No such entry: {name}.")
+            raise ValueError(f"No such factory: '{name}'.")
+
         return factory
 
-    def _load_builtin(self, name: str) -> Callable[..., Any] | None:
+    def _load_builtin(self, name: str) -> Any | None:
         try:
             locator = self._builtins[name]
         except KeyError:
@@ -70,34 +101,23 @@ class FactoryRegistry[T]:
         module = importlib.import_module(module_name)
 
         factory = module
-        if qualifier:
-            for attr in qualifier.split("."):
-                if not hasattr(factory, attr):
-                    raise ValueError(f"Bad locator '{locator}' in {self}")
-                factory = getattr(factory, attr)
+        for attr in qualifier.split("."):
+            if not hasattr(factory, attr):
+                raise ValueError(f"Bad locator '{locator}' in {self}")
+            factory = getattr(factory, attr)
 
-        if inspect.ismodule(factory):
-            raise ValueError(f"Module {factory} is not a valid factory.")
+        return factory
 
-        return _check_callable(factory)
-
-    def _load_plugin(self, name: str) -> Callable[..., Any] | None:
+    def _load_plugin(self, name: str) -> Any | None:
         try:
-            entry_point = self._entry_points[name]
+            entry_point = self._plugins[name]
         except KeyError:
             return None
 
-        factory = entry_point.load()
-        return _check_callable(factory)
+        return entry_point.load()
 
 
-def _check_callable(factory: Callable[..., Any]) -> Callable[..., Any]:
-    if not callable(factory):
-        raise TypeError(f"{factory} is not callable.")
-    return factory
-
-
-def _is_valid_locator(locator: str) -> bool:
+def _is_valid_factory_locator(locator: str) -> bool:
     module, _, qualifier = locator.partition(":")
 
     def valid(s: str) -> bool:
@@ -106,11 +126,7 @@ def _is_valid_locator(locator: str) -> bool:
     if not all(valid(m) for m in module.split(".")):
         return False
 
-    if not qualifier:
-        return True
-
     if not all(valid(q) for q in qualifier.split(".")):
         return False
 
     return True
-

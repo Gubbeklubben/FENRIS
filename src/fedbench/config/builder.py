@@ -7,7 +7,7 @@ from fedbench.config import DataConfig, MetricsConfig
 from fedbench.config.config import Config, ConfigCls
 from fedbench.eval.evaluators import Category
 from fedbench.data.partitioners import registry as partitioner_reg
-from fedbench.algorithms import registry as algorithms_registry
+from fedbench.algorithms import registry as algorithm_reg
 
 
 def build_config(cli_input: dict[str, Any]) -> Config:
@@ -55,7 +55,7 @@ def validate_data_config(data_config: Mapping[str, Any]) -> None:
     if not path.exists():
         raise FileNotFoundError(f"Dataset {path} does not exist")
 
-    if not partitioner_reg.has_entry(data_config["partitioner"]):
+    if data_config["partitioner"] not in partitioner_reg:
         raise ValueError(f"Partitioner {data_config['partitioner']} is not registered")
 
 
@@ -66,7 +66,7 @@ def validate_metrics_config(metrics_config: Mapping[str, Any]) -> None:
 
 
 def validate_config(config: Mapping[str, Any]) -> None:
-    if not algorithms_registry.has_entry(config["algorithm"]):
+    if config["algorithm"] not in algorithm_reg:
         raise ValueError(f"Algorithm {config["algorithm"]} is not registered")
 
     if config["num_rounds"] < 1:

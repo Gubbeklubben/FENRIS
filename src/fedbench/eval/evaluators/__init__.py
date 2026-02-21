@@ -17,7 +17,7 @@ class Category(StrEnum):
 _registries: dict[str, FactoryRegistry[Evaluator]] = {
     category: FactoryRegistry(
         group=f"{__package__}.{category}",
-        product_cls=Evaluator,
+        product_cls=Evaluator,  # type: ignore[type-abstract]
 
     ) for category in Category
 }

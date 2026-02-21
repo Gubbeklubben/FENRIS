@@ -4,7 +4,7 @@ from fedbench.registry import FactoryRegistry
 
 registry = FactoryRegistry[Partitioner](
     group=f"{__package__}",
-    product_cls=Partitioner,
+    product_cls=Partitioner,  # type: ignore[type-abstract]
 )
 
 registry.add_builtin(

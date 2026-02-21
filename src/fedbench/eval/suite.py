@@ -11,8 +11,8 @@ from fedbench.eval.evaluators import (
 def _get_by_categories(categories: Iterable[str]) -> Iterable[tuple[str, Evaluator]]:
     for category in categories:
         registry = evaluator_regs[category]
-        for metadata in registry:
-            yield f"{category}.{metadata.name}", registry.call(metadata.name)
+        for name in registry:
+            yield f"{category}.{name}", registry.call(name)
 
 
 def _get_by_names(names: Iterable[str]) -> Iterable[tuple[str, Evaluator]]:
@@ -20,9 +20,9 @@ def _get_by_names(names: Iterable[str]) -> Iterable[tuple[str, Evaluator]]:
     for category in Category:
         registry = evaluator_regs[category]
 
-        for metadata in registry:
-            if metadata.name not in names: continue
-            yield f"{category}.{metadata.name}", registry.call(metadata.name)
+        for name in registry:
+            if name not in names: continue
+            yield f"{category}.{name}", registry.call(name)
 
 
 class EvaluationSuite:

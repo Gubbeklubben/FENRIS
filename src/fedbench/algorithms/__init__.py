@@ -4,7 +4,7 @@ from fedbench.registry import FactoryRegistry
 
 registry: FactoryRegistry[Algorithm] = FactoryRegistry(
     group=__package__,
-    product_cls=Algorithm,
+    product_cls=Algorithm,  # type: ignore[type-abstract]
 )
 registry.add_builtin("fed_noop", f"{__package__}.fed_noop:FedNoop")
 

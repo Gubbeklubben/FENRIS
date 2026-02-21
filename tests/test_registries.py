@@ -7,8 +7,8 @@ from fedbench.algorithms import (
 
 
 def test_registered_algorithms_produce_expected_types() -> None:
-    for metadata in algorithm_reg:
-        algorithm = algorithm_reg.call(metadata.name)
+    for name in algorithm_reg:
+        algorithm = algorithm_reg.call(name)
         assert isinstance(algorithm, Algorithm)
 
         synthesizer = algorithm.create_synthesizer()
