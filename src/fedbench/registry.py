@@ -1,4 +1,5 @@
 import importlib
+import inspect
 import keyword
 from dataclasses import dataclass
 from importlib.metadata import entry_points
@@ -62,6 +63,9 @@ class FactoryRegistry[T]:
 
     def call(self, name: str, **kwargs: Any) -> T:
         factory = self._load(name)
+
+        if inspect.isclass(factory) and inspect.isabstract(factory):
+            raise TypeError(f"{factory} is an abstract class.")
 
         if not callable(factory):
             raise TypeError(f"{factory} is not callable.")
