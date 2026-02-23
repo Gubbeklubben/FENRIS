@@ -74,12 +74,10 @@ class Synthesizer(ABC):
 
 
 class Algorithm(ABC):
-    @classmethod
     @abstractmethod
-    def create_aggregator(cls) -> Aggregator:
+    def create_aggregator(self) -> Aggregator:
         pass
 
-    @classmethod
     @abstractmethod
-    def create_synthesizer(cls) -> Synthesizer:
+    def create_synthesizer(self) -> Synthesizer:
         pass

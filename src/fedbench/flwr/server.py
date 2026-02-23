@@ -47,7 +47,7 @@ def make_server_app(config: Config) -> ServerApp:
                 )
         log(__name__, (f"All clients configured.", ), level=INFO)
 
-        algorithm: type[Algorithm] = algorithm_reg.load(config.algorithm)
+        algorithm: Algorithm = algorithm_reg.call(config.algorithm)
         aggregator = algorithm.create_aggregator()
         to_flwr, from_flwr = make_serde(config.allow_pickle)
         

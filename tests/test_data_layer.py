@@ -37,8 +37,8 @@ def test_iid_partitioning(sample_df):
     ds = PartitionedDataset(
         sample_df,
         infer_schema(sample_df),
-        partitioner=partitioner_registry.load("iid-partitioner")(
-            num_partitions=2
+        partitioner=partitioner_registry.call(
+            name="iid-partitioner", num_partitions=2,
         ),
         test_size=0.2,
         seed=80085
