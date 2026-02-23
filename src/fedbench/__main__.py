@@ -3,12 +3,18 @@ from typing import Annotated, Literal
 import typer
 from flwr.simulation import run_simulation
 
-from fedbench.algorithms import registry as algorithm_reg
 from fedbench.config.builder import build_config
 # noinspection PyProtectedMember
 from fedbench.flwr import client_app
 # noinspection PyProtectedMember
 from fedbench.flwr import make_server_app
+from fedbench.registry_builders import (
+    build_algorithm_registry,
+    build_partitioner_registry,
+)
+
+algorithms = build_algorithm_registry()
+partitioners = build_partitioner_registry()
 
 app = typer.Typer()
 
@@ -39,7 +45,7 @@ def list_algorithms(
                 help="Show locators for the factories used to create "
                      "algorithm instances.")] = False) -> None:
 
-    for metadata in algorithm_reg.metadata():
+    for metadata in algorithms.metadata():
         print(metadata.name, end="")
         print(f": {metadata.locator}" if include_locator else "")
 
@@ -72,16 +78,13 @@ def run(
         allow_pickle: Annotated[bool | None, typer.Option()] = None,
 ) -> None:
 
-    config_dict = {
-        key: value
-        for key, value in locals().items()
-        if value is not None
+    cli_input = {
+        key: value for key, value in locals().items() if value is not None
     }
-
-    config = build_config(config_dict)
+    config = build_config(cli_input, algorithms, partitioners)
 
     run_simulation(
-        make_server_app(config),
+        make_server_app(config, algorithms),
         client_app,
         num_supernodes=config.num_clients,
     )

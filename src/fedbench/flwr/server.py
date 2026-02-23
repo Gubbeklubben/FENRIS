@@ -6,9 +6,10 @@ from flwr.common import Context, Message, ConfigRecord, RecordDict
 from flwr.server import Grid
 from flwr.serverapp import ServerApp
 
-from fedbench.algorithms import Algorithm, registry as algorithm_reg
+from fedbench.core.algorithm import Algorithm, Aggregator
 from fedbench.config import Config
 from fedbench.core.logging import log
+from fedbench.core.registry import FactoryRegistry
 from fedbench.flwr.serde import make_serde
 from fedbench.flwr.strategy import FedbenchStrategy
 
@@ -34,8 +35,10 @@ def configure_clients(grid: Grid, config: Config) -> Iterable[Message]:
     return grid.send_and_receive(messages)
 
 
-# Capture config in a closure as we can not easily inject into Context (?).
-def make_server_app(config: Config) -> ServerApp:
+def make_server_app(
+        config: Config,
+        algorithms: FactoryRegistry[Algorithm]) -> ServerApp:
+
     app = ServerApp()
 
     @app.main()
@@ -47,8 +50,8 @@ def make_server_app(config: Config) -> ServerApp:
                 )
         log(__name__, (f"All clients configured.", ), level=INFO)
 
-        algorithm: Algorithm = algorithm_reg.call(config.algorithm)
-        aggregator = algorithm.create_aggregator()
+        algorithm: Algorithm = algorithms.call(config.algorithm)
+        aggregator: Aggregator = algorithm.create_aggregator()
         to_flwr, from_flwr = make_serde(config.allow_pickle)
         
         strategy = FedbenchStrategy(

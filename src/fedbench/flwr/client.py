@@ -10,14 +10,20 @@ from flwr.common import (
     MetricRecord,
 )
 
-from fedbench.algorithms import Algorithm, registry as algorithm_reg
 from fedbench.config import Config
-from fedbench.data import PartitionedDataset, load_csv
-from fedbench.data.partitioners import registry as partitioner_reg
-from fedbench.eval.context import EvalContext
-from fedbench.eval.suite import EvaluationSuite
+from fedbench.core.algorithm import Algorithm
+from fedbench.core.data import PartitionedDataset, load_csv
+from fedbench.core.eval import EvalContext, EvaluationSuite
 from fedbench.flwr.serde import make_serde, FlwrSerializer, FlwrDeserializer
+from fedbench.registry_builders import (
+    build_algorithm_registry,
+    build_partitioner_registry,
+    build_evaluator_registries
+)
 
+algorithms = build_algorithm_registry()
+partitioners = build_partitioner_registry()
+evaluators = build_evaluator_registries()
 
 app = ClientApp()
 
@@ -55,7 +61,7 @@ def configure(flwr_message: Message, flwr_context: Context) -> Message:
     config = Config.parse_jsons(cast(str, cfg_record["jsons"]))
 
     df, schema = load_csv(config.data.dataset)
-    partitioner = partitioner_reg.call(
+    partitioner = partitioners.call(
         config.data.partitioner,
         **config.data.partitioner_kwargs
     )
@@ -66,7 +72,7 @@ def configure(flwr_message: Message, flwr_context: Context) -> Message:
         test_size=config.test_size,
         seed=config.seed
     )
-    algorithm = algorithm_reg.call(config.algorithm)
+    algorithm = algorithms.call(config.algorithm)
     to_flwr, from_flwr = make_serde(config.allow_pickle)
 
     global client_ctx
@@ -130,7 +136,7 @@ def evaluate(flwr_message: Message, flwr_context: Context) -> Message:
         sensitive_columns=config.data.sensitive_cols,
         schema=dataset.schema,
     )
-    eval_suite = EvaluationSuite.default()
+    eval_suite = EvaluationSuite.default(evaluators)
     #eval_suite = EvaluationSuite.with_evaluator_categories(config.metrics.run_categories)
     metrics = MetricRecord()
     for key, value in eval_suite.evaluate(eval_ctx).items():

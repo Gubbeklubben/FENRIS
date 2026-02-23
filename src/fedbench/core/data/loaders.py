@@ -4,7 +4,7 @@ from typing import Literal
 import pandas as pd
 from pandas import DataFrame
 
-from fedbench.data.schemas import TableSchema, infer_schema
+from fedbench.core.data.schemas import TableSchema, infer_schema
 
 
 def load_csv(

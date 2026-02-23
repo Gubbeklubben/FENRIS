@@ -6,7 +6,7 @@ from flwr_datasets.partitioner import (
 )
 from pandas import DataFrame
 
-from fedbench.data.partitioners.partitioner import Partitioner
+from fedbench.core.data.partitioner import Partitioner
 
 
 class FlwrDelegatePartitioner(Partitioner):

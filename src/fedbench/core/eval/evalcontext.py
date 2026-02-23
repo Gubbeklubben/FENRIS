@@ -1,7 +1,7 @@
 from dataclasses import dataclass
 import pandas as pd
 
-from fedbench.data.schemas import TableSchema
+from fedbench.core.data.schemas import TableSchema
 
 
 @dataclass(frozen=True)

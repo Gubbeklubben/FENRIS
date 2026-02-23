@@ -4,7 +4,7 @@ from typing import cast
 
 from flwr.server import Grid
 
-from fedbench.algorithms import Aggregator
+from fedbench.core.algorithm import Aggregator
 from fedbench.core.logging import log
 from fedbench.core.update import Metrics, Update
 from fedbench.flwr.serde import FlwrSerializer, FlwrDeserializer
