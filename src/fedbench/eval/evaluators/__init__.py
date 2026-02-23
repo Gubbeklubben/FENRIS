@@ -3,7 +3,7 @@ from types import MappingProxyType
 from typing import Mapping
 
 from fedbench.eval.evaluators.base import Evaluator
-from fedbench.registry import FactoryRegistry
+from fedbench.core.registry import FactoryRegistry
 
 
 class Category(StrEnum):

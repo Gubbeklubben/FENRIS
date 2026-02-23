@@ -3,8 +3,8 @@ import time
 import pytest
 import threading
 
-from fedbench.event import Event
-from fedbench.eventbus import EventBus, BusState
+from fedbench.core.events import Event
+from fedbench.core.eventbus import EventBus, BusState
 
 
 class SomeEvent(Event):

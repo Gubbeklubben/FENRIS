@@ -6,7 +6,7 @@ from importlib.metadata import entry_points
 from logging import WARNING
 from typing import Any, Iterator, Literal
 
-from fedbench.common import log
+from fedbench.core.logging import log
 
 
 @dataclass(frozen=True)

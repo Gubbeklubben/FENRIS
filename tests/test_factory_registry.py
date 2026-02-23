@@ -2,7 +2,7 @@ from abc import ABC, abstractmethod
 
 import pytest
 
-from fedbench.registry import FactoryRegistry
+from fedbench.core.registry import FactoryRegistry
 
 
 class Product:

@@ -6,11 +6,11 @@ from flwr.common import Context, Message, ConfigRecord, RecordDict
 from flwr.server import Grid
 from flwr.serverapp import ServerApp
 
+from fedbench.algorithms import Algorithm, registry as algorithm_reg
+from fedbench.config import Config
+from fedbench.core.logging import log
 from fedbench.flwr.serde import make_serde
 from fedbench.flwr.strategy import FedbenchStrategy
-from fedbench.algorithms import Algorithm, registry as algorithm_reg
-from fedbench.common import log
-from fedbench.config import Config
 
 
 def configure_clients(grid: Grid, config: Config) -> Iterable[Message]:

@@ -6,8 +6,7 @@ import pytest
 from flwr.common import Message, RecordDict, ArrayRecord
 
 from fedbench.flwr.serde import make_serde
-from fedbench.common import Update
-
+from fedbench.core.update import Update
 
 _RNG = np.random.default_rng(42)
 

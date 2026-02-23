@@ -1,5 +1,5 @@
 from fedbench.data.partitioners.partitioner import Partitioner
-from fedbench.registry import FactoryRegistry
+from fedbench.core.registry import FactoryRegistry
 
 
 registry = FactoryRegistry[Partitioner](

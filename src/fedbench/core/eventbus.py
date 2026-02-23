@@ -3,9 +3,10 @@ import threading
 from collections.abc import Iterable
 from dataclasses import dataclass
 from enum import Enum
-from typing import Protocol, Self
+from types import TracebackType
+from typing import Protocol, Self, cast
 
-from fedbench.event import Event
+from fedbench.core.events import Event
 
 
 @dataclass(frozen=True)
@@ -24,16 +25,21 @@ class BusState(Enum):
 
 class Observer(Protocol):
     def __call__(self, event: Event) -> None:
-        ...
+        pass
+
+
+type _ObserverEntry = tuple[Observer, tuple[type[Event], ...]]
+type _Observers = list[_ObserverEntry]
+type _FrozenObservers = tuple[_ObserverEntry, ...]
 
 
 class EventBus:
     def __init__(self) -> None:
         self._state = BusState.INITIAL
-        self._observers = []
-        self._frozen_observers = None
-        self._observer_thread = None
-        self._event_queue = queue.Queue()
+        self._observers: _Observers | None = []
+        self._frozen_observers: _FrozenObservers | None = None
+        self._observer_thread: threading.Thread | None = None
+        self._event_queue: queue.Queue[Event] = queue.Queue()
         self._lock = threading.Lock()
 
     def __repr__(self) -> str:
@@ -43,8 +49,14 @@ class EventBus:
         self.open()
         return self
 
-    def __exit__(self, exc_type, exc_val, exc_tb) -> None:
+    def __exit__(
+            self,
+            exc_type: type[BaseException] | None,
+            exc_val: BaseException | None,
+            exc_tb: TracebackType | None) -> bool | None:
+
         self.close()
+        return None
 
     @property
     def state(self) -> BusState:
@@ -66,14 +78,17 @@ class EventBus:
                 if not issubclass(event_type, Event):
                     raise TypeError(f"Not a valid event type: {event_type}")
 
-            self._observers.append((observer, tuple(event_types)))
+            # noinspection PyUnnecessaryCast
+            observers = cast(_Observers, self._observers)
+            observers.append((observer, tuple(event_types)))
 
     def open(self) -> None:
         with self._lock:
             if self._state is not BusState.INITIAL:
                 raise RuntimeError(f"{self}: Can not open.")
 
-            self._frozen_observers = tuple(self._observers)
+            # noinspection PyUnnecessaryCast
+            self._frozen_observers = tuple(cast(_Observers, self._observers))
             self._observers = None
             self._observer_thread = threading.Thread(
                 target=self._worker,
@@ -102,7 +117,8 @@ class EventBus:
 
         self._event_queue.join()
         self._event_queue.put_nowait(_bus_closed)
-        self._observer_thread.join()
+        # noinspection PyUnnecessaryCast
+        cast(threading.Thread, self._observer_thread).join()
 
         with self._lock:
             self._state = BusState.CLOSED
@@ -116,8 +132,10 @@ class EventBus:
                 self._event_queue.task_done()
                 return
 
+            # noinspection PyUnnecessaryCast
+            observers = cast(_FrozenObservers, self._frozen_observers)
             try:
-                for observer, event_types in self._frozen_observers:
+                for observer, event_types in observers:
                     if not isinstance(event, event_types):
                         continue
                     # noinspection PyBroadException

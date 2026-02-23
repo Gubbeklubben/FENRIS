@@ -1,5 +1,5 @@
 from fedbench.algorithms.algorithm import Algorithm, Synthesizer, Aggregator
-from fedbench.registry import FactoryRegistry
+from fedbench.core.registry import FactoryRegistry
 
 
 registry: FactoryRegistry[Algorithm] = FactoryRegistry(
