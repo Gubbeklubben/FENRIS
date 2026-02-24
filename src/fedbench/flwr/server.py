@@ -1,33 +1,30 @@
 import time
 from collections.abc import Iterable
-from logging import INFO
 
 from flwr.common import Context, Message, ConfigRecord, RecordDict
 from flwr.server import Grid
 from flwr.serverapp import ServerApp
 
-from fedbench.core.algorithm import Algorithm, Aggregator
 from fedbench.config import Config
-from fedbench.core.logging import log
-from fedbench.core.registry import FactoryRegistry
+from fedbench.core.events import ClientsConfigured
+from fedbench.core.runcontext import RunContext
 from fedbench.flwr.serde import make_serde
 from fedbench.flwr.strategy import FedbenchStrategy
 
 
 def configure_clients(grid: Grid, config: Config) -> Iterable[Message]:
-    num_clients = config.num_clients
     client_ids = list(grid.get_node_ids())
 
     # Wait for clients to connect.
     # https://github.com/adap/flower/blob/main/examples/federated-kaplan-meier-fitter/examplefkm/server_app.py
-    while len(client_ids) < num_clients:
+    while len(client_ids) < config.num_clients:
         time.sleep(1)
         client_ids = list(grid.get_node_ids())
 
-    serialized_cfg = ConfigRecord({"jsons": config.jsons()})
+    cfg_jsons = ConfigRecord({"jsons": config.jsons()})
     messages = (
         Message(
-            content=RecordDict({"config": serialized_cfg}),
+            content=RecordDict({"config": cfg_jsons}),
             message_type="query.configure",
             dst_node_id=cid
         ) for cid in client_ids
@@ -35,31 +32,28 @@ def configure_clients(grid: Grid, config: Config) -> Iterable[Message]:
     return grid.send_and_receive(messages)
 
 
-def make_server_app(
-        config: Config,
-        algorithms: FactoryRegistry[Algorithm]) -> ServerApp:
-
+def make_server_app(runcontext: RunContext) -> ServerApp:
     app = ServerApp()
+    config = runcontext.config
+    eventbus = runcontext.eventbus
+    algorithm = runcontext.components.algorithm
 
     @app.main()
-    def main(grid: Grid, context: Context) -> None:
+    def main(grid: Grid, _: Context) -> None:
+        reply_count = 0
         for reply in configure_clients(grid, config):
             if reply.has_error():
                 raise RuntimeError(
                     f"Failed to configure all clients: {reply.error.reason}"
                 )
-        log(__name__, (f"All clients configured.", ), level=INFO)
+            reply_count += 1
+        eventbus.emit(ClientsConfigured(reply_count))
 
-        algorithm: Algorithm = algorithms.call(config.algorithm)
-        aggregator: Aggregator = algorithm.create_aggregator()
-        to_flwr, from_flwr = make_serde(config.allow_pickle)
-        
         strategy = FedbenchStrategy(
-            aggregator,
-            config.num_rounds,
-            to_flwr,
-            from_flwr,
+            eventbus,
+            algorithm.create_aggregator(),
+            *make_serde(config.allow_pickle)
         )
-        strategy.start(grid)
+        runcontext.final_aggregated_state = strategy.run(grid, config.num_rounds)
 
     return app

@@ -1,5 +1,5 @@
 from fedbench.core.data import Partitioner
-from fedbench.core.registry import FactoryRegistry
+from fedbench.core.factory_registry import FactoryRegistry
 
 
 def register_builtin_partitioners(registry: FactoryRegistry[Partitioner]) -> None:

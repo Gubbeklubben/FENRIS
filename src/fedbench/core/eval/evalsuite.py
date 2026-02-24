@@ -3,7 +3,7 @@ from typing import Self
 
 from fedbench.core.eval.evalcontext import EvalContext
 from fedbench.core.eval.evaluator import Category, Evaluator
-from fedbench.core.registry import FactoryRegistry
+from fedbench.core.factory_registry import FactoryRegistry
 
 
 def _get_by_categories(

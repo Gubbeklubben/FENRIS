@@ -7,7 +7,7 @@ from fedbench.config.config import DataConfig, MetricsConfig, Config, ConfigCls
 from fedbench.core.algorithm import Algorithm
 from fedbench.core.data import Partitioner
 from fedbench.core.eval import Category
-from fedbench.core.registry import FactoryRegistry
+from fedbench.core.factory_registry import FactoryRegistry
 
 
 def build_config(

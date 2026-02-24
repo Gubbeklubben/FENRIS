@@ -1,14 +1,15 @@
 from typing import Annotated, Literal
 
 import typer
-from flwr.simulation import run_simulation
 
+import fedbench.pipeline as pipeline
+import fedbench.runner as runner
 from fedbench.config.builder import build_config
+from fedbench.core.eventbus import EventBus
+from fedbench.core.events import Event
 # noinspection PyProtectedMember
-from fedbench.flwr import client_app
 # noinspection PyProtectedMember
-from fedbench.flwr import make_server_app
-from fedbench.registry_builders import (
+from fedbench.registries import (
     build_algorithm_registry,
     build_partitioner_registry,
 )
@@ -82,12 +83,15 @@ def run(
         key: value for key, value in locals().items() if value is not None
     }
     config = build_config(cli_input, algorithms, partitioners)
-
-    run_simulation(
-        make_server_app(config, algorithms),
-        client_app,
-        num_supernodes=config.num_clients,
-    )
+    eventbus = EventBus()
+    def observer(event: Event) -> None:
+        from fedbench.core.logging import log
+        log(
+            "observer",
+            (f"observed {event}",)
+        )
+    eventbus.register(observer, (Event,))
+    runner.run(config, eventbus, pipeline.default())
 
 
 if __name__ == "__main__":

@@ -2,7 +2,8 @@ from typing import Literal, cast
 
 from datasets import Dataset
 from flwr_datasets.partitioner import (
-    Partitioner as FlwrPartitioner, IidPartitioner
+    Partitioner as FlwrPartitioner,
+    IidPartitioner
 )
 from pandas import DataFrame
 

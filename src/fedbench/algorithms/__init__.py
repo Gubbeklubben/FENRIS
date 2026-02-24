@@ -1,5 +1,5 @@
 from fedbench.core.algorithm import Algorithm
-from fedbench.core.registry import FactoryRegistry
+from fedbench.core.factory_registry import FactoryRegistry
 
 
 def register_builtin_algorithms(registry: FactoryRegistry[Algorithm]) -> None:
