@@ -1,14 +1,16 @@
 from pathlib import Path
+from typing import Optional, Union, Any
 
 import pytest
 
 from fedbench.algorithms import register_builtin_algorithms
-from fedbench.config.builder import build_config
+from fedbench.config.builder import build_config, parse_for_function
 from fedbench.core.algorithm import Algorithm
 from fedbench.core.data import Partitioner
 from fedbench.core.eval import Category
 from fedbench.core.factory_registry import FactoryRegistry
 from fedbench.partitioners import register_builtin_partitioners
+from fedbench.util.parsing import coerce, is_optional
 
 
 @pytest.fixture
@@ -40,7 +42,6 @@ def minimal_valid_cfg(tmp_path: Path, **overrides):
         "dataset": str(dataset),
         "algorithm": "fed_noop",
         "partitioner": "iid-partitioner",
-        "partitioner_kwargs": {"num_partitions": 3},
     }
     base.update(overrides)
     return base
@@ -80,18 +81,6 @@ def test_dataset_does_not_exist_raises(
 
 
 # --- metrics / category validation ----------------------------------------
-
-def test_utility_category_without_target_col_raises(
-        tmp_path, builtin_algorithms, builtin_partitioners):
-
-    cfg = minimal_valid_cfg(
-        tmp_path,
-        run_categories=(Category.UTILITY,),
-        target_col=None,
-    )
-
-    with pytest.raises(ValueError):
-        build_config(cfg, builtin_algorithms, builtin_partitioners)
 
 
 def test_unsupported_category_raises(
@@ -205,7 +194,7 @@ def test_static_defaults(tmp_path, builtin_algorithms, builtin_partitioners):
     assert config.data.target_col is None
     assert config.data.sensitive_cols == ()
 
-    assert config.metrics.run_categories == ()
+    assert config.metrics.run_categories == tuple(Category)
     assert config.metrics.early_stop == False
     assert config.metrics.stop_metric is None
     assert config.metrics.stop_mode is None
@@ -220,3 +209,379 @@ def test_static_defaults(tmp_path, builtin_algorithms, builtin_partitioners):
     assert config.seed == 42
     assert config.num_synthetic_rows is None
     assert config.allow_pickle == False
+
+
+# --- coerce tests ----------------------------------------------------------
+
+def test_coerce_bool_true_variants():
+    """Test coercion of various truthy boolean strings"""
+    for value in ["true", "True", "TRUE", "1", "yes", "Yes", "on", "ON"]:
+        assert coerce(value, bool) is True, f"Failed for value: {value}"
+
+
+def test_coerce_bool_false_variants():
+    """Test coercion of various falsy boolean strings"""
+    for value in ["false", "False", "FALSE", "0", "no", "No", "off", "OFF", ""]:
+        assert coerce(value, bool) is False, f"Failed for value: {value}"
+
+
+def test_coerce_int():
+    """Test coercion of string to int"""
+    assert coerce("42", int) == 42
+    assert coerce("-10", int) == -10
+    assert coerce("0", int) == 0
+
+
+def test_coerce_float():
+    """Test coercion of string to float"""
+    assert coerce("3.14", float) == 3.14
+    assert coerce("0.5", float) == 0.5
+    assert coerce("-2.5", float) == -2.5
+
+
+def test_coerce_list():
+    """Test coercion of string to list"""
+    assert coerce("[1,2,3]", list[int]) == [1, 2, 3]
+    assert coerce("[a,b,c]", list[str]) == ["a", "b", "c"]
+
+
+def test_coerce_tuple():
+    """Test coercion of string to tuple"""
+    assert coerce("(1,2,3)", tuple[int]) == (1, 2, 3)
+    assert coerce("(x,y)", tuple[str]) == ("x", "y")
+
+
+@pytest.mark.parametrize("list_type", [list, list[Any], tuple, tuple[Any]])
+def test_coerce_invalid_list_raises(list_type):
+    """Test that invalid list syntax raises error"""
+    with pytest.raises(TypeError):
+        coerce("not a valid list", list_type)
+
+
+def test_coerce_str():
+    """Test coercion of string to string"""
+    result = coerce("hello", str)
+    assert result == "hello"
+
+
+# --- is_optional tests -----------------------------------------------------
+
+def test_is_optional_with_optional_type():
+    """Test is_optional returns True for Optional[T]"""
+    annotation = Optional[str]
+    assert is_optional(annotation) is True
+
+
+def test_is_optional_with_union_with_none():
+    """Test is_optional returns True for Union with None"""
+    annotation = Union[str, None]
+    assert is_optional(annotation) is True
+
+
+def test_is_optional_with_union_without_none():
+    """Test is_optional returns False for Union without None"""
+    annotation = Union[str, int]
+    assert is_optional(annotation) is False
+
+
+def test_is_optional_with_non_optional_type():
+    """Test is_optional returns False for regular types"""
+    assert is_optional(str) is False
+    assert is_optional(int) is False
+    assert is_optional(bool) is False
+
+
+def test_is_optional_with_list():
+    """Test is_optional returns False for list types"""
+    assert is_optional(list) is False
+
+
+def test_is_optional_with_optional_list():
+    """Test is_optional returns True for Optional[list[T]]"""
+    annotation = Optional[list]
+    assert is_optional(annotation) is True
+
+
+# --- parse_for_function tests ----------------------------------------------
+
+def test_parse_for_function_with_no_parameters():
+    """Test parsing a function with no parameters"""
+    def dummy_func():
+        pass
+
+    result = parse_for_function(dummy_func, {})
+    assert result == {}
+
+
+def test_parse_for_function_with_required_parameter():
+    """Test parsing required parameters"""
+    def dummy_func(required_param: str):
+        pass
+
+    result = parse_for_function(dummy_func, {"required_param": "value"})
+    assert result == {"required_param": "value"}
+
+
+def test_parse_for_function_missing_required_parameter_raises():
+    """Test that missing required parameter raises TypeError"""
+    def dummy_func(required_param: str):
+        pass
+
+    with pytest.raises(TypeError, match="Missing required parameter"):
+        parse_for_function(dummy_func, {})
+
+
+def test_parse_for_function_with_default_parameter():
+    """Test parsing function with default parameters"""
+    def dummy_func(param_with_default: str = "default_value"):
+        pass
+
+    result = parse_for_function(dummy_func, {})
+    assert result == {}
+
+
+def test_parse_for_function_overrides_default():
+    """Test that provided parameters override defaults"""
+    def dummy_func(param: str = "default"):
+        pass
+
+    result = parse_for_function(dummy_func, {"param": "custom"})
+    assert result == {"param": "custom"}
+
+
+def test_parse_for_function_with_optional_type_annotation():
+    """Test parsing optional type annotations"""
+    def dummy_func(optional_param: Optional[str]):
+        pass
+
+    # Should not raise even though parameter is not provided
+    result = parse_for_function(dummy_func, {})
+    assert result == {}
+
+
+def test_parse_for_function_unknown_parameter_raises():
+    """Test that unknown parameters raise TypeError"""
+    def dummy_func(known_param: str):
+        pass
+
+    with pytest.raises(TypeError, match="Unknown parameters"):
+        parse_for_function(dummy_func, {"known_param": "value", "unknown_param": "value"})
+
+
+def test_parse_for_function_coerces_types():
+    """Test that parameters are coerced to correct types"""
+    def dummy_func(num: int, enabled: bool, items: list[int]):
+        pass
+
+    result = parse_for_function(
+        dummy_func,
+        {
+            "num": "42",
+            "enabled": "true",
+            "items": "[1, 2, 3]",
+        }
+    )
+
+    assert result["num"] == 42
+    assert result["enabled"] is True
+    assert result["items"] == [1, 2, 3]
+
+
+def test_parse_for_function_multiple_parameters_mixed():
+    """Test parsing mix of required, optional, and default parameters"""
+    def dummy_func(
+        required: str,
+        with_default: int = 10,
+        optional_type: Optional[str] = None,
+    ):
+        pass
+
+    result = parse_for_function(
+        dummy_func,
+        {"required": "test_value", "with_default": "20"}
+    )
+
+    assert result["required"] == "test_value"
+    assert result["with_default"] == 20
+    assert "optional_type" not in result
+
+
+# --- additional coerce edge cases --------------------------------------------------
+
+def test_coerce_int_invalid_raises():
+    """Test that invalid integer strings raise ValueError"""
+    with pytest.raises(ValueError):
+        coerce("not_a_number", int)
+
+
+def test_coerce_float_invalid_raises():
+    """Test that invalid float strings raise ValueError"""
+    with pytest.raises(ValueError):
+        coerce("not_a_float", float)
+
+
+def test_coerce_empty_list():
+    """Test coercion of empty list string"""
+    assert coerce("[]", list) == []
+
+
+def test_coerce_empty_tuple():
+    """Test coercion of empty tuple string"""
+    assert coerce("()", tuple) == ()
+
+
+def test_coerce_nested_structures():
+    """Test coercion of nested list structures"""
+    result = coerce("[[1, 2], [3, 4]]", list[list[int]])
+    assert result == [[1, 2], [3, 4]]
+
+
+# --- dataset path expansion tests --------------------------------------------------
+
+def test_dataset_path_expanduser(tmp_path, monkeypatch, builtin_algorithms, builtin_partitioners):
+    """Test that dataset paths with ~ are expanded"""
+    # Create a dataset file
+    dataset = tmp_path / "data.csv"
+    dataset.write_text("a,b\n1,2\n")
+
+    cfg = minimal_valid_cfg(tmp_path)
+
+    # Replace the path with expanded home dir path
+    real_path = cfg["dataset"]
+
+    # Config should expand and resolve the path correctly
+    config = build_config(cfg, builtin_algorithms, builtin_partitioners)
+
+    # Verify the path is resolved
+    assert config.data.dataset == str(Path(real_path).resolve())
+    assert not config.data.dataset.startswith("~")
+
+
+def test_outputdir_path_expanduser(tmp_path, monkeypatch, builtin_algorithms, builtin_partitioners):
+    """Test that outputdir paths are expanded and resolved"""
+    dataset = tmp_path / "data.csv"
+    dataset.write_text("a,b\n1,2\n")
+
+    out = tmp_path / "results"
+    cfg = minimal_valid_cfg(tmp_path, outputdir=str(out))
+
+    config = build_config(cfg, builtin_algorithms, builtin_partitioners)
+
+    # Verify output directory is properly resolved
+    assert config.outputdir == str(out.resolve())
+    assert not config.outputdir.startswith("~")
+
+
+# --- categories parsing tests --------------------------------------------------
+
+def test_categories_all_defaults_to_all_enum_members(tmp_path, builtin_algorithms, builtin_partitioners):
+    """Test that no categories specified defaults to all Category enum members"""
+    cfg = minimal_valid_cfg(tmp_path)
+    # Don't specify run_categories
+
+    config = build_config(cfg, builtin_algorithms, builtin_partitioners)
+
+    # Should include all Category enum members
+    assert config.metrics.run_categories == tuple(Category)
+    assert len(config.metrics.run_categories) > 0
+
+
+def test_single_category_parsing(tmp_path, builtin_algorithms, builtin_partitioners):
+    """Test parsing a single category"""
+    cfg = minimal_valid_cfg(
+        tmp_path,
+        run_categories=(Category.PRIVACY,),
+        target_col="label",
+    )
+
+    config = build_config(cfg, builtin_algorithms, builtin_partitioners)
+
+    assert config.metrics.run_categories == (Category.PRIVACY,)
+
+
+def test_multiple_categories_parsing(tmp_path, builtin_algorithms, builtin_partitioners):
+    """Test parsing multiple categories"""
+    cfg = minimal_valid_cfg(
+        tmp_path,
+        run_categories=(Category.UTILITY, Category.PRIVACY),
+        target_col="label",
+    )
+
+    config = build_config(cfg, builtin_algorithms, builtin_partitioners)
+
+    assert Category.UTILITY in config.metrics.run_categories
+    assert Category.PRIVACY in config.metrics.run_categories
+
+
+# --- algorithm and partitioner kwargs parsing tests --------------------------------------------------
+
+def test_algorithm_kwargs_empty(tmp_path, builtin_algorithms, builtin_partitioners):
+    """Test that empty algorithm_kwargs defaults to empty dict"""
+    cfg = minimal_valid_cfg(tmp_path)
+
+    config = build_config(cfg, builtin_algorithms, builtin_partitioners)
+
+    assert config.algorithm_kwargs == {}
+
+
+def test_partitioner_kwargs_preserved(tmp_path, builtin_algorithms, builtin_partitioners):
+    """Test that partitioner_kwargs are preserved"""
+    cfg = minimal_valid_cfg(tmp_path, num_clients=5)
+
+    config = build_config(cfg, builtin_algorithms, builtin_partitioners)
+
+    assert "num_partitions" in config.data.partitioner_kwargs
+    assert config.data.partitioner_kwargs["num_partitions"] == 5
+
+
+# --- parse_for_function with complex scenarios --------------------------------------------------
+
+def test_parse_for_function_all_optional_with_union():
+    """Test parsing when all parameters are optional with Union types"""
+    def dummy_func(
+        param1: Optional[str] = None,
+        param2: Optional[int] = None,
+    ):
+        pass
+
+    result = parse_for_function(dummy_func, {})
+    assert result == {}
+
+
+def test_parse_for_function_partial_parameters():
+    """Test parsing when only some of multiple parameters are provided"""
+    def dummy_func(
+        param1: str,
+        param2: str = "default",
+        param3: Optional[str] = None,
+    ):
+        pass
+
+    result = parse_for_function(dummy_func, {"param1": "value1"})
+
+    assert result["param1"] == "value1"
+    assert "param2" not in result  # Not provided, has default
+    assert "param3" not in result  # Not provided, optional
+
+
+def test_parse_for_function_with_tuple_coercion():
+    """Test coercion of tuple parameters"""
+    def dummy_func(items: tuple[int]):
+        pass
+
+    result = parse_for_function(dummy_func, {"items": "(1, 2, 3)"})
+
+    assert result["items"] == (1, 2, 3)
+
+
+# --- validation tests --------------------------------------------------
+
+def test_validate_partitioner_not_in_registry(tmp_path, builtin_algorithms, builtin_partitioners):
+    """Test that unregistered partitioner raises ValueError"""
+    cfg = minimal_valid_cfg(
+        tmp_path,
+        partitioner="nonexistent-partitioner",
+    )
+
+    with pytest.raises(ValueError):
+        build_config(cfg, builtin_algorithms, builtin_partitioners)

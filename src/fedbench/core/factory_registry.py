@@ -62,7 +62,7 @@ class FactoryRegistry[T]:
         self._builtins[name] = locator
 
     def call(self, name: str, **kwargs: Any) -> T:
-        factory = self._load(name)
+        factory = self.load(name)
 
         if inspect.isclass(factory) and inspect.isabstract(factory):
             raise TypeError(f"{factory} is an abstract class.")
@@ -84,7 +84,7 @@ class FactoryRegistry[T]:
         for ep in self._plugins.values():
             yield Metadata(name=ep.name, locator=ep.value, source="plugin")
 
-    def _load(self, name: str) -> Any:
+    def load(self, name: str) -> Any:
         factory = self._load_builtin(name)
 
         if factory is None:

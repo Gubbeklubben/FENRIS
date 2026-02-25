@@ -7,8 +7,7 @@ import fedbench.runner as runner
 from fedbench.config.builder import build_config
 from fedbench.core.eventbus import EventBus
 from fedbench.core.events import Event
-# noinspection PyProtectedMember
-# noinspection PyProtectedMember
+from fedbench.util.parsing import split_outside_brackets
 from fedbench.registries import (
     build_algorithm_registry,
     build_partitioner_registry,
@@ -20,15 +19,15 @@ partitioners = build_partitioner_registry()
 app = typer.Typer()
 
 
-def parse_kwargs(value: str) -> dict[str, int]:
+def parse_kwargs(value: str) -> dict[str, str]:
     if value is None:
         return {}
 
     result = {}
 
-    for item in value.split(","):
+    for item in split_outside_brackets(value):
         key, val = item.split("=")
-        result[key] = int(val)
+        result[key] = val
     return result
 
 
@@ -61,7 +60,7 @@ def run(
         target_col: Annotated[str | None, typer.Option()] = None,
         sensitive_cols: Annotated[str | None, typer.Option()] = None,
 
-        run_categories: Annotated[str | None, typer.Option()] = None,
+        run_categories: Annotated[str | None, typer.Option(callback=split_outside_brackets)] = None,
         early_stop: Annotated[bool | None, typer.Option()] = None,
         stop_metric: Annotated[str | None, typer.Option()] = None,
         stop_mode: Annotated[Literal["min", "max"] | None, typer.Option()] = None,
@@ -71,6 +70,7 @@ def run(
         stop_eval_every: Annotated[int | None, typer.Option()] = None,
         stop_synthetic_rows: Annotated[int | None, typer.Option()] = None,
 
+        num_clients: Annotated[int | None, typer.Option()] = None,
         num_rounds: Annotated[int | None, typer.Option()] = None,
         test_size: Annotated[float | None, typer.Option()] = None,
         seed: Annotated[int | None, typer.Option()] = None,
