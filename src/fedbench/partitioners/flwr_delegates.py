@@ -1,6 +1,6 @@
 from typing import Literal, cast
 
-from datasets import Dataset
+from datasets import Dataset  # type: ignore
 from flwr_datasets.partitioner import (
     Partitioner as FlwrPartitioner,
     IidPartitioner

@@ -2,6 +2,7 @@ import json
 from dataclasses import dataclass, field, asdict
 from typing import Literal, Self
 
+from fedbench.core.eval import Category
 
 type ConfigCls = type[DataConfig] | type[MetricsConfig] | type[Config]
 
@@ -19,7 +20,7 @@ class DataConfig:
 
 @dataclass(frozen=True)
 class MetricsConfig:
-    run_categories: tuple[str, ...] = field(default_factory=tuple)
+    run_categories: tuple[Category, ...] = field(default_factory=tuple)
     early_stop: bool = False
     stop_metric: str | None = None
     stop_mode: Literal["min", "max"] | None = None
@@ -45,6 +46,16 @@ class Config:
     num_synthetic_rows: int | None = None
     allow_pickle: bool = False
     metrics: MetricsConfig = field(default_factory=MetricsConfig)
+
+    def __post_init__(self) -> None:
+        if self.num_clients < 1:
+            raise ValueError(f"Number of clients {self.num_clients} is not supported")
+        if self.num_rounds < 1:
+            raise ValueError(f"Number of rounds {self.num_rounds} is not supported")
+        if self.test_size <= 0.0 or self.test_size >= 1.0:
+            raise ValueError(f"Test size {self.test_size} is not supported, must be between 0 and 1")
+        if self.num_synthetic_rows is not None and self.num_synthetic_rows < 1:
+            raise ValueError(f"Number of synthetic rows {self.num_synthetic_rows} is not supported")
 
     @classmethod
     def parse_jsons(cls, jsons: str) -> Self:
