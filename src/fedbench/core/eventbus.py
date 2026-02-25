@@ -1,6 +1,7 @@
 import queue
 import threading
 from collections.abc import Iterable
+from dataclasses import dataclass
 from enum import Enum
 from types import TracebackType
 from typing import Protocol, Self, cast
@@ -20,7 +21,13 @@ class Observer(Protocol):
         pass
 
 
-type _ObserverEntry = tuple[Observer, tuple[type[Event], ...]]
+@dataclass
+class _ObserverEntry:
+    observer: Observer
+    event_types: tuple[type[Event], ...]
+    failures: int = 0
+
+
 type _Observers = list[_ObserverEntry]
 type _FrozenObservers = tuple[_ObserverEntry, ...]
 
@@ -28,8 +35,8 @@ type _FrozenObservers = tuple[_ObserverEntry, ...]
 class EventBus:
     def __init__(self) -> None:
         self._state = BusState.INITIAL
-        self._observers: _Observers | None = []
-        self._frozen_observers: _FrozenObservers | None = None
+        self._observers: _Observers = []
+        self._frozen_observers: _FrozenObservers = ()
         self._observer_thread: threading.Thread | None = None
         self._event_queue: queue.Queue[Event | None] = queue.Queue()
         self._lock = threading.Lock()
@@ -70,9 +77,7 @@ class EventBus:
                 if not issubclass(event_type, Event):
                     raise TypeError(f"Not a valid event type: {event_type}")
 
-            # noinspection PyUnnecessaryCast
-            observers = cast(_Observers, self._observers)
-            observers.append((observer, tuple(event_types)))
+            self._observers.append(_ObserverEntry(observer, tuple(event_types)))
 
     def open(self) -> None:
         with self._lock:
@@ -80,8 +85,8 @@ class EventBus:
                 raise RuntimeError(f"{self}: Can not open.")
 
             # noinspection PyUnnecessaryCast
-            self._frozen_observers = tuple(cast(_Observers, self._observers))
-            self._observers = None
+            self._frozen_observers = tuple(self._observers)
+            self._observers.clear()
             self._observer_thread = threading.Thread(
                 target=self._worker,
                 name=self.__class__.__name__,
@@ -91,6 +96,9 @@ class EventBus:
             self._state = BusState.OPEN
 
     def emit(self, event: Event) -> None:
+        if not isinstance(event, Event):
+            raise TypeError(f"Not a valid event type: {event}")
+
         with self._lock:
             if self._state is not BusState.OPEN:
                 raise RuntimeError(f"{self}: Can not emit event.")
@@ -98,6 +106,9 @@ class EventBus:
             self._event_queue.put_nowait(event)
 
     def close(self) -> bool:
+        if threading.current_thread() is self._observer_thread:
+            raise RuntimeError(f"Attempt to close {self} from observer thread.")
+
         with self._lock:
             if self._state is BusState.INITIAL:
                 raise RuntimeError(f"{self}: Can not close.")
@@ -124,21 +135,20 @@ class EventBus:
                 self._event_queue.task_done()
                 return
 
-            # noinspection PyUnnecessaryCast
-            observers = cast(_FrozenObservers, self._frozen_observers)
             try:
-                for observer, event_types in observers:
-                    if not isinstance(event, event_types):
+                for entry in self._frozen_observers:
+                    if entry.failures > 0:
+                        # TODO! log warning
                         continue
-                    # noinspection PyBroadException
-                    try:
-                        observer(event)
-                    except Exception as exc:
-                        self._on_failing_observer(observer, exc)
+
+                    if isinstance(event, entry.event_types):
+                        # noinspection PyBroadException
+                        try:
+                            entry.observer(event)
+                        except Exception as exc:
+                            # TODO! log warning
+                            entry.failures += 1
             finally:
                 self._event_queue.task_done()
-
-    def _on_failing_observer(self, observer: Observer, exc: Exception) -> None:
-        pass
 
 
