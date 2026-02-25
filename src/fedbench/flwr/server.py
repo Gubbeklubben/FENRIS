@@ -54,6 +54,8 @@ def make_server_app(runcontext: RunContext) -> ServerApp:
             algorithm.create_aggregator(),
             *make_serde(config.allow_pickle)
         )
-        runcontext.final_aggregated_state = strategy.run(grid, config.num_rounds)
+        state, metrics = strategy.run(grid, config.num_rounds)
+        runcontext.aggregated_state = state
+        runcontext.aggregated_metrics = metrics
 
     return app

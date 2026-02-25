@@ -96,7 +96,7 @@ class FedbenchStrategy:
     def run(
             self,
             grid: Grid,
-            num_rounds: int) -> Update:
+            num_rounds: int) -> tuple[Update, dict[str, float]]:
 
         self._eventbus.emit(AlgorithmInitStarted())
         init_update = self.init(grid)
@@ -117,4 +117,4 @@ class FedbenchStrategy:
             self.evaluate(grid)
             self._eventbus.emit(RoundCompleted(curr_round, num_rounds))
 
-        return self._prev_aggr_update
+        return self._prev_aggr_update, {}

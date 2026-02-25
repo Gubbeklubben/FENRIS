@@ -1,5 +1,7 @@
 from collections.abc import Callable
 from dataclasses import dataclass
+from types import MappingProxyType
+from typing import Mapping
 
 from pandas import DataFrame
 
@@ -19,17 +21,18 @@ class Components:
     eval_suite: EvaluationSuite
 
 
+# The repetitive getter/setter's in RunContext is at least explicit,
+# but could probably be implemented with python's descriptor protocol.
 class RunContext:
     def __init__(self, run_id: str, config: Config, eventbus: EventBus) -> None:
         self._run_id = run_id
         self._config = config
         self._eventbus = eventbus
         self._components: Components | None = None
-        self._final_aggregated_state: Update | None = None
+        self._aggregated_state: Update | None = None
+        self._aggregated_metrics: dict[str, float] | None = None
         # per client metrics?
-        # aggregated training metrics?
-        # globally created synthetic data
-        # in memory repr of final metrics output
+        self._synthetic_df: DataFrame | None = None
 
     @property
     def run_id(self) -> str:
@@ -46,21 +49,51 @@ class RunContext:
     @property
     def components(self) -> Components:
         if self._components is None:
-            raise ValueError("Property components is not set.")
+            raise RuntimeError("Property 'components' accessed before set.")
         return self._components
 
     @components.setter
     def components(self, components: Components) -> None:
         if self._components is not None:
-            raise ValueError("Can only set components once.")
+            raise RuntimeError("Can only set components once.")
         self._components = components
 
     @property
-    def final_aggregated_state(self) -> Update | None:
-        return self._final_aggregated_state
+    def aggregated_state(self) -> Update:
+        if self._aggregated_state is None:
+            raise RuntimeError(
+                "Property 'aggregated_state' accessed before set."
+            )
+        return self._aggregated_state
 
-    @final_aggregated_state.setter
-    def final_aggregated_state(self, final_aggregated_state: Update) -> None:
-        if self._final_aggregated_state is not None:
-            raise ValueError("Can only set final_aggregated_state once.")
-        self._final_aggregated_state = final_aggregated_state
+    @aggregated_state.setter
+    def aggregated_state(self, state: Update) -> None:
+        if self._aggregated_state is not None:
+            raise RuntimeError("Can only set 'aggregated_state' once.")
+        self._aggregated_state = state
+
+    @property
+    def aggregated_metrics(self) -> Mapping[str, float]:
+        if self._aggregated_metrics is None:
+            raise RuntimeError(
+                "Property 'aggregated_metrics' accessed before set."
+            )
+        return MappingProxyType(self._aggregated_metrics)
+
+    @aggregated_metrics.setter
+    def aggregated_metrics(self, metrics: dict[str,float]) -> None:
+        if self._aggregated_metrics is not None:
+            raise RuntimeError("Can only set 'aggregated_metrics' once.")
+        self._aggregated_metrics = metrics
+
+    @property
+    def synthetic_df(self) -> DataFrame:
+        if self._synthetic_df is None:
+            raise RuntimeError("Property 'synthetic_df' accessed before set.")
+        return self._synthetic_df
+
+    @synthetic_df.setter
+    def synthetic_df(self, df: DataFrame) -> None:
+        if self._synthetic_df is not None:
+            raise RuntimeError("Can only set 'synthetic_df' once.")
+        self._synthetic_df = df
