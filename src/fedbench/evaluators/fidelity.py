@@ -4,14 +4,16 @@ from abc import ABC
 from typing import Mapping
 
 import numpy as np
+import pandas as pd
 from scipy import stats
 
 from fedbench.core.eval import EvalContext, Evaluator
+from fedbench.util.metrics import get_schema_columns
 
 
 class MomentReductionMetricsEvaluator(Evaluator, ABC):
     def evaluate(self, ctx: EvalContext) -> Mapping[str, float]:
-        numeric_columns = [c.name for c in ctx.schema.columns if c.kind in ("continuous", "integer")]
+        numeric_columns, _ = get_schema_columns(ctx)
         if not numeric_columns:
             return {}
 
@@ -19,8 +21,8 @@ class MomentReductionMetricsEvaluator(Evaluator, ABC):
         std_abs_diff = []
 
         for col in numeric_columns:
-            r = ctx.train_df[col].astype(float)
-            s = ctx.synthetic_df[col].astype(float)
+            r = pd.to_numeric(ctx.train_df[col], errors="coerce")
+            s = pd.to_numeric(ctx.synthetic_df[col], errors="coerce")
 
             mean_abs_diff.append(abs(r.mean() - s.mean()))
             std_abs_diff.append(abs(r.std() - s.std()))
@@ -33,13 +35,13 @@ class MomentReductionMetricsEvaluator(Evaluator, ABC):
 
 class DistributionSimilarityMetricsEvaluator(Evaluator, ABC):
     def evaluate(self, ctx: EvalContext) -> dict[str, float]:
-        numeric_columns = [c.name for c in ctx.schema.columns if c.kind in ("continuous", "integer")]
+        numeric_columns, _ = get_schema_columns(ctx)
         if not numeric_columns:
             return {}
 
-        ks_stats = []
-        wasserstein_distances = []
-        t_stats_abs = []
+        ks = []
+        wasserstein = []
+        t_stats = []
 
         for col in numeric_columns:
             r = ctx.train_df[col].astype(float).dropna()
@@ -49,27 +51,27 @@ class DistributionSimilarityMetricsEvaluator(Evaluator, ABC):
                 continue
 
             ks_stat, _ = stats.ks_2samp(r, s)
-            ks_stats.append(ks_stat)
+            ks.append(ks_stat)
 
             wasserstein_distance = stats.wasserstein_distance(r, s)
-            wasserstein_distances.append(wasserstein_distance)
+            wasserstein.append(wasserstein_distance)
 
             t_stat, _ = stats.ttest_ind(r, s, equal_var=False)
-            t_stats_abs.append(abs(t_stat))
+            t_stats.append(abs(t_stat))
 
-        if not (ks_stats and wasserstein_distances and t_stats_abs):
+        if not (ks and wasserstein and t_stats):
             return {}
 
         return {
-            "ks_mean": float(np.nanmean(ks_stats)),
-            "wasserstein_mean": float(np.nanmean(wasserstein_distances)),
-            "t_stat_mean_abs": float(np.nanmean(t_stats_abs)),
+            "ks_mean": float(np.nanmean(ks)),
+            "wasserstein_mean": float(np.nanmean(wasserstein)),
+            "t_stat_mean_abs": float(np.nanmean(t_stats)),
         }
 
 
 class CategoricalTvMeanEvaluator(Evaluator):
     def evaluate(self, ctx: EvalContext) -> dict[str, float]:
-        categorical_columns = [c.name for c in ctx.schema.columns if c.kind in ("categorical", "binary")]
+        _, categorical_columns = get_schema_columns(ctx)
         if not categorical_columns:
             return {}
 
@@ -89,7 +91,7 @@ class CategoricalTvMeanEvaluator(Evaluator):
 
 class CorrFroDiffEvaluator(Evaluator):
     def evaluate(self, ctx: EvalContext) -> dict[str, float]:
-        numeric_columns = [c.name for c in ctx.schema.columns if c.kind in ("continuous", "integer")]
+        numeric_columns, _ = get_schema_columns(ctx)
         if len(numeric_columns) < 2:
             return {}
 
