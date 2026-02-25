@@ -49,3 +49,14 @@ def get_schema_columns(ctx: EvalContext) -> tuple[list[str], list[str]]:
     ]
 
     return numeric, categorical
+
+
+def get_quasi_identifiers(
+    all_columns: set[str],
+    sensitive_column: str,
+    target_column: str | None,
+) -> list[str]:
+    qi = set(all_columns) - {sensitive_column}
+    if target_column:
+        qi -= {target_column}
+    return sorted(qi)

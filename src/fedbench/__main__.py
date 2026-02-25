@@ -58,7 +58,7 @@ def run(
         algorithm_kwargs: Annotated[str | None, typer.Option(callback=parse_kwargs)] = None,
         partitioner_kwargs: Annotated[str | None, typer.Option(callback=parse_kwargs)] = None,
         target_col: Annotated[str | None, typer.Option()] = None,
-        sensitive_cols: Annotated[str | None, typer.Option()] = None,
+        sensitive_cols: Annotated[str | None, typer.Option(callback=split_outside_brackets)] = None,
 
         run_categories: Annotated[str | None, typer.Option(callback=split_outside_brackets)] = None,
         early_stop: Annotated[bool | None, typer.Option()] = None,
