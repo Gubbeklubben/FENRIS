@@ -31,6 +31,12 @@ def parse_kwargs(value: str) -> dict[str, str]:
     return result
 
 
+def parse_args(value: str) -> list[str]:
+    if value is None:
+        return []
+    return value.split(",")
+
+
 @app.command()
 def new(name: str) -> None:
     pass
@@ -58,9 +64,9 @@ def run(
         algorithm_kwargs: Annotated[str | None, typer.Option(callback=parse_kwargs)] = None,
         partitioner_kwargs: Annotated[str | None, typer.Option(callback=parse_kwargs)] = None,
         target_col: Annotated[str | None, typer.Option()] = None,
-        sensitive_cols: Annotated[str | None, typer.Option(callback=split_outside_brackets)] = None,
+        sensitive_cols: Annotated[str | None, typer.Option(callback=parse_args)] = None,
 
-        run_categories: Annotated[str | None, typer.Option(callback=split_outside_brackets)] = None,
+        run_categories: Annotated[str | None, typer.Option(callback=parse_args)] = None,
         early_stop: Annotated[bool | None, typer.Option()] = None,
         stop_metric: Annotated[str | None, typer.Option()] = None,
         stop_mode: Annotated[Literal["min", "max"] | None, typer.Option()] = None,
