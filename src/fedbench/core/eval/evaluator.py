@@ -1,5 +1,6 @@
 from abc import ABC, abstractmethod
 from enum import StrEnum
+from typing import Mapping
 
 from fedbench.core.eval.evalcontext import EvalContext
 
@@ -14,5 +15,5 @@ class Category(StrEnum):
 
 class Evaluator(ABC):
     @abstractmethod
-    def evaluate(self, ctx: EvalContext) -> float:
+    def evaluate(self, ctx: EvalContext) -> Mapping[str, float]:
         ...

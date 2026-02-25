@@ -13,7 +13,7 @@ def _get_by_categories(
     for category in categories:
         registry = registries[category]
         for name in registry:
-            yield f"{category}.{name}", registry.call(name)
+            yield category, registry.call(name)
 
 
 def _get_by_names(
@@ -26,7 +26,7 @@ def _get_by_names(
 
         for name in registry:
             if name not in names: continue
-            yield f"{category}.{name}", registry.call(name)
+            yield category, registry.call(name)
 
 
 class EvaluationSuite:
@@ -35,14 +35,15 @@ class EvaluationSuite:
 
     def evaluate(self, ctx: EvalContext) -> dict[str, float]:
         metrics: dict[str, float] = {}
-        for name, ev in self._evaluators:
-            metrics[name] = ev.evaluate(ctx)
+        for category, ev in self._evaluators:
+            for metric, value in ev.evaluate(ctx).items():
+                metrics[f"{category}.{metric}"] = value
         return metrics
 
     @classmethod
     def default(cls, registries: Mapping[str, FactoryRegistry[Evaluator]]) -> Self:
         return cls.with_evaluator_categories(
-            registries, [category.value for category in Category]
+            registries, tuple(Category)
         )
 
     @classmethod
