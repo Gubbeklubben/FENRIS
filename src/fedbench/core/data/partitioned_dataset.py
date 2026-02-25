@@ -1,7 +1,7 @@
 from pandas import DataFrame
 
-from fedbench.data.schemas import TableSchema
-from fedbench.data.partitioners.partitioner import Partitioner
+from fedbench.core.data.partitioner import Partitioner
+from fedbench.core.data.schemas import TableSchema
 
 
 class PartitionedDataset:

@@ -3,14 +3,18 @@ from dataclasses import fields, MISSING
 from pathlib import Path
 from typing import Any, Mapping
 
-from fedbench.config import DataConfig, MetricsConfig
-from fedbench.config.config import Config, ConfigCls
-from fedbench.eval.evaluators import Category
-from fedbench.data.partitioners import registry as partitioner_reg
-from fedbench.algorithms import registry as algorithm_reg
+from fedbench.config.config import DataConfig, MetricsConfig, Config, ConfigCls
+from fedbench.core.algorithm import Algorithm
+from fedbench.core.data import Partitioner
+from fedbench.core.eval import Category
+from fedbench.core.factory_registry import FactoryRegistry
 
 
-def build_config(cli_input: dict[str, Any]) -> Config:
+def build_config(
+        cli_input: dict[str, Any],
+        algorithm_registry: FactoryRegistry[Algorithm],
+        partitioner_registry: FactoryRegistry[Partitioner]) -> Config:
+
     datacfg_defaults = build_defaults_dict(DataConfig)
     metricscfg_defaults = build_defaults_dict(MetricsConfig)
     cfg_defaults = build_defaults_dict(Config)
@@ -34,9 +38,11 @@ def build_config(cli_input: dict[str, Any]) -> Config:
         cfg_combined,
         datacfg_combined,
         metricscfg_combined,
+        algorithm_registry,
+        partitioner_registry
     )
 
-    partitioner = partitioner_reg.call(
+    partitioner = partitioner_registry.call(
         datacfg_combined["partitioner"],
         **datacfg_combined["partitioner_kwargs"]
     )
@@ -48,14 +54,17 @@ def build_config(cli_input: dict[str, Any]) -> Config:
     return Config(**cfg_combined)
 
 
-def validate_data_config(data_config: Mapping[str, Any]) -> None:
+def validate_data_config(
+        data_config: Mapping[str, Any],
+        partitioner_registry: FactoryRegistry[Partitioner]) -> None:
+
     path = Path(data_config["dataset"])
     if path.is_dir():
         raise IsADirectoryError(f'"{path}" is a directory')
     if not path.exists():
         raise FileNotFoundError(f"Dataset {path} does not exist")
 
-    if data_config["partitioner"] not in partitioner_reg:
+    if data_config["partitioner"] not in partitioner_registry:
         raise ValueError(f"Partitioner {data_config['partitioner']} is not registered")
 
 
@@ -65,8 +74,11 @@ def validate_metrics_config(metrics_config: Mapping[str, Any]) -> None:
             raise ValueError(f"Category {category} is not supported")
 
 
-def validate_config(config: Mapping[str, Any]) -> None:
-    if config["algorithm"] not in algorithm_reg:
+def validate_config(
+        config: Mapping[str, Any],
+        algorithm_registry: FactoryRegistry[Algorithm]) -> None:
+
+    if config["algorithm"] not in algorithm_registry:
         raise ValueError(f"Algorithm {config["algorithm"]} is not registered")
 
     if config["num_rounds"] < 1:
@@ -82,10 +94,12 @@ def validate_all_configs(
         config: Mapping[str, Any],
         data_config: Mapping[str, Any],
         metrics_config: Mapping[str, Any],
-) -> None:
-    validate_data_config(data_config)
+        algorithm_registry: FactoryRegistry[Algorithm],
+        partitioner_registry: FactoryRegistry[Partitioner]) -> None:
+
+    validate_data_config(data_config, partitioner_registry)
     validate_metrics_config(metrics_config)
-    validate_config(config)
+    validate_config(config, algorithm_registry)
 
     if Category.UTILITY in metrics_config["run_categories"] and data_config["target_col"] is None:
         raise ValueError("Target column must be specified when running utility metrics")

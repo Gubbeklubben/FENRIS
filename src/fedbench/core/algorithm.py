@@ -3,7 +3,7 @@ from collections.abc import Iterable
 
 from pandas import DataFrame
 
-from fedbench.common import Update
+from fedbench.core.update import Update
 
 
 class Aggregator(ABC):

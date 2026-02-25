@@ -2,11 +2,12 @@ from typing import Literal, cast
 
 from datasets import Dataset
 from flwr_datasets.partitioner import (
-    Partitioner as FlwrPartitioner, IidPartitioner
+    Partitioner as FlwrPartitioner,
+    IidPartitioner
 )
 from pandas import DataFrame
 
-from fedbench.data.partitioners.partitioner import Partitioner
+from fedbench.core.data.partitioner import Partitioner
 
 
 class FlwrDelegatePartitioner(Partitioner):

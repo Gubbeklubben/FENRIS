@@ -3,10 +3,10 @@ from collections.abc import Iterable
 import numpy as np
 import pandas as pd
 
-from fedbench.algorithms.algorithm import Aggregator, Algorithm
-from fedbench.algorithms.algorithm import Synthesizer
-from fedbench.common import Update
-from fedbench.common import log_calls
+from fedbench.core.algorithm import Aggregator, Algorithm
+from fedbench.core.algorithm import Synthesizer
+from fedbench.core.update import Update
+from fedbench.core.logging import log_calls
 
 
 _bullshit_state = {

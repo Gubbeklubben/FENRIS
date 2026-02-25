@@ -1,12 +1,12 @@
 from __future__ import annotations
 
 from abc import abstractmethod, ABC
+
 import numpy as np
 from pandas import Series
 from scipy import stats
 
-from fedbench.eval.context import EvalContext
-from fedbench.eval.evaluators import Evaluator
+from fedbench.core.eval import EvalContext, Evaluator
 
 
 class ReductionMetricEvaluator(Evaluator, ABC):
