@@ -1,19 +1,11 @@
 import queue
 import threading
 from collections.abc import Iterable
-from dataclasses import dataclass
 from enum import Enum
 from types import TracebackType
 from typing import Protocol, Self, cast
 
 from fedbench.core.events import Event
-
-
-@dataclass(frozen=True)
-class _BusClosed(Event):
-    pass
-
-_bus_closed = _BusClosed()
 
 
 class BusState(Enum):
@@ -39,7 +31,7 @@ class EventBus:
         self._observers: _Observers | None = []
         self._frozen_observers: _FrozenObservers | None = None
         self._observer_thread: threading.Thread | None = None
-        self._event_queue: queue.Queue[Event] = queue.Queue()
+        self._event_queue: queue.Queue[Event | None] = queue.Queue()
         self._lock = threading.Lock()
 
     def __repr__(self) -> str:
@@ -116,7 +108,7 @@ class EventBus:
             self._state = BusState.CLOSING # No more events in
 
         self._event_queue.join()
-        self._event_queue.put_nowait(_bus_closed)
+        self._event_queue.put_nowait(None)
         # noinspection PyUnnecessaryCast
         cast(threading.Thread, self._observer_thread).join()
 
@@ -128,7 +120,7 @@ class EventBus:
     def _worker(self) -> None:
         while True:
             event = self._event_queue.get()
-            if event is _bus_closed:
+            if event is None:
                 self._event_queue.task_done()
                 return
 
