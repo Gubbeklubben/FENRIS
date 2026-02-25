@@ -23,3 +23,8 @@ def register_builtin_evaluators(
         "corr_fro_diff",
         f"{__package__}.fidelity:CorrFroDiffEvaluator"
     )
+
+    registries[Category.UTILITY].add_builtin(
+        "tstr",
+        f"{__package__}.utility:TSTREvaluator"
+    )
