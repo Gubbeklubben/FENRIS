@@ -1,14 +1,12 @@
 from collections.abc import Iterable
 
-import numpy as np
 import pandas as pd
 
 from fedbench.core.algorithm import Aggregator, Algorithm
 from fedbench.core.algorithm import Synthesizer
 from fedbench.core.data import load_csv
+from fedbench.core.logger import log_calls
 from fedbench.core.update import Update
-from fedbench.core.logging import log_calls
-
 
 _bullshit_state = {
     "bs1": {"bs11": 1, "bs12": 2, "bs13": 3, "nested_dict": {1: 1}},

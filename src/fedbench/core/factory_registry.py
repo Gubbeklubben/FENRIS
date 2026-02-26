@@ -6,7 +6,7 @@ from importlib.metadata import entry_points
 from logging import WARNING
 from typing import Any, Iterator, Literal
 
-from fedbench.core.logging import log
+from fedbench.core.logger import log_warning
 
 
 @dataclass(frozen=True)
@@ -29,10 +29,9 @@ class FactoryRegistry[T]:
 
         for ep in entry_points(group=group):
             if ep.name in self._plugins:
-                log(
-                    self.__class__.__name__,
-                    (f"Ignoring duplicate plugin '{ep.name}' from '{ep.value}'", ),
-                    level=WARNING
+                log_warning(
+                    str(self),
+                    f"Ignoring duplicate plugin '{ep.name}' from '{ep.value}'"
                 )
             else:
                 self._plugins[ep.name] = ep

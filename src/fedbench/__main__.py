@@ -1,17 +1,16 @@
+import sys
 from typing import Annotated, Literal
 
 import typer
 
-import fedbench.pipeline as pipeline
 import fedbench.runner as runner
 from fedbench.config.builder import build_config
-from fedbench.core.eventbus import EventBus
-from fedbench.core.events import Event
-from fedbench.util.parsing import split_outside_brackets
+from fedbench.pipeline import pipeline
 from fedbench.registries import (
     build_algorithm_registry,
     build_partitioner_registry,
 )
+from fedbench.util.parsing import split_outside_brackets
 
 algorithms = build_algorithm_registry()
 partitioners = build_partitioner_registry()
@@ -88,9 +87,14 @@ def run(
     cli_input = {
         key: value for key, value in locals().items() if value is not None
     }
-    config = build_config(cli_input, algorithms, partitioners)
-    eventbus = EventBus()
-    runner.run(config, eventbus, pipeline.default())
+    # noinspection PyBroadException
+    try:
+        config = build_config(cli_input, algorithms, partitioners)
+    except Exception as exc:
+        print(f"Failed to build valid config: {exc}", file=sys.stderr)
+        sys.exit(1)
+        
+    runner.run(config, pipeline())
 
 
 if __name__ == "__main__":

@@ -64,7 +64,7 @@ def write_artifacts(ctx: RunContext) -> None:
     ctx.synthetic_df.to_csv(outputdir.joinpath("synthetic.csv"))
 
 
-def default() -> Iterable[Command]:
+def pipeline() -> Iterable[Command]:
     yield resolve_components
     yield try_loader
     yield federated_train_eval_loop
