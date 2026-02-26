@@ -93,7 +93,7 @@ def run(
     except Exception as exc:
         print(f"Failed to build valid config: {exc}", file=sys.stderr)
         sys.exit(1)
-        
+    
     runner.run(config, pipeline())
 
 

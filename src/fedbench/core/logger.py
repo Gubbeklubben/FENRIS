@@ -1,17 +1,71 @@
+from __future__ import annotations
+
 import functools
 import logging
 import multiprocessing
 import os
+from collections.abc import Callable
 from logging.handlers import QueueHandler
-from typing import Any
+from pprint import pformat
+from typing import Any, TYPE_CHECKING, ParamSpec, TypeVar
+
+if TYPE_CHECKING:
+    type  LogQueue = multiprocessing.Queue[logging.Logger]
+else:
+    type LogQueue = multiprocessing.Queue
+
+
+TEE = "\u251c\u2500\u2500"
+ELBOW = "\u2514\u2500\u2500"
+
+# Stolen from flwr.common.logger
+LOG_COLORS = {
+    "DEBUG": "\033[94m",  # Blue
+    "INFO": "\033[92m",  # Green
+    "WARNING": "\033[93m",  # Yellow
+    "ERROR": "\033[91m",  # Red
+    "CRITICAL": "\033[95m",  # Magenta
+    "RESET": "\033[0m",  # Reset to default
+}
 
 LOGGER_NAME = "FedBench"
 logger = logging.getLogger(LOGGER_NAME)
 logger.setLevel(logging.DEBUG)
 
 
-def log(src: str, message: str, level: int = logging.INFO, **kwargs: Any) -> None:
-    logger.log(level, f"{src}: {message}", **kwargs)
+class ColoredStreamHandler(logging.StreamHandler):  # type: ignore[type-arg]
+    # Adapted from flwr.common.logger
+    def format(self, record: logging.LogRecord) -> str:
+        seperator = " " * (8 - len(record.levelname))
+        log_fmt = (
+            f"{LOG_COLORS[record.levelname]}"
+            f"%(levelname)s %(asctime)s{LOG_COLORS["RESET"]}"
+            f": {seperator} %(message)s"
+        )
+        formatter = logging.Formatter(log_fmt)
+        return formatter.format(record)
+
+
+def add_queue_handler(queue: LogQueue) -> None:
+    handler = QueueHandler(queue)
+
+    if log_level := os.getenv("FEDBENCH_LOG_LEVEL"):
+        handler.setLevel(log_level.upper())
+    else:
+        handler.setLevel(logging.INFO)
+
+    handler.setFormatter(logging.Formatter("%(message)s"))
+    logger.addHandler(handler)
+
+
+def log(
+        source: str,
+        message: str,
+        level: int = logging.INFO,
+        **kwargs: Any) -> None:
+
+    msg = f"{source}: {message}" if source else message
+    logger.log(level, msg, **kwargs)
 
 
 log_debug = functools.partial(log, level=logging.DEBUG)
@@ -19,35 +73,22 @@ log_info = functools.partial(log, level=logging.INFO)
 log_warning = functools.partial(log, level=logging.WARNING)
 log_error = functools.partial(log, level=logging.ERROR)
 log_critical = functools.partial(log, level=logging.CRITICAL)
+pformat = functools.partial(pformat, indent=2, width=70, compact=True)
 
 
-def add_queue_handler(queue: multiprocessing.Queue) -> None:  # type: ignore[type-arg]
-    handler = QueueHandler(queue)
-    if log_level := os.getenv("FEDBENCH_LOG_LEVEL"):
-        handler.setLevel(log_level.upper())
-    else:
-        handler.setLevel(logging.INFO)
+P = ParamSpec("P")
+R = TypeVar("R")
 
-    handler.setFormatter(
-        logging.Formatter(
-            '%(asctime)s - %(name)s - %(levelname)s - %(message)s')
-    )
-    logger.addHandler(handler)
-
-
-_BOX_DRAWING = "\u251c\u2500\u2500"
-
-
-# Quick and dirty, set and export env variable FLWR_LOG_LEVEL="DEBUG" to enable.
-def log_calls(modulename):  # type: ignore[no-untyped-def]
-    def decorator(func):  # type: ignore[no-untyped-def]
-        def wrapper(*args, **kwargs):  # type: ignore[no-untyped-def]
-            log_debug(modulename, "Calling {func.__name__}")
-            log_debug(modulename, f"\t{_BOX_DRAWING} args: {args}")
-            log_debug(modulename, f"\t{_BOX_DRAWING} kwargs: {kwargs}")
+def log_calls(modulename: str) -> Callable[[Callable[P, R]], Callable[P, R]]:
+    def decorator(func: Callable[P, R]) -> Callable[P, R]:
+        @functools.wraps(func)
+        def wrapper(*args: P.args, **kwargs: P.kwargs) -> R:
+            log_debug(modulename, f"Calling {func.__name__}")
+            log_debug("", f"\t{TEE} args: {pformat(args)}")
+            log_debug("", f"\t{TEE} kwargs: {pformat(kwargs)}")
             ret = func(*args, **kwargs)
-            log_debug(modulename, f"\t{_BOX_DRAWING} return value: {ret}")
-            log_debug(modulename, "")
+            log_debug("", f"\t{ELBOW} return value: {pformat(ret)}")
+            log_debug("", "")
             return ret
         return wrapper
     return decorator

@@ -7,6 +7,7 @@ from types import TracebackType
 from typing import Protocol, Self, cast
 
 from fedbench.core.events import Event
+from fedbench.core.logger import log_warning, log_error
 
 
 class BusState(Enum):
@@ -138,15 +139,21 @@ class EventBus:
             try:
                 for entry in self._frozen_observers:
                     if entry.failures > 0:
-                        # TODO! log warning
+                        log_warning(
+                            str(self),
+                            "Ignoring previously failed observer"
+                        )
                         continue
 
                     if isinstance(event, entry.event_types):
                         # noinspection PyBroadException
                         try:
                             entry.observer(event)
-                        except Exception as exc:
-                            # TODO! log warning
+                        except Exception:
+                            log_error(
+                                str(self), f"Exception in observer: ",
+                                exc_info=True
+                            )
                             entry.failures += 1
             finally:
                 self._event_queue.task_done()
