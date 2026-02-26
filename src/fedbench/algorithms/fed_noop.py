@@ -5,6 +5,7 @@ import pandas as pd
 
 from fedbench.core.algorithm import Aggregator, Algorithm
 from fedbench.core.algorithm import Synthesizer
+from fedbench.core.data import load_csv
 from fedbench.core.update import Update
 from fedbench.core.logging import log_calls
 
@@ -59,11 +60,15 @@ class FedSmokeSynthesizer(Synthesizer):
             num_rows: int,
             seed: int) -> pd.DataFrame:
 
-        num_records = 10
-        data = {
-            "ints": np.random.randint(0, 100, size=num_records),
-            "floats": np.random.randn(num_records),
-            "dates": pd.date_range('2023-01-01', periods=num_records),
-            "categories": np.random.choice(["a", "b", "c"], size=num_records)
-        }
-        return pd.DataFrame(data)
+        # TODO: Extremely hacky, fix later
+        df, schema = load_csv("datasets/breast_cancer.csv")
+        return df
+
+        #num_records = 10
+        #data = {
+        #    "ints": np.random.randint(0, 100, size=num_records),
+        #    "floats": np.random.randn(num_records),
+        #    "dates": pd.date_range('2023-01-01', periods=num_records),
+        #    "categories": np.random.choice(["a", "b", "c"], size=num_records)
+        #}
+        #return pd.DataFrame(data)

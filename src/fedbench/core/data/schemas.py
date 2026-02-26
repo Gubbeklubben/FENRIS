@@ -47,16 +47,15 @@ def infer_schema(df: pd.DataFrame) -> TableSchema:
     for name, col in df.items():
         dtype = col.dtype
 
-        # default for non-numeric columns with cardinality > 2
-        kind: Kind = "categorical"
-
-        # 1️⃣ numeric → continuous / integer
+        kind: Kind
         if pd.api.types.is_float_dtype(dtype):
             kind = "continuous"
         elif col.nunique(dropna=True) <= 2:
             kind = "binary"
         elif pd.api.types.is_integer_dtype(dtype):
             kind = "integer"
+        else:
+            kind = "categorical"
 
         columns.append(ColumnSchema(name=str(name), kind=kind))
 

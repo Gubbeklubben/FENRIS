@@ -1,3 +1,4 @@
+import re
 from typing import get_origin, Any, get_args, Callable, Union
 import inspect
 
@@ -92,3 +93,7 @@ def parse_for_function(func: Callable[..., Any], raw: dict[str, str]) -> dict[st
                 raise TypeError(f"Missing required parameter for {func.__name__}: {name}")
 
     return parsed
+
+
+def to_snake_case(text: str) -> str:
+    return re.sub(r'[^a-z_]+', '_', text.lower())
