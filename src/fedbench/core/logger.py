@@ -23,7 +23,7 @@ log_critical = functools.partial(log, level=logging.CRITICAL)
 
 def add_queue_handler(queue: multiprocessing.Queue) -> None:  # type: ignore[type-arg]
     handler = QueueHandler(queue)
-    if log_level := os.getenv("FEDBENCH_LOGLEVEL"):
+    if log_level := os.getenv("FEDBENCH_LOG_LEVEL"):
         handler.setLevel(log_level.upper())
     else:
         handler.setLevel(logging.INFO)
