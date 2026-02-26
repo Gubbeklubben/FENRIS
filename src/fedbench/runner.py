@@ -4,14 +4,15 @@ from collections.abc import Iterable
 from fedbench.config import Config
 from fedbench.core.eventbus import EventBus
 from fedbench.core.events import (
+    Event,
     RunStarted,
     RunCompleted,
     RunFailed,
     CommandStarted,
     CommandCompleted,
 )
-from fedbench.core.runcontext import RunContext
 from fedbench.core.pipeline import Command
+from fedbench.core.runcontext import RunContext
 
 
 def run(
@@ -20,6 +21,7 @@ def run(
         commands: Iterable[Command]) -> None:
 
     run_id = str(uuid.uuid4())
+    eventbus.register(lambda e: print(e), (Event, ))
 
     with eventbus:
         eventbus.emit(RunStarted(run_id))

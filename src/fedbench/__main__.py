@@ -90,13 +90,6 @@ def run(
     }
     config = build_config(cli_input, algorithms, partitioners)
     eventbus = EventBus()
-    def observer(event: Event) -> None:
-        from fedbench.core.logging import log
-        log(
-            "observer",
-            (f"observed {event}",)
-        )
-    eventbus.register(observer, (Event,))
     runner.run(config, eventbus, pipeline.default())
 
 
