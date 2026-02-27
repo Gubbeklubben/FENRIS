@@ -50,9 +50,11 @@ def make_server_app(runcontext: RunContext) -> ServerApp:
         eventbus.emit(ClientsConfigured(reply_count))
 
         strategy = FedbenchStrategy(
-            eventbus,
             algorithm.create_aggregator(),
-            *make_serde(config.allow_pickle)
+            config.seed,
+            runcontext.schema,
+            *make_serde(config.allow_pickle),
+            eventbus=eventbus,
         )
         state, metrics = strategy.run(grid, config.num_rounds)
         runcontext.aggregated_state = state

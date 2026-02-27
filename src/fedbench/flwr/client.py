@@ -12,7 +12,9 @@ from flwr.common import (
 from fedbench.config import Config
 from fedbench.core.algorithm import Algorithm
 from fedbench.core.data import PartitionedDataset
+from fedbench.core.data.schemas import infer_schema
 from fedbench.core.eval import EvalContext, EvaluationSuite
+from fedbench.core.logger import LogQueue
 from fedbench.flwr.serde import make_serde, FlwrSerializer, FlwrDeserializer
 from fedbench.registries import (
     build_algorithm_registry,
@@ -37,7 +39,12 @@ class FedbenchClient:
         self._to_flwr = to_flwr
         self._from_flwr = from_flwr
 
-    def init(self, flwr_message: Message, flwr_context: Context) -> Message:
+    def init(
+            self,
+            seed: int,
+            flwr_message: Message,
+            flwr_context: Context) -> Message:
+
         partition_id = self._get_partition_id(flwr_context)
         train_df = self._dataset.load_train_partition(partition_id)
         synthesizer = self._algorithm.create_synthesizer()
@@ -46,7 +53,7 @@ class FedbenchClient:
             flwr_message,
             synthesizer.arrays_to_ml_framework_map
         )
-        reply = synthesizer.init(request, train_df)
+        reply = synthesizer.init(request, seed, self._dataset.schema, train_df)
         return self._to_flwr(update=reply, reply_to=flwr_message)
 
 
@@ -133,7 +140,8 @@ def configure(flwr_message: Message, flwr_context: Context) -> Message:
         build_partitioner_registry(),
         build_evaluator_registries()
     )
-    df, schema = components.df_loader()
+    df = components.df_loader()
+    schema = infer_schema(df)
 
     dataset = PartitionedDataset(
         df=df,
@@ -154,8 +162,8 @@ def configure(flwr_message: Message, flwr_context: Context) -> Message:
 
 @app.query("init")
 def init(flwr_message: Message, flwr_context: Context) -> Message:
-    _, client = require_context()
-    return client.train(flwr_message, flwr_context)
+    cfg, client = require_context()
+    return client.init(cfg.seed, flwr_message, flwr_context)
 
 
 @app.train()

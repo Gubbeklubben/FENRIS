@@ -2,6 +2,8 @@ import json
 from collections.abc import Iterable
 from pathlib import Path
 
+from fedbench.core.data.schemas import infer_schema as _infer_schema
+from fedbench.core.logger import debug_calls
 from fedbench.core.pipeline import Command
 from fedbench.core.runcontext import RunContext
 from fedbench.registries import (
@@ -22,9 +24,15 @@ def resolve_components(ctx: RunContext) -> None:
     ctx.components = components
 
 
-def try_loader(ctx: RunContext) -> None:
-    # Crash early if loader fails
-    ctx.components.df_loader()
+def load_df(ctx: RunContext) -> None:
+    ctx.df = ctx.components.df_loader()
+
+
+def infer_schema(ctx: RunContext) -> None:
+    if ctx.df is None:
+        raise RuntimeError("No dataset loaded, can not infer schema.")
+    ctx.schema = _infer_schema(ctx.df)
+    ctx.df = None  # Not needed atm. so forget it and free some memory.
 
 
 def federated_train_eval_loop(ctx: RunContext) -> None:
@@ -66,7 +74,8 @@ def write_artifacts(ctx: RunContext) -> None:
 
 def pipeline() -> Iterable[Command]:
     yield resolve_components
-    yield try_loader
+    yield load_df
+    yield infer_schema
     yield federated_train_eval_loop
     yield global_sample
     yield global_evaluate

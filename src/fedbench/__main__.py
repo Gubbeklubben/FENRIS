@@ -92,6 +92,7 @@ def run(
         config = build_config(cli_input, algorithms, partitioners)
     except Exception as exc:
         print(f"Failed to build valid config: {exc}", file=sys.stderr)
+        raise exc
         sys.exit(1)
     
     runner.run(config, pipeline())

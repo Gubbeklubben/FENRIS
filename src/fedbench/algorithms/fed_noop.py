@@ -5,7 +5,7 @@ import pandas as pd
 from fedbench.core.algorithm import Aggregator, Algorithm
 from fedbench.core.algorithm import Synthesizer
 from fedbench.core.data import load_csv
-from fedbench.core.logger import log_calls
+from fedbench.core.logger import debug_calls
 from fedbench.core.update import Update
 
 _bullshit_state = {
@@ -25,13 +25,13 @@ class FedNoop(Algorithm):
 
 
 class FedSmokeAggregator(Aggregator):
-    @log_calls(__name__)
+    @debug_calls(__name__)
     def aggregate_init(self, replies: Iterable[Update]) -> Update:
         update = Update()
         update.objects["my-bs-state"] = _bullshit_state
         return update
 
-    @log_calls(__name__)
+    @debug_calls(__name__)
     def aggregate_train(
             self,
             replies: Iterable[Update]) -> Update:
@@ -41,7 +41,7 @@ class FedSmokeAggregator(Aggregator):
 
 
 class FedSmokeSynthesizer(Synthesizer):
-    @log_calls(__name__)
+    @debug_calls(__name__)
     def train(
             self,
             request: Update,
@@ -51,7 +51,7 @@ class FedSmokeSynthesizer(Synthesizer):
         update.objects["my-bs-state"] = _bullshit_state
         return update
 
-    @log_calls(__name__)
+    @debug_calls(__name__)
     def sample(
             self,
             request: Update,

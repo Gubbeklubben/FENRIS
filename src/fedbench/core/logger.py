@@ -79,7 +79,7 @@ pformat = functools.partial(pformat, indent=2, width=70, compact=True)
 P = ParamSpec("P")
 R = TypeVar("R")
 
-def log_calls(modulename: str) -> Callable[[Callable[P, R]], Callable[P, R]]:
+def debug_calls(modulename: str) -> Callable[[Callable[P, R]], Callable[P, R]]:
     def decorator(func: Callable[P, R]) -> Callable[P, R]:
         @functools.wraps(func)
         def wrapper(*args: P.args, **kwargs: P.kwargs) -> R:
