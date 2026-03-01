@@ -1,20 +1,26 @@
 from collections.abc import Iterable
-from types import MappingProxyType
+from typing import Any, Iterator, cast
 
 import numpy as np
+import pandas as pd
 import torch
 from pandas import DataFrame
 from sklearn.preprocessing import LabelEncoder, QuantileTransformer
+from torch import nn
+from torch import optim, Tensor
+from torch.utils.data import TensorDataset, DataLoader
 
 from fedbench.core.algorithm import Algorithm, Synthesizer, Aggregator
 from fedbench.core.data import TableSchema
-from fedbench.core.update import Update, Extras
-from fedbench.core.logger import debug_calls
+from fedbench.core.logger import log_info, ELBOW, TEE
+from fedbench.core.update import Update, Extras, Objects
+# Relative imports for algorithm specifics.
 from .config import config
+from .diffuser import Diffuser
 from .mlpsynth import MLPSynthesizer
 
 
-def _split_cat_num(schema: TableSchema) -> tuple[list[str], list[str]]:
+def split_cat_num(schema: TableSchema) -> tuple[list[str], list[str]]:
     cat_attrs = [
         c.name for c in schema.columns
         if c.kind in ("categorical", "binary")
@@ -26,9 +32,148 @@ def _split_cat_num(schema: TableSchema) -> tuple[list[str], list[str]]:
     return cat_attrs, num_attrs
 
 
-def _prefix_columns(df: DataFrame, cat_attrs: Iterable[str]) -> None:
+def prefix_columns(df: DataFrame, cat_attrs: Iterable[str]) -> None:
     for cat_attr in cat_attrs:
         df[cat_attr] = cat_attr + "_" + df[cat_attr].astype("str")
+
+
+# https://github.com/sattarov/FedTabDiff/blob/main/fedtabdiff_modules.py
+def init_model(cfg: dict[str, Any]) -> tuple[MLPSynthesizer, Diffuser]:
+    """ Initialize model
+
+    Args:
+        cfg (dict): experiment parameters
+
+    Returns:
+        synthesizer: synthesizer model
+        diffuser: diffuser model
+    """
+    synthesizer = MLPSynthesizer(
+        d_in=cfg["encoded-dim"],
+        hidden_layers=cfg["mlp-layers"],
+        activation=cfg["activation"],
+        n_cat_tokens=cfg["n-cat-tokens"],
+        n_cat_emb=cfg["n-cat-emb"],
+        n_classes=None,
+        embedding_learned=False
+    )
+    # define diffuser
+    diffuser = Diffuser(
+        total_steps=cfg["diffusion-steps"],
+        beta_start=cfg["diffusion-beta-start"],
+        beta_end=cfg["diffusion-beta-end"],
+        device=cfg["device"],
+        scheduler=cfg["scheduler"])
+
+    return synthesizer, diffuser
+
+
+# https://github.com/sattarov/FedTabDiff/blob/main/fedtabdiff_modules.py
+@torch.no_grad()  # type: ignore[untyped-decorator]
+def generate_samples(
+        synthesizer: MLPSynthesizer,
+        diffuser: Diffuser,
+        encoded_dim: int,
+        last_diff_step: int,
+        n_samples: int | None =None,
+        label: Tensor | None =None) -> Tensor:
+
+    if n_samples is None and label is None:
+        raise ValueError("Either 'n_samples' or 'label' is required.")
+
+    device = next(synthesizer.parameters()).device
+
+    if label is not None:
+        n_samples = len(label)
+        label = label.to(device)
+
+    # initialize noise
+    z_norm = torch.randn((n_samples, encoded_dim)).float()
+    z_norm = z_norm.to(device)
+
+    # iterate over diffusion steps
+    for i in reversed(range(0, last_diff_step)):
+        # sample timestamps t
+        t = torch.full((n_samples,), i, dtype=torch.long).to(device)
+
+        # conduct forward encoder/decoder pass
+        model_out = synthesizer(z_norm, t, label)
+
+        # reverse diffusion step, i.e. noise removal
+        z_norm = diffuser.p_sample_gauss(model_out, z_norm, t)
+
+    return z_norm
+
+
+# https://github.com/sattarov/FedTabDiff/blob/main/fedtabdiff_modules.py
+def decode_samples(
+        samples: Tensor,
+        cat_dim: int,
+        n_cat_emb: int,
+        num_attrs: list[str],
+        cat_attrs: list[str],
+        num_scaler: QuantileTransformer,
+        vocab_per_attr: dict[str, Iterable[int]],
+        label_encoder: LabelEncoder,
+        embeddings: Tensor) -> DataFrame:
+
+    # split sample into numeric and categorical parts
+    samples_num = samples[:, cat_dim:]
+    samples_cat = samples[:, :cat_dim]
+
+    # denormalize numeric attributes
+    z_norm_upscaled = num_scaler.inverse_transform(samples_num.cpu().numpy())
+    z_norm_df = DataFrame(z_norm_upscaled, columns=num_attrs)
+
+    # reshape back to batch_size * n_dim_cat * cat_emb_dim
+    samples_cat = samples_cat.reshape(-1, len(cat_attrs), n_cat_emb)
+
+    # compute batch-wise calculation of distances because for datasets with large number of embedding tokens can be memory costly
+    batch_size = 2048
+    n_samples = len(samples)
+    z_cat_df_list = []
+
+    # iterate over generated categorical samples
+    for i in range(0, n_samples, batch_size):
+        # get batch of samples
+        samples_cat_subset = samples_cat[i: i + batch_size]
+
+        # compute pairwise distances between embeddings and generated samples
+        distances = torch.cdist(x1=embeddings, x2=samples_cat_subset)
+
+        # create temp dataframes for collection of intermediate results
+        z_cat_df_temp = DataFrame(index=range(len(samples_cat_subset)),
+                                     columns=cat_attrs)
+
+        for attr_idx, attr_name in enumerate(cat_attrs):
+            # get vocab indices for attribute
+            attr_emb_idx = list(vocab_per_attr[attr_name])
+
+            # get distances for attribute
+            attr_distances = distances[:, attr_emb_idx, attr_idx]
+
+            # get nearest embedding index
+            _, nearest_idx = torch.min(attr_distances, dim=1)
+
+            # convert to numpy
+            nearest_idx = nearest_idx.cpu().numpy()
+
+            # map emb indices back to column indices
+            z_cat_df_temp[attr_name] = np.array(attr_emb_idx)[nearest_idx]
+
+        # collect temp DFs
+        z_cat_df_list.append(z_cat_df_temp)
+
+    # concat DFs
+    z_cat_df = pd.concat(z_cat_df_list, ignore_index=True)
+
+    # inverse transform categorical attributes
+    z_cat_df = z_cat_df.apply(label_encoder.inverse_transform)
+
+    # concat numeric and categorical attributes
+    sample_decoded = pd.concat([z_cat_df, z_norm_df], axis=1)
+
+    return sample_decoded
 
 
 class FedTabDiff(Algorithm):
@@ -40,13 +185,13 @@ class FedTabDiff(Algorithm):
 
 
 class FedTabDiffAggregator(Aggregator):
-    def __init__(self, cfg):
-        self._cfg = cfg
-        self._cat_attrs = None
-        self._num_attrs = None
-        self._client_preproc_objects = None
-        self._client_preproc_extras = None
-        self._init_params = None
+    def __init__(self, cfg: dict[str, Any]) -> None:
+        self._cfg: dict[str, Any] = cfg
+        self._cat_attrs: list[str] | None = None
+        self._num_attrs: list[str] | None = None
+        self._client_preproc_objects: Objects | None = None
+        self._client_preproc_extras: Extras | None = None
+        self._state: dict[str, Tensor] | None = None
 
     def configure_init(
             self,
@@ -60,79 +205,87 @@ class FedTabDiffAggregator(Aggregator):
         if torch.cuda.is_available():
             torch.cuda.manual_seed(seed)
 
-        self._cat_attrs, self._num_attrs = _split_cat_num(schema)
+        self._cat_attrs, self._num_attrs = split_cat_num(schema)
 
         initialize_qt: bool = True
         # TODO! Framework must somehow guarantee reproducible mapping to
         #  partition_id if this is to be reliable.
         for cid in client_ids:
             update = Update()
-            cfg = {"initialize-qt": initialize_qt}
+            cfg: Extras = {"initialize-qt": initialize_qt}
             update.extras["config"] = cfg
             initialize_qt = False  # Only one client
             yield cid, update
 
 
     def aggregate_init(self, replies: Iterable[Update]) -> Update:
-        vocab_classes = set()
+        vocab_classes: set[str] = set()
         num_scaler = None
 
         for reply in replies:
-            preproc_obj = reply.objects["preproc-objects"]
-            if "num-scaler" in preproc_obj:
+            if "preproc-objects" in reply.objects:
+                preproc_obj = reply.objects["preproc-objects"]
                 num_scaler = preproc_obj["num-scaler"]
 
             extras = reply.extras["preproc-extras"]
-            vocab_classes = vocab_classes | set(extras["vocab-classes"])
+            # noinspection PyUnnecessaryCast
+            client_vocab_classes: list[str] = cast(list[str], extras["vocab-classes"])
+            vocab_classes = vocab_classes | set(client_vocab_classes)
 
-        vocab_classes = sorted(vocab_classes)
-        label_encoder = LabelEncoder().fit(vocab_classes)
+        vocab_classes_srt: list[str] = sorted(vocab_classes)
+        label_encoder = LabelEncoder().fit(vocab_classes_srt)
 
         vocab_per_attr = {}
-        for col in self._cat_attrs:
+        # noinspection PyUnnecessaryCast
+        for col in cast(list[str], self._cat_attrs):
             prefix = f"{col}_"
-            tokens = tuple(t for t in vocab_classes if t.startswith(prefix))
+            tokens = tuple(t for t in vocab_classes_srt if t.startswith(prefix))
             if tokens:
                 ids = label_encoder.transform(tokens)
                 vocab_per_attr[col] = set(ids)
             else:
-                vocab_per_attr = set()
+                vocab_per_attr[col] = set()
 
-        objects = {
+        self._client_preproc_objects = {
             "num-scaler": num_scaler,
-            "label-encoder": label_encoder
+            "label-encoder": label_encoder,
+            "vocab-per-attr": vocab_per_attr,
         }
-        self._client_preproc_objects = MappingProxyType(objects)
-
+        # noinspection PyUnnecessaryCast
+        cat_attrs = cast(list[str], self._cat_attrs)
+        # noinspection PyUnnecessaryCast
+        num_attrs = cast(list[str], self._num_attrs)
         extras = {
+            "cat-attrs": cat_attrs,
+            "num-attrs": num_attrs,
             "n-cat-tokens": len(vocab_classes),
-            "cat-dim": self._cfg["n_cat_emb"] * len(self._cat_attrs),
-            "encoded-dim": self._cfg["n_cat_emb"] * len(self._cat_attrs) +
-                           len(self._num_attrs),
-            "vocab-per-attr": list(vocab_per_attr)
+            "cat-dim": self._cfg["n-cat-emb"] * len(cat_attrs),
+            "encoded-dim": self._cfg["n-cat-emb"] * len(cat_attrs) + len(num_attrs),
         }
-        self._client_preproc_extras = MappingProxyType(extras)
+        self._client_preproc_extras = extras
 
+        # noinspection PyUnnecessaryCast
         synthesizer = MLPSynthesizer(
-            d_in=extras["encoded-dim"],
-            hidden_layers=self._cfg["mlp_layers"],
+            d_in=cast(int, extras["encoded-dim"]),
+            hidden_layers=self._cfg["mlp-layers"],
             activation=self._cfg["activation"],
-            n_cat_tokens=extras["n-cat-tokens"],
-            n_cat_emb=self._cfg["n_cat_emb"],
+            n_cat_tokens=cast(int, extras["n-cat-tokens"]),
+            n_cat_emb=self._cfg["n-cat-emb"],
             n_classes=None,
             embedding_learned=False
         )
-        self._init_params = synthesizer.state_dict()
+        self._state = synthesizer.state_dict()
         return self._create_update()
 
     def aggregate_train(self, replies: Iterable[Update]) -> Update:
         return self._create_update()
 
     def _create_update(self) -> Update:
+        # noinspection PyUnnecessaryCast
         return Update(
-            arrays={"arrays": self._init_params},
-            objects={"preproc-objects": self._client_preproc_objects},
-            extras={"preproc-extras": self._client_preproc_extras}
+            arrays={"arrays": cast(dict[str, Tensor], self._state)},
+            objects={"preproc-objects": cast(Objects, self._client_preproc_objects)},
+            extras={"preproc-extras": cast(Extras, self._client_preproc_extras)}
         )
 
 
@@ -141,12 +294,11 @@ class FedTabDiffSynthesizer(Synthesizer):
     def arrays_to_ml_framework_map(self) -> dict[str, str] | None:
         return {"arrays": "torch"}
 
-    def __init__(self, cfg):
+    def __init__(self, cfg: dict[str, Any]) -> None:
         self._cfg = cfg
         self._device = cfg["device"]
-        self._client_rounds = cfg["client_rounds"]
+        self._max_batches = cfg["max-batches"]
 
-    @debug_calls(__name__)
     def init(
             self,
             request: Update,
@@ -154,26 +306,32 @@ class FedTabDiffSynthesizer(Synthesizer):
             schema: TableSchema,
             data: DataFrame) -> Update:
 
-        cat_attrs, num_attrs = _split_cat_num(schema)
-        _prefix_columns(data, cat_attrs)
+        cat_attrs, num_attrs = split_cat_num(schema)
+        prefix_columns(data, cat_attrs)
 
         # Aggregator has no data access, pick the simplest possible route
         # and let one client perform the task performed centrally in
         # https://github.com/sattarov/FedTabDiff/blob/main/main.py
         cfg: Extras = request.extras["config"]
-        initialize_qt: bool = cfg["initialize-qt"]
+        # noinspection PyUnnecessaryCast
+        initialize_qt: bool = cast(bool, cfg["initialize-qt"])
 
         if initialize_qt:
             num_scaler = QuantileTransformer(
+                n_quantiles=len(data),
                 output_distribution="normal",
                 random_state=seed
             )
             print(35 * " ", f"num_attrs: {num_attrs}")
-            num_scaler.fit(data[num_attrs])
+            num_scaler.fit(data[num_attrs].values)
         else:
             num_scaler = None
 
         vocab_classes = list(np.unique(data[cat_attrs]))
+        log_info(str(self), "")
+        log_info("", f"\t{TEE} vocab_classes: {vocab_classes}")
+        log_info("", f"\t{TEE} type: {type(vocab_classes)}")
+        log_info("", f"\t{ELBOW} type[, ...]: {type(vocab_classes[0])}")
 
         update = Update()
         update.extras["preproc-extras"] = {
@@ -186,35 +344,56 @@ class FedTabDiffSynthesizer(Synthesizer):
             }
         return update
 
-    @debug_calls(__name__)
     def train(self, request: Update, data: DataFrame) -> Update:
+        log_info(str(self), "Start training round...")
         arrays = request.arrays["arrays"]
-        preproc = request.extras["preprocessing-results"]
+        preproc = request.objects["preproc-objects"] | request.extras["preproc-extras"]
         n_samples = len(data)
 
         mlp_synth, diffuser = init_model(self._cfg | preproc)
-        set_parameters(mlp_synth, arrays)
+        mlp_synth.load_state_dict(arrays)
+        # set_parameters(mlp_synth, arrays)
         optimizer = optim.Adam(
             filter(lambda p: p.requires_grad, mlp_synth.parameters()),
-            lr=cfg["learning_rate"]
+            lr=self._cfg["learning-rate"]
         )
 
         # init loss function
         loss_fnc = nn.MSELoss()
         total_losses = []
-        rnd = 0
 
-        # iterate over distinct mini-batches
-        for _, (batch_cat, batch_num, batch_y) in enumerate(train_loader):
+        cat_attrs = preproc["cat-attrs"]
+        prefix_columns(data, cat_attrs)
+        label_encoder = preproc["label-encoder"]
+        cat_scaled = data[cat_attrs].apply(label_encoder.transform)
 
-            # set network in training mode
-            mlp_synth.train()
-            mlp_synth.to(self._device)
+        num_attrs = preproc["num-attrs"]
+        num_scaler = preproc["num-scaler"]
+        num_scaled = num_scaler.transform(data[num_attrs].values)
 
+        tensor_dataset = TensorDataset(
+            torch.tensor(cat_scaled.values, dtype=torch.long),
+            torch.tensor(num_scaled, dtype=torch.float)
+        )
+        torch_loader = DataLoader(
+            tensor_dataset, batch_size=self._cfg["batch-size"], shuffle=True
+        )
+        # Adapt unsupervised fedbench training to orig alg loop
+        # Tmp solution.
+        def loader() -> Iterator[tuple[Tensor, Tensor, Tensor | None]]:
+            for cat, num in torch_loader:
+                yield cat, num, None
+
+        # set network in training mode
+        mlp_synth.train()
+        mlp_synth.to(self._device)
+
+        for idx, (batch_cat, batch_num, batch_y) in enumerate(loader()):
             # move batch to device
-            batch_cat = batch_cat.to(device)
-            batch_num = batch_num.to(device)
-            batch_y = batch_y.to(device)
+            batch_cat = batch_cat.to(self._device)
+            batch_num = batch_num.to(self._device)
+            if batch_y is not None:
+                batch_y = batch_y.to(self._device)
 
             # sample timestamps t
             timesteps = diffuser.sample_timesteps(n=batch_cat.shape[0])
@@ -228,7 +407,7 @@ class FedTabDiffSynthesizer(Synthesizer):
             # add noise
             batch_noise_t, noise_t = diffuser.add_gauss_noise(
                 x_num=batch_cat_num,
-                t=timesteps)
+                timesteps=timesteps)
 
             # conduct forward encoder/decoder pass
             predicted_noise = mlp_synth(
@@ -254,17 +433,43 @@ class FedTabDiffSynthesizer(Synthesizer):
             # collect rec error losses
             total_losses.append(train_losses.detach().cpu().numpy())
 
-            rnd += 1
-            if rnd >= self._client_rounds:
+            if idx >= self._max_batches:
                 break
 
+        log_info(str(self), f"Trained on {len(data)} rows.")
         # average of rec errors
         loss = np.mean(np.array(total_losses)).item()
         reply = Update()
-        reply["arrays"] = get_parameters(mlp_synth)
-        reply["loss"] = loss
-        reply["num_samples"] = n_samples
+        reply.arrays["arrays"] = mlp_synth.state_dict()
+        reply.metrics["metrics"] = {"loss": loss, "num-samples": n_samples}
+        log_info(str(self), "About to send train reply.")
+        log_info("", f"\t{ELBOW} loss: {loss}.")
         return reply
 
     def sample(self, request: Update, num_rows: int, seed: int) -> DataFrame:
-        return DataFrame()
+        log_info(str(self), "Start training round...")
+        arrays = request.arrays["arrays"]
+        preproc = request.objects["preproc-objects"] | request.extras["preproc-extras"]
+
+        mlp_synth, diffuser = init_model(self._cfg | preproc)
+        mlp_synth.load_state_dict(arrays)
+
+        tensor = generate_samples(
+            mlp_synth,
+            diffuser,
+            encoded_dim=preproc["encoded-dim"],
+            last_diff_step=self._cfg["diffusion-steps"],
+            n_samples=num_rows,
+            label=None
+        )
+        return decode_samples(
+            tensor,
+            cat_dim=preproc["cat-dim"],
+            n_cat_emb=self._cfg["n-cat-emb"],
+            num_attrs=preproc["num-attrs"],
+            cat_attrs=preproc["cat-attrs"],
+            num_scaler=preproc["num-scaler"],
+            vocab_per_attr=preproc["vocab-per-attr"],
+            label_encoder=preproc["label-encoder"],
+            embeddings=mlp_synth.get_embeddings()
+        )

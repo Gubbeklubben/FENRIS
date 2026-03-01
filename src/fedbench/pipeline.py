@@ -3,7 +3,6 @@ from collections.abc import Iterable
 from pathlib import Path
 
 from fedbench.core.data.schemas import infer_schema as _infer_schema
-from fedbench.core.logger import debug_calls
 from fedbench.core.pipeline import Command
 from fedbench.core.runcontext import RunContext
 from fedbench.registries import (

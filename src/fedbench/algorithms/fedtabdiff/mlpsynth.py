@@ -1,19 +1,23 @@
 # This file is ripped from https://github.com/sattarov/FedTabDiff/tree/main
 # and has not been significantly modified.
+from collections.abc import Sequence
 
 import torch
-from torch import nn
+from torch import nn, Tensor
 import math
 
 
-def init_linear_layer(input_size, hidden_size):
+def init_linear_layer(input_size: int, hidden_size: int) -> nn.Linear:
     linear = nn.Linear(input_size, hidden_size, bias=True)
     nn.init.xavier_uniform_(linear.weight)
     nn.init.constant_(linear.bias, 0.0)
     return linear
 
 
-def timestep_embedding(timesteps, dim_out, max_period=10000):
+def timestep_embedding(
+        timesteps: Tensor,
+        dim_out: int,
+        max_period: int = 10000) -> Tensor:
     """
     Create sinusoidal timestep embeddings.
     :param timesteps: a 1-D Tensor of N indices, one per batch element.
@@ -34,25 +38,32 @@ def timestep_embedding(timesteps, dim_out, max_period=10000):
     return embedding
 
 
-class MLP(nn.Module):
+class MLP(nn.Module):  # type: ignore[misc]
     """ Base FeedForward Network
     """
-    def __init__(self, hidden_size, activation='lrelu'):
+    def __init__(
+            self,
+            hidden_size: Sequence[int],
+            activation: str ="lrelu") -> None:
+
         super(MLP, self).__init__()
         # init encoder architecture
         self.layers = self.init_layers(hidden_size)
-        if activation == 'lrelu':
+        if activation == "lrelu":
             self.activation = nn.LeakyReLU(negative_slope=0.4, inplace=True)
-        elif activation == 'relu':
+        elif activation == "relu":
             self.activation = nn.ReLU(inplace=True)
-        elif activation == 'tanh':
+        elif activation == "tanh":
             self.activation = nn.Tanh()
-        elif activation == 'sigmoid':
+        elif activation == "sigmoid":
             self.activation = nn.Sigmoid()
         else:
-            print('WRONG bottleneck function name !!!')
+            raise ValueError(f"Bad activation function: '{activation}'")
 
-    def init_layers(self, layer_dimensions):
+    def init_layers(
+            self,
+            layer_dimensions: Sequence[int]) -> list[nn.Linear]:
+
         layers = []
         for i in range(len(layer_dimensions) - 1):
             linear_layer = init_linear_layer(layer_dimensions[i],
@@ -62,28 +73,28 @@ class MLP(nn.Module):
             self.add_module('linear_' + str(i), linear_layer)
         return layers
 
-    def forward(self, x):
+    def forward(self, x: Tensor) -> Tensor:
         # Define the forward pass
         for i in range(len(self.layers)):
             x = self.activation(self.layers[i](x))
         return x
 
 
-class MLPSynthesizer(nn.Module):
+class MLPSynthesizer(nn.Module):  # type: ignore[misc]
     """ Feed Forward Network used as a synthesizer in the diffusion process."""
     def __init__(
             self,
             d_in: int,
-            hidden_layers: list,
-            activation: str = 'lrelu',
+            hidden_layers: Sequence[int],
+            activation: str = "lrelu",
             dim_t: int = 64,
-            n_cat_tokens=None,
-            n_cat_emb=None,
-            embedding=None,
-            embedding_learned=True,
-            n_classes=None
-    ):
-        """ Constructor for initializing the synthesizer
+            n_cat_tokens: int | None = None,
+            n_cat_emb: int | None = None,
+            embedding: Tensor | None = None,
+            embedding_learned: bool = True,
+            n_classes: int | None = None) -> None:
+        """
+        Constructor for initializing the synthesizer
 
         Args:
             d_in (int): dimensionality of the input data
@@ -128,7 +139,7 @@ class MLPSynthesizer(nn.Module):
         # used for the output layer
         self.head = nn.Linear(hidden_layers[-1], d_in)
 
-    def get_embeddings(self):
+    def get_embeddings(self) -> Tensor:
         """ Extract embedding vectors
 
         Returns:
@@ -136,7 +147,7 @@ class MLPSynthesizer(nn.Module):
         """
         return self.embedding.weight.data
 
-    def embed_categorical(self, x_cat):
+    def embed_categorical(self, x_cat: Tensor) -> Tensor:
         """ Perform embedding mapping for categorical attributes
 
         Args:
@@ -151,7 +162,11 @@ class MLPSynthesizer(nn.Module):
         x_cat_emb = x_cat_emb.view(-1, x_cat_emb.shape[1] * x_cat_emb.shape[2])
         return x_cat_emb
 
-    def forward(self, x, timesteps, label=None):
+    def forward(
+            self,
+            x: Tensor,
+            timesteps: Tensor,
+            label: Tensor | None =None) -> Tensor:
 
         # time embeddings
         emb = self.time_embed(timestep_embedding(timesteps, self.dim_t))
@@ -160,7 +175,7 @@ class MLPSynthesizer(nn.Module):
         if label is not None:
             emb = emb + self.label_emb(label)
 
-        # aggeregated data projection with time & label embeddings
+        # aggregated data projection with time & label embeddings
         x = self.proj(x) + emb
 
         # additional mlp layers
