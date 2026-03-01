@@ -73,64 +73,66 @@ class DirectOverlapDiagnosticEvaluator(Evaluator):
 
 class MIANearestNeighborAttackEvaluator(Evaluator):
     def evaluate(self, ctx: EvalContext) -> dict[str, float]:
-        train, test, syn = ctx.train_df, ctx.test_df, ctx.synthetic_df
+        metrics = {
+            "mia_auc": math.nan,
+            "mia_accuracy": math.nan,
+            "mia_advantage": math.nan,
+        }
 
-        K = min(DEFAULT_MIA_K, len(train), len(test))
-        if K == 0:
-            return {
-                "mia_auc": math.nan,
-                "mia_accuracy": math.nan,
-                "mia_advantage": math.nan
-            }
+        K = min(DEFAULT_MIA_K, len(ctx.train_df), len(ctx.test_df))
+        if K == 0 or len(ctx.synthetic_df) == 0:
+            return metrics
 
-        members = train.sample(n=K, random_state=ctx.seed)
-        nonmembers = test.sample(n=K, random_state=ctx.seed)
+        numeric_cols, _ = get_schema_columns(ctx)
+        if not numeric_cols:
+            return metrics
+
+        # --- numeric-only, NaN-free ---
+        rt = ctx.train_df[numeric_cols].apply(pd.to_numeric, errors="coerce").dropna()
+        rh = ctx.test_df[numeric_cols].apply(pd.to_numeric, errors="coerce").dropna()
+        sx = ctx.synthetic_df[numeric_cols].apply(pd.to_numeric, errors="coerce").dropna()
+
+        if rt.empty or rh.empty or sx.empty:
+            return metrics
+
+        k_train = min(K, len(rt))
+        k_test = min(K, len(rh))
+
+        members = rt.sample(n=k_train, random_state=ctx.seed)
+        nonmembers = rh.sample(n=k_test, random_state=ctx.seed)
 
         X = pd.concat([members, nonmembers], ignore_index=True)
-        y = np.array([1] * K + [0] * K)
+        y = np.array([1] * k_train + [0] * k_test)
 
-        # Subsample synthetic data for tractability
-        if len(syn) > MAX_MIA_SYNTHETIC:
-            syn = syn.sample(n=MAX_MIA_SYNTHETIC, random_state=ctx.seed)
+        syn_mat = sx.to_numpy(dtype=float)
+        syn_min = syn_mat.min(axis=0)
+        syn_rng = syn_mat.max(axis=0) - syn_min
+        syn_rng[syn_rng == 0] = 1.0
 
-        numeric_cols, categorical_cols = get_schema_columns(ctx)
+        syn_norm = (syn_mat - syn_min) / syn_rng
 
-        # Scale numeric columns
-        if numeric_cols:
-            scaler = MinMaxScaler()
-            scaler.fit(train[numeric_cols])
-            X_num = scaler.transform(X[numeric_cols])
-            syn_num = scaler.transform(syn[numeric_cols])
-        else:
-            X_num = np.zeros((len(X), 0))
-            syn_num = np.zeros((len(syn), 0))
+        def nn_dist(x: np.ndarray) -> float:
+            x = (x - syn_min) / syn_rng
+            d2 = np.sum((syn_norm - x) ** 2, axis=1)
+            return float(np.sqrt(np.min(d2)))
 
-        # Categorical arrays
-        if categorical_cols:
-            X_cat = X[categorical_cols].to_numpy()
-            syn_cat = syn[categorical_cols].to_numpy()
-        else:
-            X_cat = np.zeros((len(X), 0))
-            syn_cat = np.zeros((len(syn), 0))
+        dists = np.array([nn_dist(v) for v in X.to_numpy(dtype=float)])
+        scores = -dists
 
-        # Compute distances vectorized
-        dists = np.zeros((len(X), len(syn)))
-
-        if numeric_cols:
-            dists += np.linalg.norm(X_num[:, None, :] - syn_num[None, :, :], axis=2)
-
-        if categorical_cols:
-            dists += (X_cat[:, None, :] != syn_cat[None, :, :]).mean(axis=2)
-
-        # Minimum distance per candidate
-        min_dists = dists.min(axis=1)
-        scores = -min_dists
+        finite = scores[np.isfinite(scores)]
+        if len(finite) == 0:
+            return metrics
+        scores = np.where(np.isfinite(scores), scores, finite.min())
 
         threshold = np.median(scores)
+
         return {
             "mia_auc": roc_auc_score(y, scores),
             "mia_accuracy": accuracy_score(y, scores > threshold),
-            "mia_advantage": np.mean(scores[y == 1] > threshold) - np.mean(scores[y == 0] > threshold)
+            "mia_advantage": (
+                    np.mean(scores[y == 1] > threshold)
+                    - np.mean(scores[y == 0] > threshold)
+            ),
         }
 
 
