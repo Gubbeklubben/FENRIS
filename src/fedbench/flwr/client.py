@@ -14,7 +14,6 @@ from fedbench.core.algorithm import Algorithm
 from fedbench.core.data import PartitionedDataset
 from fedbench.core.data.schemas import infer_schema
 from fedbench.core.eval import EvalContext, EvaluationSuite
-from fedbench.core.logger import LogQueue
 from fedbench.flwr.serde import make_serde, FlwrSerializer, FlwrDeserializer
 from fedbench.registries import (
     build_algorithm_registry,

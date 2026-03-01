@@ -2,18 +2,10 @@ from __future__ import annotations
 
 import functools
 import logging
-import multiprocessing
 import os
 from collections.abc import Callable
-from logging.handlers import QueueHandler
 from pprint import pformat
-from typing import Any, TYPE_CHECKING, ParamSpec, TypeVar
-
-if TYPE_CHECKING:
-    type  LogQueue = multiprocessing.Queue[logging.Logger]
-else:
-    type LogQueue = multiprocessing.Queue
-
+from typing import Any, ParamSpec, TypeVar
 
 TEE = "\u251c\u2500\u2500"
 ELBOW = "\u2514\u2500\u2500"
@@ -46,16 +38,13 @@ class ColoredStreamHandler(logging.StreamHandler):  # type: ignore[type-arg]
         return formatter.format(record)
 
 
-def add_queue_handler(queue: LogQueue) -> None:
-    handler = QueueHandler(queue)
+handler = ColoredStreamHandler()
+if log_level := os.getenv("FEDBENCH_LOG_LEVEL"):
+    handler.setLevel(log_level.upper())
+else:
+    handler.setLevel(logging.INFO)
 
-    if log_level := os.getenv("FEDBENCH_LOG_LEVEL"):
-        handler.setLevel(log_level.upper())
-    else:
-        handler.setLevel(logging.INFO)
-
-    handler.setFormatter(logging.Formatter("%(message)s"))
-    logger.addHandler(handler)
+logger.addHandler(handler)
 
 
 def log(

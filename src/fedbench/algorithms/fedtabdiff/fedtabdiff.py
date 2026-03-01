@@ -9,6 +9,7 @@ from sklearn.preprocessing import LabelEncoder, QuantileTransformer
 from fedbench.core.algorithm import Algorithm, Synthesizer, Aggregator
 from fedbench.core.data import TableSchema
 from fedbench.core.update import Update, Extras
+from fedbench.core.logger import debug_calls
 from .config import config
 from .mlpsynth import MLPSynthesizer
 
@@ -145,6 +146,7 @@ class FedTabDiffSynthesizer(Synthesizer):
         self._device = cfg["device"]
         self._client_rounds = cfg["client_rounds"]
 
+    @debug_calls(__name__)
     def init(
             self,
             request: Update,
@@ -184,6 +186,7 @@ class FedTabDiffSynthesizer(Synthesizer):
             }
         return update
 
+    @debug_calls(__name__)
     def train(self, request: Update, data: DataFrame) -> Update:
         arrays = request.arrays["arrays"]
         preproc = request.extras["preprocessing-results"]

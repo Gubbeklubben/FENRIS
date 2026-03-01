@@ -43,9 +43,8 @@ class FedbenchStrategy:
                 self._seed,
                 self._schema,
                 grid.get_node_ids()):
-            # noinspection PyUnnecessaryCast
             request = self._to_flwr(
-                cast(Update, update),
+                update,
                 message_type="query.init",
                 dst_node_id=cid
             )
