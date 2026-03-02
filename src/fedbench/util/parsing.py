@@ -1,6 +1,7 @@
-import re
-from typing import get_origin, Any, get_args, Callable, Union
 import inspect
+import re
+from types import UnionType
+from typing import get_origin, Any, get_args, Callable, Union, Literal
 
 
 def split_outside_brackets(s: str) -> list[str]:
@@ -33,8 +34,24 @@ def split_outside_brackets(s: str) -> list[str]:
 
 
 def coerce(value: str, annotation: Any) -> Any:
-    # Handle containers (list, tuple, etc.)
+
+    # Handle Union / Optional (PEP 604 and typing.Union)
     base_type = get_origin(annotation)
+    if base_type in (UnionType, Union):
+        for arg in get_args(annotation):
+            if arg is type(None):
+                if value in {"", "none", "null", "None"}:
+                    return None
+                continue
+
+            try:
+                return coerce(value, arg)
+            except Exception:
+                pass
+
+        raise TypeError(f"Value {value!r} does not match any type in {annotation}")
+
+    # Handle containers (list, tuple, etc.)
     if not base_type:
         base_type = annotation
     if not base_type:
@@ -59,6 +76,24 @@ def coerce(value: str, annotation: Any) -> Any:
     # Handle bool specially
     if annotation is bool:
         return value.lower() in {"true", "1", "yes", "on"}
+
+    # Handle Literal[...] types
+    if get_origin(annotation) is Literal:
+        literals = get_args(annotation)
+
+        for lit in literals:
+            # Coerce to the literal's type (str, int, bool, etc.)
+            try:
+                coerced = type(lit)(value)
+            except ValueError:
+                continue
+
+            if coerced == lit:
+                return lit
+
+        raise TypeError(
+            f"Expected one of {literals}, got {value!r}"
+        )
 
     # Fallback: call the type directly
     return annotation(value)

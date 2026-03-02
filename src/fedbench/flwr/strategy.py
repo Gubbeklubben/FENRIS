@@ -3,6 +3,7 @@ from typing import cast
 from flwr.server import Grid
 
 from fedbench.core.algorithm import Aggregator
+from fedbench.core.data import TableSchema
 from fedbench.core.eventbus import EventBus
 from fedbench.core.events import (
     AlgorithmInitStarted,
@@ -12,6 +13,7 @@ from fedbench.core.events import (
     RoundStarted,
     RoundCompleted,
 )
+from fedbench.core.logger import log_info
 from fedbench.core.update import Update, Metrics
 from fedbench.flwr.serde import FlwrSerializer, FlwrDeserializer
 
@@ -19,28 +21,34 @@ from fedbench.flwr.serde import FlwrSerializer, FlwrDeserializer
 class FedbenchStrategy:
     def __init__(
             self,
-            eventbus: EventBus,
             aggregator: Aggregator,
+            seed: int,
+            schema: TableSchema,
             to_flwr: FlwrSerializer,
-            from_flwr: FlwrDeserializer) -> None:
+            from_flwr: FlwrDeserializer,
+            eventbus: EventBus) -> None:
 
-        self._eventbus = eventbus
         self._aggregator = aggregator
+        self._seed = seed
+        self._schema = schema
         self._to_flwr = to_flwr
         self._from_flwr = from_flwr
+        self._eventbus = eventbus
         self._prev_aggr_update: Update | None = None
         self._per_client_metrics: dict[int, Metrics] = {}
 
     def init(self, grid: Grid) -> Update:
         requests = []
-        for cid, update in self._aggregator.configure_init(grid.get_node_ids()):
-            # noinspection PyUnnecessaryCast
+        for cid, update in self._aggregator.configure_init(
+                self._seed,
+                self._schema,
+                grid.get_node_ids()):
             request = self._to_flwr(
-                cast(Update, self._prev_aggr_update),
-                message_type="init",
+                update,
+                message_type="query.init",
                 dst_node_id=cid
             )
-            self._eventbus.emit(ServerRequest(cid, msg_type="init"))
+            self._eventbus.emit(ServerRequest(cid, msg_type="query.init"))
             requests.append(request)
 
         arrays_map = self._aggregator.arrays_to_ml_framework_map

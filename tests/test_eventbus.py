@@ -1,10 +1,11 @@
+import queue
+import threading
 import time
 
 import pytest
-import threading
 
-from fedbench.core.events import Event
 from fedbench.core.eventbus import EventBus, BusState
+from fedbench.core.events import Event
 
 
 class SomeEvent(Event):
@@ -192,3 +193,33 @@ def test_closed_state(event_bus, default_observer):
 
     assert not event_bus.close()
 
+
+def test_emit_none_raises(event_bus):
+    with event_bus:
+        with pytest.raises(TypeError):
+            # noinspection PyTypeChecker
+            event_bus.emit(None)
+
+
+def test_emit_any_raises(event_bus):
+    with event_bus:
+        with pytest.raises(TypeError):
+            # noinspection PyTypeChecker
+            event_bus.emit(object())
+
+
+def test_close_raises_from_observer_thread(event_bus):
+    exc_queue: Queue[Exception] = queue.Queue()
+
+    def observer(_):
+        try:
+            event_bus.close()
+        except Exception as e:
+            exc_queue.put_nowait(e)
+
+    event_bus.register(observer, (SomeEvent,))
+    with event_bus:
+        event_bus.emit(SomeEvent())
+
+    exc = exc_queue.get(timeout=3.0)
+    assert isinstance(exc, RuntimeError)

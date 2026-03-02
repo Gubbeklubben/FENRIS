@@ -3,6 +3,7 @@ from collections.abc import Iterable
 
 from pandas import DataFrame
 
+from fedbench.core.data import TableSchema
 from fedbench.core.update import Update
 
 
@@ -19,11 +20,13 @@ class Aggregator(ABC):
     def arrays_to_ml_framework_map(self) -> dict[str, str] | None:
         return None
 
-    # noinspection PyMethodMayBeStatic,PyUnusedLocal
+    @abstractmethod
     def configure_init(
             self,
+            seed: int,
+            schema: TableSchema,
             client_ids: Iterable[int]) -> Iterable[tuple[int, Update]]:
-        return ()
+        pass
 
     @abstractmethod
     def aggregate_init(
@@ -54,6 +57,8 @@ class Synthesizer(ABC):
     def init(
             self,
             request: Update,
+            seed: int,
+            schema: TableSchema,
             data: DataFrame) -> Update:
         return Update()
 
@@ -74,6 +79,9 @@ class Synthesizer(ABC):
 
 
 class Algorithm(ABC):
+    def __repr__(self) -> str:
+        return f"<{self.__class__.__name__}>"
+
     @abstractmethod
     def create_aggregator(self) -> Aggregator:
         pass
