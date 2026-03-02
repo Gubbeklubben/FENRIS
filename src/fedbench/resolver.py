@@ -19,11 +19,11 @@ def resolve_components(
 
     algorithm = algorithms.call(
         config.algorithm,
-        **config.algorithm_kwargs
+        config.algorithm_kwargs
     )
     partitioner = partitioners.call(
         config.data.partitioner,
-        **config.data.partitioner_kwargs
+        config.data.partitioner_kwargs
     )
 
     if not config.metrics.run_categories:

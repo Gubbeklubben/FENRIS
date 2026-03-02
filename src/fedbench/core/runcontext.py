@@ -110,4 +110,8 @@ class RunContext:
     def synthetic_df(self, df: DataFrame) -> None:
         if self._synthetic_df is not None:
             raise RuntimeError("Can only set 'synthetic_df' once.")
+
+        if not isinstance(df, DataFrame):
+            raise ValueError(f"Expected a DataFrame, got {type(df)}.")
+
         self._synthetic_df = df

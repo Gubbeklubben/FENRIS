@@ -3,7 +3,6 @@ import inspect
 import keyword
 from dataclasses import dataclass
 from importlib.metadata import entry_points
-from logging import WARNING
 from typing import Any, Iterator, Literal
 
 from fedbench.core.logger import log_warning
@@ -60,7 +59,8 @@ class FactoryRegistry[T]:
 
         self._builtins[name] = locator
 
-    def call(self, name: str, **kwargs: Any) -> T:
+    def call(self, name: str, factory_kwargs: dict[str, Any] | None = None) -> T:
+        factory_kwargs = factory_kwargs or {}
         factory = self.load(name)
 
         if inspect.isclass(factory) and inspect.isabstract(factory):
@@ -69,7 +69,7 @@ class FactoryRegistry[T]:
         if not callable(factory):
             raise TypeError(f"{factory} is not callable.")
 
-        instance = factory(**kwargs)
+        instance = factory(**factory_kwargs)
         if not isinstance(instance, self._product_cls):
             raise TypeError(
                 f"Unexpected type {type(instance)} produced by factory {name}"
