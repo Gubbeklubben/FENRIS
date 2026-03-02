@@ -4,7 +4,7 @@ from typing import Any, Iterator, cast
 import numpy as np
 import pandas as pd
 import torch
-from pandas import DataFrame
+from pandas import DataFrame, Series
 from sklearn.preprocessing import LabelEncoder, QuantileTransformer
 from torch import nn
 from torch import optim, Tensor
@@ -12,7 +12,7 @@ from torch.utils.data import TensorDataset, DataLoader
 
 from fedbench.core.algorithm import Algorithm, Synthesizer, Aggregator
 from fedbench.core.data import TableSchema
-from fedbench.core.logger import log_info, ELBOW, TEE
+from fedbench.core.logger import log_info, ELBOW, TEE, log_debug
 from fedbench.core.update import Update, Extras, Objects
 # Relative imports for algorithm specifics.
 from .config import config
@@ -37,17 +37,14 @@ def prefix_columns(df: DataFrame, cat_attrs: Iterable[str]) -> None:
         df[cat_attr] = cat_attr + "_" + df[cat_attr].astype("str")
 
 
+def remove_col_prefixes(df: DataFrame, cat_attrs: Iterable[str]) -> None:
+    for cat_attr in cat_attrs:
+        s: Series = df[cat_attr].astype("str")
+        df[cat_attr] = s.str.removeprefix(f"{cat_attr}_")
+
+
 # https://github.com/sattarov/FedTabDiff/blob/main/fedtabdiff_modules.py
 def init_model(cfg: dict[str, Any]) -> tuple[MLPSynthesizer, Diffuser]:
-    """ Initialize model
-
-    Args:
-        cfg (dict): experiment parameters
-
-    Returns:
-        synthesizer: synthesizer model
-        diffuser: diffuser model
-    """
     synthesizer = MLPSynthesizer(
         d_in=cfg["encoded-dim"],
         hidden_layers=cfg["mlp-layers"],
@@ -57,7 +54,6 @@ def init_model(cfg: dict[str, Any]) -> tuple[MLPSynthesizer, Diffuser]:
         n_classes=None,
         embedding_learned=False
     )
-    # define diffuser
     diffuser = Diffuser(
         total_steps=cfg["diffusion-steps"],
         beta_start=cfg["diffusion-beta-start"],
@@ -169,6 +165,7 @@ def decode_samples(
 
     # inverse transform categorical attributes
     z_cat_df = z_cat_df.apply(label_encoder.inverse_transform)
+    remove_col_prefixes(z_cat_df, cat_attrs)
 
     # concat numeric and categorical attributes
     sample_decoded = pd.concat([z_cat_df, z_norm_df], axis=1)
@@ -322,16 +319,18 @@ class FedTabDiffSynthesizer(Synthesizer):
                 output_distribution="normal",
                 random_state=seed
             )
-            print(35 * " ", f"num_attrs: {num_attrs}")
             num_scaler.fit(data[num_attrs].values)
         else:
             num_scaler = None
 
         vocab_classes = list(np.unique(data[cat_attrs]))
-        log_info(str(self), "")
-        log_info("", f"\t{TEE} vocab_classes: {vocab_classes}")
-        log_info("", f"\t{TEE} type: {type(vocab_classes)}")
-        log_info("", f"\t{ELBOW} type[, ...]: {type(vocab_classes[0])}")
+        log_debug(str(self), "")
+        log_debug("", f"\t{TEE} vocab_classes: {vocab_classes}")
+        log_debug("", f"\t{TEE} type: {type(vocab_classes)}")
+        try:
+            log_debug("", f"\t{ELBOW} type[, ...]: {type(vocab_classes[0])}")
+        except IndexError:
+            pass
 
         update = Update()
         update.extras["preproc-extras"] = {
@@ -345,10 +344,9 @@ class FedTabDiffSynthesizer(Synthesizer):
         return update
 
     def train(self, request: Update, data: DataFrame) -> Update:
-        log_info(str(self), "Start training round...")
+        log_info(str(self), "Start training...")
         arrays = request.arrays["arrays"]
         preproc = request.objects["preproc-objects"] | request.extras["preproc-extras"]
-        n_samples = len(data)
 
         mlp_synth, diffuser = init_model(self._cfg | preproc)
         mlp_synth.load_state_dict(arrays)
@@ -388,7 +386,9 @@ class FedTabDiffSynthesizer(Synthesizer):
         mlp_synth.train()
         mlp_synth.to(self._device)
 
+        num_samples = 0
         for idx, (batch_cat, batch_num, batch_y) in enumerate(loader()):
+            num_samples += len(batch_cat)  # len operates on 1st tensor dim
             # move batch to device
             batch_cat = batch_cat.to(self._device)
             batch_num = batch_num.to(self._device)
@@ -436,18 +436,17 @@ class FedTabDiffSynthesizer(Synthesizer):
             if idx >= self._max_batches:
                 break
 
-        log_info(str(self), f"Trained on {len(data)} rows.")
         # average of rec errors
         loss = np.mean(np.array(total_losses)).item()
         reply = Update()
         reply.arrays["arrays"] = mlp_synth.state_dict()
-        reply.metrics["metrics"] = {"loss": loss, "num-samples": n_samples}
-        log_info(str(self), "About to send train reply.")
+        reply.metrics["metrics"] = {"loss": loss, "num-samples": num_samples}
+        log_info(str(self), "Finished training.")
         log_info("", f"\t{ELBOW} loss: {loss}.")
         return reply
 
     def sample(self, request: Update, num_rows: int, seed: int) -> DataFrame:
-        log_info(str(self), "Start training round...")
+        log_info(str(self), "Start sampling...")
         arrays = request.arrays["arrays"]
         preproc = request.objects["preproc-objects"] | request.extras["preproc-extras"]
 
@@ -462,6 +461,7 @@ class FedTabDiffSynthesizer(Synthesizer):
             n_samples=num_rows,
             label=None
         )
+        log_info(str(self), "Finished sampling.")
         return decode_samples(
             tensor,
             cat_dim=preproc["cat-dim"],
