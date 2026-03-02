@@ -1,5 +1,5 @@
 import re
-from typing import get_origin, Any, get_args, Callable, Union
+from typing import get_origin, Any, get_args, Callable, Union, Literal
 import inspect
 
 
@@ -59,6 +59,24 @@ def coerce(value: str, annotation: Any) -> Any:
     # Handle bool specially
     if annotation is bool:
         return value.lower() in {"true", "1", "yes", "on"}
+
+    # Handle Literal[...] types
+    if get_origin(annotation) is Literal:
+        literals = get_args(annotation)
+
+        for lit in literals:
+            # Coerce to the literal's type (str, int, bool, etc.)
+            try:
+                coerced = type(lit)(value)
+            except ValueError:
+                continue
+
+            if coerced == lit:
+                return lit
+
+        raise TypeError(
+            f"Expected one of {literals}, got {value!r}"
+        )
 
     # Fallback: call the type directly
     return annotation(value)
