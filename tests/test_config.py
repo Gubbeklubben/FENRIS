@@ -40,7 +40,7 @@ def minimal_valid_cfg(tmp_path: Path, **overrides):
 
     base = {
         "dataset": str(dataset),
-        "algorithm": "fed_noop",
+        "algorithm": "fed_hello",
         "partitioner": "iid-partitioner",
     }
     base.update(overrides)

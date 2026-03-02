@@ -49,7 +49,8 @@ def test_iid_partitioning(sample_df, built_in_partitioners):
         sample_df,
         infer_schema(sample_df),
         partitioner=built_in_partitioners.call(
-            name="iid-partitioner", num_partitions=2,
+            name="iid-partitioner",
+            factory_kwargs={"num_partitions": 2},
         ),
         test_size=0.2,
         seed=80085
