@@ -12,7 +12,7 @@ from torch.utils.data import TensorDataset, DataLoader
 
 from fedbench.core.algorithm import Algorithm, Synthesizer, Aggregator
 from fedbench.core.data import TableSchema
-from fedbench.core.logger import log_info, ELBOW, TEE, log_debug
+from fedbench.core.logger import log_info, ELBOW, TEE, log_debug, log_warning
 from fedbench.core.update import Update, Extras, Objects
 # Relative imports for algorithm specifics.
 from .config import config
@@ -190,6 +190,10 @@ class FedTabDiffAggregator(Aggregator):
         self._client_preproc_extras: Extras | None = None
         self._state: dict[str, Tensor] | None = None
 
+    @property
+    def arrays_to_ml_framework_map(self) -> dict[str, str] | None:
+        return {"arrays": "torch"}
+
     def configure_init(
             self,
             seed: int,
@@ -261,20 +265,49 @@ class FedTabDiffAggregator(Aggregator):
         }
         self._client_preproc_extras = extras
 
-        # noinspection PyUnnecessaryCast
-        synthesizer = MLPSynthesizer(
-            d_in=cast(int, extras["encoded-dim"]),
-            hidden_layers=self._cfg["mlp-layers"],
-            activation=self._cfg["activation"],
-            n_cat_tokens=cast(int, extras["n-cat-tokens"]),
-            n_cat_emb=self._cfg["n-cat-emb"],
-            n_classes=None,
-            embedding_learned=False
-        )
-        self._state = synthesizer.state_dict()
+        preproc = self._client_preproc_objects | self._client_preproc_extras
+        mlp_synth, _ = init_model(self._cfg | preproc)
+        self._state = mlp_synth.state_dict()
+
         return self._create_update()
 
     def aggregate_train(self, replies: Iterable[Update]) -> Update:
+        if not replies:
+            raise ValueError("No replies, can not aggregate.")
+
+        num_samples: list[int] = []
+        state_dicts: list[dict[str, Tensor]] = []
+
+        for reply in replies:
+            # noinspection PyUnnecessaryCast
+            num_samples.append(cast(int, reply.metrics["metrics"]["num-samples"]))
+            # noinspection PyUnnecessaryCast
+            state_dicts.append(cast(dict[str, Tensor], reply.arrays["arrays"]))
+
+        total = sum(num_samples)
+        if total <= 0:
+            log_warning(str(self), f"Total number of samples: {total}")
+            log_warning("", f"\t{ELBOW} Skipping aggregation.")
+            return self._create_update()
+
+        weights = tuple(float(n) / total for n in num_samples)
+        keys = tuple(state_dicts[0].keys())
+        aggr_state: dict[str, Tensor] = {}
+
+        with torch.no_grad():
+            for key in keys:
+                result: Tensor | None = None
+
+                for state_dict, weight in zip(state_dicts, weights, strict=True):
+                    tensor = state_dict[key].detach().cpu()
+                    if result is None:
+                        result = tensor * weight
+                    else:
+                        result = result + tensor * weight
+
+                aggr_state[key] = result
+
+        self._state = aggr_state
         return self._create_update()
 
     def _create_update(self) -> Update:
