@@ -39,8 +39,7 @@ def timestep_embedding(
 
 
 class MLP(nn.Module):  # type: ignore[misc]
-    """ Base FeedForward Network
-    """
+    """ Base FeedForward Network"""
     def __init__(
             self,
             hidden_size: Sequence[int],
@@ -58,7 +57,7 @@ class MLP(nn.Module):  # type: ignore[misc]
         elif activation == "sigmoid":
             self.activation = nn.Sigmoid()
         else:
-            raise ValueError(f"Bad activation function: '{activation}'")
+            raise ValueError(f"Unknown activation function: {activation}")
 
     def init_layers(
             self,
@@ -70,7 +69,7 @@ class MLP(nn.Module):  # type: ignore[misc]
                                              layer_dimensions[i + 1])
             layers.append(linear_layer)
 
-            self.add_module('linear_' + str(i), linear_layer)
+            self.add_module("linear_" + str(i), linear_layer)
         return layers
 
     def forward(self, x: Tensor) -> Tensor:

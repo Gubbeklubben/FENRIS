@@ -79,6 +79,9 @@ class Synthesizer(ABC):
 
 
 class Algorithm(ABC):
+    def __repr__(self) -> str:
+        return f"<{self.__class__.__name__}>"
+
     @abstractmethod
     def create_aggregator(self) -> Aggregator:
         pass

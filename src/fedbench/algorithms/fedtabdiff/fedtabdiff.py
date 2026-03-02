@@ -1,5 +1,5 @@
 from collections.abc import Iterable
-from typing import Any, Iterator, cast
+from typing import Any, Iterator, cast, Literal
 
 import numpy as np
 import pandas as pd
@@ -12,10 +12,12 @@ from torch.utils.data import TensorDataset, DataLoader
 
 from fedbench.core.algorithm import Algorithm, Synthesizer, Aggregator
 from fedbench.core.data import TableSchema
-from fedbench.core.logger import log_info, ELBOW, TEE, log_debug, log_warning
+from fedbench.core.logger import (
+    ELBOW, TEE,
+    log_info, log_debug, log_warning
+)
 from fedbench.core.update import Update, Extras, Objects
 # Relative imports for algorithm specifics.
-from .config import config
 from .diffuser import Diffuser
 from .mlpsynth import MLPSynthesizer
 
@@ -174,11 +176,74 @@ def decode_samples(
 
 
 class FedTabDiff(Algorithm):
+    def __init__(
+            self,
+            batch_size: int = 128,
+            max_batches: int = 10,
+            n_cat_emb: int = 2,
+            learning_rate: float = 1e-4,
+            mlp_layers: list[int] | None = None,
+            activation: str = "lrelu",
+            diffusion_steps: int = 500,
+            diffusion_beta_start: float = 1e-4,
+            diffusion_beta_end: float = 0.02,
+            scheduler: Literal["linear", "quad"] = "linear"):
+
+        # Validation apparently not done by mlp_synth/diffuser components.
+        # Note: AI used to suggest appropriate ranges for hard fail. There
+        # are values well within ranges that might still make the algorithm
+        # blow up.
+        if n_cat_emb < 1:
+            raise ValueError("Expecting n_cat_emb >= 1.")
+
+        if learning_rate <= 0 or learning_rate > 0.1:
+            raise ValueError("Expecting 0 < learning_rate <= 0.1")
+
+        if mlp_layers is None:
+            mlp_layers = [512, 512]
+
+        if not mlp_layers:
+            raise ValueError("Expecting non-empty mlp_layers.")
+
+        for value in mlp_layers:
+            if not isinstance(value, int):
+                raise ValueError("Expecting int sequence mlp_layers.")
+
+        if diffusion_steps < 1:
+            raise ValueError("Expecting diffusion_steps >= 1.")
+
+        if diffusion_beta_start <= 0:
+            raise ValueError("Expecting diffusion_beta_start > 0.")
+
+        if diffusion_beta_end >= 1:
+            raise ValueError("Expecting diffusion_beta_end < 1.")
+
+        if diffusion_beta_start >= diffusion_beta_end:
+            raise ValueError(
+                "Expecting diffusion_beta_start < diffusion_beta_end"
+            )
+
+        self._cfg = {
+            "batch-size": batch_size,
+            "max-batches": max_batches,
+            "n-cat-emb": n_cat_emb,
+            "learning-rate": learning_rate,
+            "mlp-layers": mlp_layers,
+            "activation": activation,
+            "diffusion-steps": diffusion_steps,
+            "diffusion-beta-start": diffusion_beta_start,
+            "diffusion-beta-end": diffusion_beta_end,
+            "scheduler": scheduler,
+            "device": torch.device(
+                "cuda" if torch.cuda.is_available() else "cpu"
+            ),
+        }
+
     def create_aggregator(self) -> Aggregator:
-        return FedTabDiffAggregator(config)
+        return FedTabDiffAggregator(self._cfg)
 
     def create_synthesizer(self) -> Synthesizer:
-        return FedTabDiffSynthesizer(config)
+        return FedTabDiffSynthesizer(self._cfg)
 
 
 class FedTabDiffAggregator(Aggregator):
@@ -326,8 +391,8 @@ class FedTabDiffSynthesizer(Synthesizer):
 
     def __init__(self, cfg: dict[str, Any]) -> None:
         self._cfg = cfg
-        self._device = cfg["device"]
         self._max_batches = cfg["max-batches"]
+        self._device = cfg["device"]
 
     def init(
             self,
