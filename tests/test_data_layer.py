@@ -32,7 +32,8 @@ def test_load_csv_and_schema(sample_df, tmp_path):
     csv_path = tmp_path / "sample.csv"
     sample_df.to_csv(csv_path, index=False)
 
-    df, schema = load_csv(csv_path)
+    df = load_csv(csv_path)
+    schema = infer_schema(df)
 
     assert df.shape == sample_df.shape
     # schema is deterministic
