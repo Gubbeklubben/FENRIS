@@ -29,7 +29,7 @@ def make_tabular_preprocessor(df: pd.DataFrame) -> ColumnTransformer:
             ]), num_cols),
             ("cat", Pipeline([
                 ("imputer", SimpleImputer(strategy="most_frequent")),
-                ("onehot", OneHotEncoder(handle_unknown="ignore"))
+                ("onehot", OneHotEncoder(handle_unknown="ignore", sparse_output=False))
             ]), cat_cols)
         ],
         remainder="drop"

@@ -44,3 +44,9 @@ def register_builtin_evaluators(
         "aia_supervised_attack",
         f"{__package__}.privacy:AIASupervisedAttackEvaluator"
     )
+
+    # Fairness Evaluators
+    registries[Category.FAIRNESS].add_builtin(
+        "fairness",
+        f"{__package__}.fairness:FairnessEvaluator"
+    )
