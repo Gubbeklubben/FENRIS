@@ -550,6 +550,7 @@ class FedTabDiffSynthesizer(Synthesizer):
 
         mlp_synth, diffuser = init_model(self._cfg | preproc)
         mlp_synth.load_state_dict(arrays)
+        mlp_synth.to(self._device)
 
         tensor = generate_samples(
             mlp_synth,
