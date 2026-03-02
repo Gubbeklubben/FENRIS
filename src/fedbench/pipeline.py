@@ -68,7 +68,7 @@ def write_artifacts(ctx: RunContext) -> None:
     with outputdir.joinpath("metrics.json").open("w") as f:
         json.dump(dict(ctx.aggregated_metrics), f)
 
-    ctx.synthetic_df.to_csv(outputdir.joinpath("synthetic.csv"))
+    ctx.synthetic_df.to_csv(outputdir.joinpath("synthetic.csv"), index=False)
 
 
 def pipeline() -> Iterable[Command]:
