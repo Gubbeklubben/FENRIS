@@ -1,6 +1,7 @@
-import re
-from typing import get_origin, Any, get_args, Callable, Union, Literal
 import inspect
+import re
+from types import UnionType
+from typing import get_origin, Any, get_args, Callable, Union, Literal
 
 
 def split_outside_brackets(s: str) -> list[str]:
@@ -33,8 +34,24 @@ def split_outside_brackets(s: str) -> list[str]:
 
 
 def coerce(value: str, annotation: Any) -> Any:
-    # Handle containers (list, tuple, etc.)
+
+    # Handle Union / Optional (PEP 604 and typing.Union)
     base_type = get_origin(annotation)
+    if base_type in (UnionType, Union):
+        for arg in get_args(annotation):
+            if arg is type(None):
+                if value in {"", "none", "null", "None"}:
+                    return None
+                continue
+
+            try:
+                return coerce(value, arg)
+            except Exception:
+                pass
+
+        raise TypeError(f"Value {value!r} does not match any type in {annotation}")
+
+    # Handle containers (list, tuple, etc.)
     if not base_type:
         base_type = annotation
     if not base_type:
