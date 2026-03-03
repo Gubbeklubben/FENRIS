@@ -69,7 +69,7 @@ def _fairness_metrics_from_counts(
     tprs_a = np.array(tprs, dtype=float)
     fprs_a = np.array(fprs, dtype=float)
 
-    def nanptp(sequence: np.ndarray):
+    def nanptp(sequence: np.ndarray) -> float:
         """Like np.ptp but ignores NaNs and returns NaN if all values are NaN."""
         if np.all(np.isnan(sequence)):
             return math.nan
@@ -98,8 +98,8 @@ def _evaluate_for_sensitive_column(
     nan_result = (math.nan, math.nan, math.nan)
 
     # Require both columns present in both dataframes
-    for col, label in [(sensitive_column, "sensitive"), (target_column, "target")]:
-        for df, name in [(train_df, "train"), (syn_df, "synthetic")]:
+    for col in [sensitive_column, target_column]:
+        for df in [train_df, syn_df]:
             if col not in df.columns:
                 return nan_result
 
@@ -140,7 +140,7 @@ def _evaluate_for_sensitive_column(
 
     y_pred = pipe.predict(X_real)
 
-    y_true_arr = y_real_enc
+    y_true_arr = pd.Series(y_real_enc).to_numpy()
     y_pred_arr = np.array(y_pred)
     sensitive_arr = sens.to_numpy()
 
