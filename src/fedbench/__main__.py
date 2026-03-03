@@ -1,4 +1,3 @@
-import sys
 from typing import Annotated, Literal
 
 import typer
@@ -81,20 +80,12 @@ def run(
         seed: Annotated[int | None, typer.Option()] = None,
         outputdir: Annotated[str | None, typer.Option()] = None,
         num_synthetic_rows: Annotated[int | None, typer.Option()] = None,
-        allow_pickle: Annotated[bool | None, typer.Option()] = None,
-) -> None:
+        disable_pickle: Annotated[bool | None, typer.Option()] = None) -> None:
 
     cli_input = {
         key: value for key, value in locals().items() if value is not None
     }
-    # noinspection PyBroadException
-    try:
-        config = build_config(cli_input, algorithms, partitioners)
-    except Exception as exc:
-        print(f"Failed to build valid config: {exc}", file=sys.stderr)
-        raise exc
-        sys.exit(1)
-    
+    config = build_config(cli_input, algorithms, partitioners)
     runner.run(config, pipeline())
 
 

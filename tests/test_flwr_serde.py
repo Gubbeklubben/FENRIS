@@ -5,15 +5,21 @@ import numpy as np
 import pytest
 from flwr.common import Message, RecordDict, ArrayRecord
 
-from fedbench.flwr.serde import make_serde
 from fedbench.core.update import Update
+from fedbench.flwr.serde import (
+    FlwrSerializer, FlwrDeserializer,
+    to_flwr_pickle, from_flwr_pickle, to_flwr_disable_pickle
+)
 
 _RNG = np.random.default_rng(42)
 
 
-@pytest.fixture
-def flwr_serde_no_pickle():
-    return make_serde(allow_pickle=False)
+@pytest.fixture(params=[
+    pytest.param((to_flwr_pickle, from_flwr_pickle), id="pickle"),
+    pytest.param((to_flwr_disable_pickle, from_flwr_pickle), id="disable_pickle"),
+])
+def serde(request) -> tuple[FlwrSerializer, FlwrDeserializer]:
+    return request.param
 
 
 @pytest.fixture
@@ -23,9 +29,9 @@ def make_random_ndarrays() -> Callable[[], list[np.ndarray]]:
     return factory
 
 
-def test_empty(flwr_serde_no_pickle):
-    to_flwr, from_flwr = flwr_serde_no_pickle
+def test_empty(serde):
     orig = Update()
+    to_flwr, from_flwr = serde
     flwr_message = to_flwr(
         orig,
         message_type="train",
@@ -37,13 +43,12 @@ def test_empty(flwr_serde_no_pickle):
 
 
 def test_to_flwr_single_array_group(
-        flwr_serde_no_pickle,
+        serde,
         make_random_ndarrays) -> None:
-
-    to_flwr, _ = flwr_serde_no_pickle
     update = Update()
     orig = make_random_ndarrays()
     update.arrays["test-arrays"] = orig
+    to_flwr, _ = serde
     flwr_message = to_flwr(
         update,
         message_type="train",
@@ -55,11 +60,11 @@ def test_to_flwr_single_array_group(
 
 
 def test_from_flwr_single_array_group(
-        make_random_ndarrays,
-        flwr_serde_no_pickle) -> None:
+        serde,
+        make_random_ndarrays) -> None:
 
-    _, from_flwr = flwr_serde_no_pickle
     orig = make_random_ndarrays()
+    _, from_flwr = serde
     flwr_message = Message(
         message_type="train",
         dst_node_id=1,
@@ -72,16 +77,16 @@ def test_from_flwr_single_array_group(
 
 
 def test_to_flwr_multiple_array_groups(
-        make_random_ndarrays,
-        flwr_serde_no_pickle) -> None:
+        serde,
+        make_random_ndarrays) -> None:
 
-    to_flwr, _ = flwr_serde_no_pickle
     update = Update()
     orig1 = make_random_ndarrays()
     orig2 = make_random_ndarrays()
     update.arrays["test-arrays1"] = orig1
     update.arrays["test-arrays2"] = orig2
 
+    to_flwr, _ = serde
     flwr_message = to_flwr(
         update,
         message_type="train",
@@ -98,12 +103,12 @@ def test_to_flwr_multiple_array_groups(
 
 
 def test_from_flwr_multiple_array_groups(
-        make_random_ndarrays,
-        flwr_serde_no_pickle) -> None:
+        serde,
+        make_random_ndarrays) -> None:
 
-    _, from_flwr = flwr_serde_no_pickle
     orig1 = make_random_ndarrays()
     orig2 = make_random_ndarrays()
+    _, from_flwr = serde
     flwr_message = Message(
         message_type="train",
         dst_node_id=1,
@@ -123,6 +128,23 @@ def test_from_flwr_multiple_array_groups(
         assert np.array_equal(arr, retrieved2[idx]), "Arrays not equal"
 
 
+def test_round_trip_combined(serde, make_random_ndarrays) -> None:
+    """Update with arrays, metrics, and extras all populated simultaneously."""
+    to_flwr, from_flwr = serde
+    update = Update()
+    update.arrays["weights"] = make_random_ndarrays()
+    update.metrics["train-metrics"] = {"loss": 0.42, "acc": 0.91}
+    update.extras["meta"] = {"round": 3, "tag": "combined", "flag": True}
+
+    flwr_message = to_flwr(update, message_type="train", dst_node_id=1)
+    result = from_flwr(flwr_message)
+
+    for idx, arr in enumerate(update.arrays["weights"]):
+        assert np.array_equal(arr, result.arrays["weights"][idx])
+    assert result.metrics["train-metrics"] == update.metrics["train-metrics"]
+    assert result.extras["meta"] == update.extras["meta"]
+
+
 class PickleMe:
     def __init__(self, name):
         self.name = name
@@ -137,13 +159,12 @@ def test_single_object_pickle():
     update = Update()
     orig = PickleMe("Some Name")
     update.objects["test-objects"] = {"pickle-me": orig}
-    to_flwr, from_flwr = make_serde(allow_pickle=True)
-    flwr_message = to_flwr(
+    flwr_message = to_flwr_pickle(
         update,
         message_type="train",
         dst_node_id=1
     )
-    deserialized = from_flwr(flwr_message)
+    deserialized = from_flwr_pickle(flwr_message)
     unpickled = deserialized.objects["test-objects"]["pickle-me"]
     assert isinstance(unpickled, PickleMe), "Not a PickleMe instance"
     assert unpickled.name == orig.name
@@ -151,8 +172,8 @@ def test_single_object_pickle():
     assert unpickled.some_dict == orig.some_dict
 
 
-def test_metrics_single_group_all_types(flwr_serde_no_pickle):
-    to_flwr, from_flwr = flwr_serde_no_pickle
+def test_metrics_single_group_all_types(serde):
+    to_flwr, from_flwr = serde
     update = Update()
     metrics = {
         "int": 1,
@@ -170,8 +191,8 @@ def test_metrics_single_group_all_types(flwr_serde_no_pickle):
     assert deserialized.metrics["test-metrics"] == metrics
 
 
-def test_extras_single_group_all_types(flwr_serde_no_pickle):
-    to_flwr, from_flwr = flwr_serde_no_pickle
+def test_extras_single_group_all_types(serde):
+    to_flwr, from_flwr = serde
     update = Update()
     extras = {
         "int": 1,
@@ -195,3 +216,12 @@ def test_extras_single_group_all_types(flwr_serde_no_pickle):
     assert deserialized.extras["test-extras"] == extras
 
 
+def test_disable_pickle_raises():
+    update = Update()
+    update.objects["test-objects"] = {"pickle-me": None}
+    with pytest.raises(RuntimeError):
+        to_flwr_disable_pickle(
+            update,
+            message_type="train",
+            dst_node_id=1
+        )

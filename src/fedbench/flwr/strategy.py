@@ -13,7 +13,6 @@ from fedbench.core.events import (
     RoundStarted,
     RoundCompleted,
 )
-from fedbench.core.logger import log_info
 from fedbench.core.update import Update, Metrics
 from fedbench.flwr.serde import FlwrSerializer, FlwrDeserializer
 

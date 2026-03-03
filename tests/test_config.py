@@ -208,7 +208,7 @@ def test_static_defaults(tmp_path, builtin_algorithms, builtin_partitioners):
     assert config.test_size == 0.2
     assert config.seed == 42
     assert config.num_synthetic_rows is None
-    assert config.allow_pickle == False
+    assert config.disable_pickle == False
 
 
 # --- coerce tests ----------------------------------------------------------
