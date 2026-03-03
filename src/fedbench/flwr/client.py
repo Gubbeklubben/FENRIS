@@ -14,7 +14,10 @@ from fedbench.core.algorithm import Algorithm
 from fedbench.core.data import PartitionedDataset
 from fedbench.core.data.schemas import infer_schema
 from fedbench.core.eval import EvalContext, EvaluationSuite
-from fedbench.flwr.serde import make_serde, FlwrSerializer, FlwrDeserializer
+from fedbench.flwr.serde import (
+    FlwrSerializer, FlwrDeserializer,
+    to_flwr_pickle, from_flwr_pickle
+)
 from fedbench.registries import (
     build_algorithm_registry,
     build_partitioner_registry,
@@ -127,7 +130,7 @@ def require_context() -> tuple[Config, FedbenchClient]:
 
 
 @app.query("configure")
-def configure(flwr_message: Message, flwr_context: Context) -> Message:
+def configure(flwr_message: Message, _: Context) -> Message:
     cfg_record: ConfigRecord = flwr_message.content.config_records["config"]
     global config
     # noinspection PyUnnecessaryCast
@@ -154,7 +157,8 @@ def configure(flwr_message: Message, flwr_context: Context) -> Message:
         dataset,
         components.algorithm,
         components.eval_suite,
-        *make_serde(config.allow_pickle)
+        to_flwr_pickle,
+        from_flwr_pickle
     )
     return Message(content=RecordDict(), reply_to=flwr_message)
 

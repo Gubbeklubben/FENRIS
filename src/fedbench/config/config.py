@@ -44,7 +44,6 @@ class Config:
     seed: int = 42
     outputdir: str = ""
     num_synthetic_rows: int | None = None
-    allow_pickle: bool = False
     metrics: MetricsConfig = field(default_factory=MetricsConfig)
 
     def __post_init__(self) -> None:

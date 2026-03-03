@@ -13,7 +13,7 @@ from flwr.common import (
 from fedbench.core.update import Objects, Update
 
 
-METADATA_KEY = f"{__package__}.metadata"
+_METADATA_KEY = f"{__package__}.metadata"
 
 
 class FlwrSerializer(Protocol):
@@ -23,7 +23,7 @@ class FlwrSerializer(Protocol):
             message_type: str | None = None,
             dst_node_id: int | None = None,
             reply_to: Message | None = None) -> Message:
-        ...
+        pass
 
 
 class FlwrDeserializer(Protocol):
@@ -31,99 +31,81 @@ class FlwrDeserializer(Protocol):
             self,
             message: Message,
             arrays_to_ml_framework_map: dict[str, str] | None = None) -> Update:
-        ...
+        pass
 
 
-def make_serde(allow_pickle: bool) -> tuple[FlwrSerializer, FlwrDeserializer]:
-    return (
-        make_serializer(allow_pickle),
-        make_deserializer(allow_pickle)
+def to_flwr_pickle(
+        update: Update,
+        message_type: str | None = None,
+        dst_node_id: int | None = None,
+        reply_to: Message | None = None) -> Message:
+
+    if reply_to is None:
+        if dst_node_id is None:
+            raise ValueError("Either dst_node_id or reply_to is required.")
+
+        if message_type is None:
+            raise ValueError("message_type required when reply_to is None.")
+
+    rdict = RecordDict()
+    pickle_records = []
+
+    for key, arrays in update.arrays.items():
+        rdict[key] = ArrayRecord(arrays)
+
+    for key, objects in update.objects.items():
+        # noinspection PyUnnecessaryCast
+        rdict[key] = ArrayRecord(_pickle_objects(objects))
+        pickle_records.append(key)
+
+    for key, metrics in update.metrics.items():
+        rdict[key] = MetricRecord(metrics)
+
+    for key, extras in update.extras.items():
+        rdict[key] = ConfigRecord(extras)
+
+    _inject_metadata(rdict, pickle_records)
+
+    if reply_to is not None:
+        return Message(content=rdict, reply_to=reply_to)
+
+    # noinspection PyUnnecessaryCast
+    return Message(
+        content=rdict,
+        message_type=cast(str, message_type),
+        dst_node_id=cast(int, dst_node_id)
     )
 
 
-def make_serializer(allow_pickle: bool) -> FlwrSerializer:
-    def serializer(
-            update: Update,
-            message_type: str | None = None,
-            dst_node_id: int | None = None,
-            reply_to: Message | None = None) -> Message:
+def from_flwr_pickle(
+        message: Message,
+        arrays_to_ml_framework_map: dict[str, str] | None = None) -> Update:
 
-        if update.objects and not allow_pickle:
-            raise RuntimeError(
-                f"Refusing to pickle objects: allow_pickle={allow_pickle}"
-            )
-        if reply_to is None:
-            if dst_node_id is None:
-                raise ValueError("Either dst_node_id or reply_to is required.")
+    arrays_to_ml_framework_map = arrays_to_ml_framework_map or {}
+    rdict = message.content
+    update = Update()
 
-            if message_type is None:
-                raise ValueError("message_type required when reply_to is None.")
+    pickle_records = _extract_metadata(rdict)
 
-        rdict = RecordDict()
-        pickle_records = []
-
-        for key, arrays in update.arrays.items():
-            rdict[key] = ArrayRecord(arrays)
-
-        for key, objects in update.objects.items():
+    for key, arrays in rdict.array_records.items():
+        if key in pickle_records:
             # noinspection PyUnnecessaryCast
-            rdict[key] = ArrayRecord(_pickle_objects(objects))
-            pickle_records.append(key)
-
-        for key, metrics in update.metrics.items():
-            rdict[key] = MetricRecord(metrics)
-
-        for key, extras in update.extras.items():
-            rdict[key] = ConfigRecord(extras)
-
-        _inject_metadata(rdict, pickle_records)
-
-        if reply_to is not None:
-            return Message(content=rdict, reply_to=reply_to)
-
-        # noinspection PyUnnecessaryCast
-        return Message(
-            content=rdict,
-            message_type=cast(str, message_type),
-            dst_node_id=cast(int, dst_node_id)
-        )
-    return serializer
-
-
-def make_deserializer(allow_pickle: bool) -> FlwrDeserializer:
-    def deserializer(
-            message: Message,
-            arrays_to_ml_framework_map: dict[str, str] | None = None) -> Update:
-
-        arrays_to_ml_framework_map = arrays_to_ml_framework_map or {}
-        rdict = message.content
-        update = Update()
-
-        pickle_records = _extract_metadata(rdict)
-        if pickle_records and not allow_pickle:
-            raise RuntimeError(
-                f"Refusing to unpickle arrays: allow_pickle={allow_pickle}"
-            )
-        for key, arrays in rdict.array_records.items():
-            if key in pickle_records:
-                # noinspection PyUnnecessaryCast
-                objects = _unpickle_arrays(arrays)
-                update.objects[key] = objects
+            objects = _unpickle_arrays(arrays)
+            update.objects[key] = objects
+        else:
+            ml_framework = arrays_to_ml_framework_map.get(key, "numpy")
+            if ml_framework == "torch":
+                update.arrays[key] = arrays.to_torch_state_dict()
             else:
-                ml_framework = arrays_to_ml_framework_map.get(key, "numpy")
-                if ml_framework == "torch":
-                    update.arrays[key] = arrays.to_torch_state_dict()
-                else:
-                    update.arrays[key] = arrays.to_numpy_ndarrays()
+                update.arrays[key] = arrays.to_numpy_ndarrays()
 
-        for key, metrics in rdict.metric_records.items():
-            update.metrics[key] = dict(metrics)
+    for key, metrics in rdict.metric_records.items():
+        update.metrics[key] = dict(metrics)
 
-        for key, extras in rdict.config_records.items():
-            update.extras[key] = dict(extras)
+    for key, extras in rdict.config_records.items():
+        update.extras[key] = dict(extras)
 
-        return update
-    return deserializer
+    return update
 
 
 def _pickle_objects(objects: Objects) -> dict[str, Array]:
@@ -149,11 +131,11 @@ def _unpickle_arrays(arrays: ArrayRecord) -> Objects:
 
 def _inject_metadata(rdict: RecordDict, pickle_records: list[str]) -> None:
     cfg_record = ConfigRecord({"pickle-records": pickle_records})
-    rdict.config_records[METADATA_KEY] = cfg_record
+    rdict.config_records[_METADATA_KEY] = cfg_record
 
 
 def _extract_metadata(rdict: RecordDict) -> list[str]:
-    cfg_record = rdict.config_records.pop(METADATA_KEY, None)
+    cfg_record = rdict.config_records.pop(_METADATA_KEY, None)
     if cfg_record is None:
         return []
     # noinspection PyUnnecessaryCast
