@@ -1,0 +1,259 @@
+"""Unit tests for fidelity evaluators.
+
+Approach
+--------
+Tests use known-answer inputs where the correct result is mathematically
+obvious, so no deep statistical expertise is required to verify correctness.
+Where the formula allows an exact analytic result (e.g. Wasserstein shift of
+1, TV = 0.5, Frobenius = 2√2) the expected value is derived in the docstring.
+
+Note on the NaN contract (Code Structure Guide §7.1.2)
+------------------------------------------------------
+The spec requires evaluators to return ``float("nan")`` for inapplicable
+metrics rather than omitting the key.  The current implementations return an
+empty ``{}`` dict instead.  Tests below verify the *actual* behaviour; an
+``assert result == {}`` comment marks each such assertion so it is easy to
+find when the implementation is updated to full spec compliance.
+"""
+
+import math
+
+import numpy as np
+import pandas as pd
+import pytest
+
+from fedbench.evaluators.fidelity import (
+    CategoricalTvMeanEvaluator,
+    CorrFroDiffEvaluator,
+)
+
+from .conftest import (
+    CATEGORICAL_DF,
+    NUMERIC_DF,
+    _DistSimilarity,
+    _MomentReduction,
+    make_ctx,
+    make_schema,
+)
+
+
+# ===================================================================
+# MomentReductionMetricsEvaluator
+# ===================================================================
+
+class TestMomentReduction:
+    """Tests for mean_abs_diff and std_abs_diff metrics."""
+
+    evaluator = _MomentReduction()
+
+    def test_identical_data_gives_zero(self):
+        ctx = make_ctx(NUMERIC_DF, NUMERIC_DF.copy())
+        result = self.evaluator.evaluate(ctx)
+
+        assert result["mean_abs_diff"] == pytest.approx(0.0, abs=1e-9)
+        assert result["std_abs_diff"] == pytest.approx(0.0, abs=1e-9)
+
+    def test_constant_shift_changes_only_mean(self):
+        """Shifting all values by `shift` changes mean_abs_diff but not std."""
+        shift = 5.0
+        syn = NUMERIC_DF + shift
+        ctx = make_ctx(NUMERIC_DF, syn)
+        result = self.evaluator.evaluate(ctx)
+
+        assert result["mean_abs_diff"] == pytest.approx(shift, abs=1e-6)
+        assert result["std_abs_diff"] == pytest.approx(0.0, abs=1e-6)
+
+    def test_scaling_changes_std(self):
+        """Doubling values naturally inflates the std of each column."""
+        syn = NUMERIC_DF * 2.0
+        ctx = make_ctx(NUMERIC_DF, syn)
+        result = self.evaluator.evaluate(ctx)
+
+        assert result["std_abs_diff"] > 0.0
+
+    def test_single_column(self):
+        """Single-column case: mean diff = 3.0, std diff = 0.0 (parallel shift)."""
+        real = pd.DataFrame({"x": [1.0, 2.0, 3.0, 4.0, 5.0]})
+        syn = pd.DataFrame({"x": [4.0, 5.0, 6.0, 7.0, 8.0]})
+        ctx = make_ctx(real, syn)
+        result = self.evaluator.evaluate(ctx)
+
+        assert result["mean_abs_diff"] == pytest.approx(3.0, abs=1e-9)
+        assert result["std_abs_diff"] == pytest.approx(0.0, abs=1e-9)
+
+    def test_no_numeric_columns_returns_empty(self):
+        """No numeric columns → no applicable metrics.  Returns {} (see NaN contract note)."""
+        ctx = make_ctx(CATEGORICAL_DF, CATEGORICAL_DF.copy())
+        result = self.evaluator.evaluate(ctx)
+
+        assert result == {}  # spec: should emit nan keys; current impl returns {}
+
+    def test_returns_both_keys(self):
+        """Sanity-check that both expected keys are present in the output."""
+        ctx = make_ctx(NUMERIC_DF, NUMERIC_DF.copy())
+        result = self.evaluator.evaluate(ctx)
+
+        assert "mean_abs_diff" in result
+        assert "std_abs_diff" in result
+
+
+# ===================================================================
+# DistributionSimilarityMetricsEvaluator
+# ===================================================================
+
+class TestDistributionSimilarity:
+    """Tests for ks_mean, wasserstein_mean, t_stat_mean_abs metrics."""
+
+    evaluator = _DistSimilarity()
+
+    def test_identical_data_gives_zero(self):
+        """Perfect replication → all distribution-similarity metrics = 0."""
+        ctx = make_ctx(NUMERIC_DF, NUMERIC_DF.copy())
+        result = self.evaluator.evaluate(ctx)
+
+        assert result["ks_mean"] == pytest.approx(0.0, abs=1e-9)
+        assert result["wasserstein_mean"] == pytest.approx(0.0, abs=1e-9)
+        assert result["t_stat_mean_abs"] == pytest.approx(0.0, abs=1e-9)
+
+    def test_shifted_wasserstein(self):
+        """A uniform shift of 1 gives Wasserstein distance of exactly 1."""
+        real = pd.DataFrame({"x": np.arange(100, dtype=float)})
+        syn = pd.DataFrame({"x": np.arange(100, dtype=float) + 1.0})
+        ctx = make_ctx(real, syn)
+        result = self.evaluator.evaluate(ctx)
+
+        assert result["wasserstein_mean"] == pytest.approx(1.0, abs=1e-9)
+
+    def test_disjoint_distributions_high_ks(self):
+        """Non-overlapping distributions → KS statistic approaches 1."""
+        rng = np.random.default_rng(99)
+        real = pd.DataFrame({"x": rng.normal(0, 1, 500)})
+        syn = pd.DataFrame({"x": rng.normal(100, 1, 500)})
+        ctx = make_ctx(real, syn)
+        result = self.evaluator.evaluate(ctx)
+
+        assert result["ks_mean"] > 0.99
+
+    def test_no_numeric_columns_returns_empty(self):
+        """No numeric columns → no applicable metrics.  Returns {} (see NaN contract note)."""
+        ctx = make_ctx(CATEGORICAL_DF, CATEGORICAL_DF.copy())
+        result = self.evaluator.evaluate(ctx)
+
+        assert result == {}  # spec: should emit nan keys; current impl returns {}
+
+    def test_returns_all_keys(self):
+        """Sanity-check that all three expected keys are present."""
+        ctx = make_ctx(NUMERIC_DF, NUMERIC_DF * 1.1)
+        result = self.evaluator.evaluate(ctx)
+
+        assert "ks_mean" in result
+        assert "wasserstein_mean" in result
+        assert "t_stat_mean_abs" in result
+
+
+# ===================================================================
+# CategoricalTvMeanEvaluator
+# ===================================================================
+
+class TestCategoricalTvMean:
+    """Tests for categorical_tv_mean (Total Variation distance)."""
+
+    evaluator = CategoricalTvMeanEvaluator()
+
+    def test_identical_categories_gives_zero(self):
+        """Identical category distributions → TV distance = 0."""
+        ctx = make_ctx(CATEGORICAL_DF, CATEGORICAL_DF.copy())
+        result = self.evaluator.evaluate(ctx)
+
+        assert result["categorical_tv_mean"] == pytest.approx(0.0, abs=1e-9)
+
+    def test_completely_disjoint_gives_one(self):
+        """All real = 'A', all syn = 'B'  → TV = 1.0."""
+        n = 100
+        real = pd.DataFrame({"cat": ["A"] * n})
+        syn = pd.DataFrame({"cat": ["B"] * n})
+        schema = make_schema(("cat", "categorical"))
+        ctx = make_ctx(real, syn, schema=schema)
+        result = self.evaluator.evaluate(ctx)
+
+        assert result["categorical_tv_mean"] == pytest.approx(1.0, abs=1e-9)
+
+    def test_half_overlap(self):
+        """
+        real = [A, A, B, B]  → P(A)=0.5, P(B)=0.5
+        syn  = [A, A, A, A]  → P(A)=1.0, P(B)=0.0
+        TV = 0.5 * (|0.5-1.0| + |0.5-0.0|) = 0.5
+        """
+        real = pd.DataFrame({"cat": ["A", "A", "B", "B"]})
+        syn = pd.DataFrame({"cat": ["A", "A", "A", "A"]})
+        schema = make_schema(("cat", "categorical"))
+        ctx = make_ctx(real, syn, schema=schema)
+        result = self.evaluator.evaluate(ctx)
+
+        assert result["categorical_tv_mean"] == pytest.approx(0.5, abs=1e-9)
+
+    def test_no_categorical_columns_returns_empty(self):
+        """No categorical columns → no applicable metrics.  Returns {} (see NaN contract note)."""
+        ctx = make_ctx(NUMERIC_DF, NUMERIC_DF.copy())
+        result = self.evaluator.evaluate(ctx)
+
+        assert result == {}  # spec: should emit nan keys; current impl returns {}
+
+    def test_nan_values_treated_as_category(self):
+        """NaN is mapped to __NA__ so it shouldn't crash."""
+        real = pd.DataFrame({"cat": ["A", None, "B", None]})
+        syn = pd.DataFrame({"cat": ["A", None, "B", None]})
+        schema = make_schema(("cat", "categorical"))
+        ctx = make_ctx(real, syn, schema=schema)
+        result = self.evaluator.evaluate(ctx)
+
+        assert result["categorical_tv_mean"] == pytest.approx(0.0, abs=1e-9)
+
+
+# ===================================================================
+# CorrFroDiffEvaluator
+# ===================================================================
+
+class TestCorrFroDiff:
+    """Tests for corr_fro_diff (Frobenius norm of correlation difference)."""
+
+    evaluator = CorrFroDiffEvaluator()
+
+    def test_identical_data_gives_zero(self):
+        """Perfect replication → Frobenius norm of the diff matrix = 0."""
+        ctx = make_ctx(NUMERIC_DF, NUMERIC_DF.copy())
+        result = self.evaluator.evaluate(ctx)
+
+        assert result["corr_fro_diff"] == pytest.approx(0.0, abs=1e-9)
+
+    def test_fewer_than_two_columns_returns_empty(self):
+        """Correlation is undefined for a single column.  Returns {} (see NaN contract note)."""
+        real = pd.DataFrame({"x": [1.0, 2.0, 3.0]})
+        syn = pd.DataFrame({"x": [4.0, 5.0, 6.0]})
+        ctx = make_ctx(real, syn)
+        result = self.evaluator.evaluate(ctx)
+
+        assert result == {}  # spec: should emit nan keys; current impl returns {}
+
+    def test_perfect_positive_vs_negative_correlation(self):
+        """
+        real: b = a  → corr = [[1, 1], [1, 1]]
+        syn:  b = -a → corr = [[1, -1], [-1, 1]]
+        diff = [[0, 2], [2, 0]]
+        Frobenius = sqrt(0 + 4 + 4 + 0) = 2*sqrt(2) ≈ 2.828
+        """
+        a = np.linspace(1, 100, 50)
+        real = pd.DataFrame({"a": a, "b": a})
+        syn = pd.DataFrame({"a": a, "b": -a})
+        ctx = make_ctx(real, syn)
+        result = self.evaluator.evaluate(ctx)
+
+        expected = 2 * math.sqrt(2)
+        assert result["corr_fro_diff"] == pytest.approx(expected, abs=1e-6)
+
+    def test_only_categorical_returns_empty(self):
+        """No numeric columns → correlation undefined.  Returns {} (see NaN contract note)."""
+        ctx = make_ctx(CATEGORICAL_DF, CATEGORICAL_DF.copy())
+        result = self.evaluator.evaluate(ctx)
+
+        assert result == {}  # spec: should emit nan keys; current impl returns {}
