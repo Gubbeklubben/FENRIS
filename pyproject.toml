@@ -22,6 +22,9 @@ dependencies = [
     "scikit-learn (>=1.8.0,<2.0.0)"
 ]
 
+[project.scripts]
+fedbench = "fedbench.__main__:app"
+
 [build-system]
 requires = ["poetry-core>=2.0.0,<3.0.0"]
 build-backend = "poetry.core.masonry.api"
