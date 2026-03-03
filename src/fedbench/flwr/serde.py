@@ -108,6 +108,19 @@ def from_flwr_pickle(
     return update
 
 
+def to_flwr_disable_pickle(
+    update: Update,
+    message_type: str | None = None,
+    dst_node_id: int | None = None,
+    reply_to: Message | None = None) -> Message:
+
+    if update.objects:
+        raise RuntimeError(
+        "Pickle is disabled, but update has non-empty objects field."
+    )
+    return to_flwr_pickle(update, message_type, dst_node_id, reply_to)
+
+
 def _pickle_objects(objects: Objects) -> dict[str, Array]:
     arrays = {}
     for key, value in objects.items():

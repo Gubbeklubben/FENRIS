@@ -16,7 +16,7 @@ from fedbench.core.data.schemas import infer_schema
 from fedbench.core.eval import EvalContext, EvaluationSuite
 from fedbench.flwr.serde import (
     FlwrSerializer, FlwrDeserializer,
-    to_flwr_pickle, from_flwr_pickle
+    to_flwr_pickle, from_flwr_pickle, to_flwr_disable_pickle
 )
 from fedbench.registries import (
     build_algorithm_registry,
@@ -157,7 +157,7 @@ def configure(flwr_message: Message, _: Context) -> Message:
         dataset,
         components.algorithm,
         components.eval_suite,
-        to_flwr_pickle,
+        to_flwr_disable_pickle if config.disable_pickle else to_flwr_pickle,
         from_flwr_pickle
     )
     return Message(content=RecordDict(), reply_to=flwr_message)

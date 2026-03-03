@@ -79,7 +79,8 @@ def run(
         test_size: Annotated[float | None, typer.Option()] = None,
         seed: Annotated[int | None, typer.Option()] = None,
         outputdir: Annotated[str | None, typer.Option()] = None,
-        num_synthetic_rows: Annotated[int | None, typer.Option()] = None) -> None:
+        num_synthetic_rows: Annotated[int | None, typer.Option()] = None,
+        disable_pickle: Annotated[bool | None, typer.Option()] = None) -> None:
 
     cli_input = {
         key: value for key, value in locals().items() if value is not None

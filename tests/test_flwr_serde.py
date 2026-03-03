@@ -9,7 +9,7 @@ from flwr.common import Message, RecordDict, ArrayRecord
 from fedbench.core.update import Update
 from fedbench.flwr.serde import (
     FlwrSerializer, FlwrDeserializer,
-    to_flwr_pickle, from_flwr_pickle
+    to_flwr_pickle, from_flwr_pickle, to_flwr_disable_pickle
 )
 
 _RNG = np.random.default_rng(42)
@@ -19,6 +19,7 @@ _RNG = np.random.default_rng(42)
 def serde() -> Iterable[tuple[FlwrSerializer, FlwrDeserializer]]:
     return (
         (to_flwr_pickle, from_flwr_pickle),
+        (to_flwr_disable_pickle, from_flwr_pickle)
     )
 
 
@@ -197,3 +198,14 @@ def test_extras_single_group_all_types(serde):
         )
         deserialized = from_flwr(flwr_message)
         assert deserialized.extras["test-extras"] == extras
+
+
+def test_disable_pickle_raises():
+    update = Update()
+    update.objects["test-objects"] = {"pickle-me": None}
+    with pytest.raises(RuntimeError):
+        to_flwr_disable_pickle(
+            update,
+            message_type="train",
+            dst_node_id=1
+        )
