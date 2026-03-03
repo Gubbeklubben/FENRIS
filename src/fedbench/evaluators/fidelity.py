@@ -100,13 +100,6 @@ class CategoricalTvMeanEvaluator(Evaluator):
         }
 
 
-def _safe_corr(df: pd.DataFrame) -> pd.DataFrame:
-    # Drop zero-variance columns
-    non_constant = df.columns[df.nunique(dropna=True) > 1]
-    corr = df[non_constant].corr()
-    return corr.fillna(0.0)
-
-
 class CorrFroDiffEvaluator(Evaluator):
     def evaluate(self, ctx: EvalContext) -> dict[str, float]:
         numeric_columns, _ = get_schema_columns(ctx)
@@ -115,8 +108,14 @@ class CorrFroDiffEvaluator(Evaluator):
                 "corr_fro_diff": math.nan
             }
 
-        r_corr = _safe_corr(ctx.train_df[numeric_columns])
-        s_corr = _safe_corr(ctx.synthetic_df[numeric_columns])
+        def safe_corr(df: pd.DataFrame) -> pd.DataFrame:
+            # Drop zero-variance columns
+            non_constant = df.columns[df.nunique(dropna=True) > 1]
+            corr = df[non_constant].corr()
+            return corr.fillna(0.0)
+
+        r_corr = safe_corr(ctx.train_df[numeric_columns])
+        s_corr = safe_corr(ctx.synthetic_df[numeric_columns])
 
         # Align matrices (important if columns dropped differently)
         common = r_corr.index.intersection(s_corr.index)

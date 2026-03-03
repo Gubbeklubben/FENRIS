@@ -4,7 +4,6 @@ import numpy as np
 import pandas as pd
 from sklearn.linear_model import LogisticRegression, Ridge
 from sklearn.metrics import accuracy_score, mean_squared_error, roc_auc_score
-from sklearn.preprocessing import MinMaxScaler
 
 from fedbench.core.eval import Evaluator, EvalContext
 from fedbench.util.metrics import get_quasi_identifiers, get_schema_columns, fit_tabular_model, canonical_row_hash
@@ -73,7 +72,7 @@ class DirectOverlapDiagnosticEvaluator(Evaluator):
 
 class MIANearestNeighborAttackEvaluator(Evaluator):
     def evaluate(self, ctx: EvalContext) -> dict[str, float]:
-        metrics = {
+        nan_result = {
             "mia_auc": math.nan,
             "mia_accuracy": math.nan,
             "mia_advantage": math.nan,
@@ -81,11 +80,11 @@ class MIANearestNeighborAttackEvaluator(Evaluator):
 
         K = min(DEFAULT_MIA_K, len(ctx.train_df), len(ctx.test_df))
         if K == 0 or len(ctx.synthetic_df) == 0:
-            return metrics
+            return nan_result
 
         numeric_cols, _ = get_schema_columns(ctx)
         if not numeric_cols:
-            return metrics
+            return nan_result
 
         # --- numeric-only, NaN-free ---
         rt = ctx.train_df[numeric_cols].apply(pd.to_numeric, errors="coerce").dropna()
@@ -93,7 +92,7 @@ class MIANearestNeighborAttackEvaluator(Evaluator):
         sx = ctx.synthetic_df[numeric_cols].apply(pd.to_numeric, errors="coerce").dropna()
 
         if rt.empty or rh.empty or sx.empty:
-            return metrics
+            return nan_result
 
         k_train = min(K, len(rt))
         k_test = min(K, len(rh))
@@ -121,7 +120,7 @@ class MIANearestNeighborAttackEvaluator(Evaluator):
 
         finite = scores[np.isfinite(scores)]
         if len(finite) == 0:
-            return metrics
+            return nan_result
         scores = np.where(np.isfinite(scores), scores, finite.min())
 
         threshold = np.median(scores)
@@ -142,6 +141,12 @@ class MIANearestNeighborAttackEvaluator(Evaluator):
 
 class AIASupervisedAttackEvaluator(Evaluator):
     def evaluate(self, ctx: EvalContext) -> dict[str, float]:
+        nan_result = {
+            "aia_accuracy": math.nan,
+            "aia_auc": math.nan,
+            "aia_rmse": math.nan,
+        }
+
         train, test, syn = ctx.train_df, ctx.test_df, ctx.synthetic_df
         all_columns = set(train.columns)
 
@@ -191,4 +196,4 @@ class AIASupervisedAttackEvaluator(Evaluator):
                 y_pred = pipe.predict(X_test)
                 metrics[f"aia_rmse.{sensitive_column_normalized}"] = math.sqrt(mean_squared_error(y_test, y_pred))
 
-        return metrics or {"aia": math.nan}
+        return metrics or nan_result
