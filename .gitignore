@@ -207,26 +207,14 @@ marimo/_lsp/
 __marimo__/
 
 # idea files
-.idea/copilot.data.migration.agent.xml
-.idea/copilot.data.migration.ask.xml
-.idea/copilot.data.migration.edit.xml
-.idea/FedBench.iml
-.idea/material_theme_project_new.xml
-.idea/misc.xml
-.idea/modules.xml
-.idea/vcs.xml
-.idea/inspectionProfiles/profiles_settings.xml
+.idea/
 
 # Artifacts
-out/*/metrics.json
-out/*/synthetic.csv
+out/
 
 # vscode files
-.vscode/BACHELOR PROJECT DESCRIPTION.md
-.vscode/copilot-instructions.md
-.vscode/FEDBENCH_EXPLANATION.md
-.vscode/settings.json
-.vscode/tasks.json
+.vscode/
 
 # helper docs
-docs/evaluator_testing_strategy.md
+docs/
+
