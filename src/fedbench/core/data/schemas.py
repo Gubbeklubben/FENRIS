@@ -57,6 +57,8 @@ def infer_schema(df: pd.DataFrame) -> TableSchema:
         else:
             kind = "categorical"
 
+        print(f"{name} ({kind})")
+
         columns.append(ColumnSchema(name=str(name), kind=kind))
 
     return TableSchema(tuple(columns))
