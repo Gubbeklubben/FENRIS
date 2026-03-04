@@ -12,6 +12,18 @@ from fedbench.core.eval import EvalContext, Evaluator
 from fedbench.util.metrics import get_schema_columns
 
 
+def _safe_nanmean(values: list[float]) -> float:
+    """Like ``np.nanmean`` but returns ``nan`` silently for all-NaN inputs.
+
+    ``np.nanmean`` emits a ``RuntimeWarning: Mean of empty slice`` when every
+    element is NaN.  This helper avoids that by returning ``math.nan``
+    directly when no finite values remain.
+    """
+    arr = np.asarray(values, dtype=float)
+    finite = arr[~np.isnan(arr)]
+    return float(np.mean(finite)) if finite.size else math.nan
+
+
 class MomentReductionMetricsEvaluator(Evaluator, ABC):
     def evaluate(self, ctx: EvalContext) -> Mapping[str, float]:
         numeric_columns, _ = get_schema_columns(ctx)
@@ -32,8 +44,8 @@ class MomentReductionMetricsEvaluator(Evaluator, ABC):
             std_abs_diff.append(abs(r.std() - s.std()))
 
         return {
-            "mean_abs_diff": float(np.nanmean(mean_abs_diff)),
-            "std_abs_diff": float(np.nanmean(std_abs_diff)),
+            "mean_abs_diff": _safe_nanmean(mean_abs_diff),
+            "std_abs_diff": _safe_nanmean(std_abs_diff),
         }
 
 
@@ -69,11 +81,11 @@ class DistributionSimilarityMetricsEvaluator(Evaluator, ABC):
             t_stats.append(abs(t_stat))
 
         if ks:
-            metrics["ks_mean"] = float(np.nanmean(ks))
+            metrics["ks_mean"] = _safe_nanmean(ks)
         if wasserstein:
-            metrics["wasserstein_mean"] = float(np.nanmean(wasserstein))
+            metrics["wasserstein_mean"] = _safe_nanmean(wasserstein)
         if t_stats:
-            metrics["t_stat_mean_abs"] = float(np.nanmean(t_stats))
+            metrics["t_stat_mean_abs"] = _safe_nanmean(t_stats)
 
         return metrics
 

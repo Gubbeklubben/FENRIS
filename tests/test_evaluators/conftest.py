@@ -14,6 +14,8 @@ Design rationale
   instantiated in tests.
 """
 
+import math
+
 import numpy as np
 import pandas as pd
 import pytest
@@ -24,6 +26,28 @@ from fedbench.evaluators.fidelity import (
     DistributionSimilarityMetricsEvaluator,
     MomentReductionMetricsEvaluator,
 )
+
+
+# ---------------------------------------------------------------------------
+# Assertion helpers
+# ---------------------------------------------------------------------------
+
+def assert_dicts_nan_safe(d1: dict[str, float], d2: dict[str, float]) -> None:
+    """Assert two metric dicts are equal, treating NaN == NaN.
+
+    Standard ``dict.__eq__`` relies on CPython identity short-circuiting for
+    the ``math.nan`` singleton.  This helper is portable: it compares key
+    sets explicitly, then checks each value with ``math.isnan`` awareness.
+    """
+    assert d1.keys() == d2.keys(), (
+        f"Key mismatch: {set(d1) ^ set(d2)}"
+    )
+    for k in d1:
+        v1, v2 = d1[k], d2[k]
+        if math.isnan(v1):
+            assert math.isnan(v2), f"{k}: expected nan, got {v2}"
+        else:
+            assert v1 == v2, f"{k}: {v1} != {v2}"
 
 
 # ---------------------------------------------------------------------------

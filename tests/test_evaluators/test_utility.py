@@ -3,18 +3,14 @@
 Approach
 --------
 TSTR trains a classifier or regressor on synthetic data and evaluates it on
-held-out real data.  Tests exercise three paths:
-  * Binary classification  → emits ``tstr_auc`` and ``tstr_accuracy``
-  * Multi-class classification → emits ``tstr_accuracy`` (no AUC)
-  * Regression  → emits ``tstr_rmse``
-
-Known bug
----------
-``TSTREvaluator`` crashes on single-class data (sklearn LogisticRegression
-requires ≥2 distinct classes).  The corresponding edge-case test in
-``test_edge_cases.py`` is marked ``xfail`` until a guard is added.
+held-out real data.  The evaluator always returns all three keys; inapplicable
+paths emit ``float("nan")``:
+  * Binary classification  → ``tstr_auc`` computed; ``tstr_accuracy`` and ``tstr_rmse`` are nan
+  * Multi-class classification → ``tstr_accuracy`` computed; ``tstr_auc`` and ``tstr_rmse`` are nan
+  * Regression  → ``tstr_rmse`` computed; ``tstr_auc`` and ``tstr_accuracy`` are nan
 """
 
+import math
 import numpy as np
 import pandas as pd
 import pytest
@@ -24,21 +20,46 @@ from fedbench.evaluators.utility import TSTREvaluator
 from .conftest import make_ctx, make_schema
 
 
-evaluator = TSTREvaluator()
-
-
 # ===================================================================
 # Guard clauses
 # ===================================================================
 
 class TestTSTRGuards:
-    """Guard-clause tests: evaluator should return {} when it cannot run."""
+    """Guard-clause tests: missing prerequisites produce the full nan key set."""
 
-    def test_no_target_returns_empty(self):
-        """No target_column set → TSTR has nothing to predict; returns {}."""
+    evaluator = TSTREvaluator()
+
+    EXPECTED_KEYS = {"tstr_auc", "tstr_accuracy", "tstr_rmse"}
+
+    def test_no_target_returns_nan_keys(self):
+        """No target_column set → all three keys present as nan (NaN contract §7.1.2)."""
         df = pd.DataFrame({"x": [1.0, 2.0], "y": [0, 1]})
         ctx = make_ctx(df, df.copy(), target_column=None)
-        assert evaluator.evaluate(ctx) == {}
+        result = self.evaluator.evaluate(ctx)
+
+        assert set(result.keys()) == self.EXPECTED_KEYS
+        assert all(math.isnan(v) for v in result.values())
+
+    def test_single_class_returns_nan_keys(self):
+        """Only one class in the target → all three keys nan."""
+        df = pd.DataFrame({"x": [1.0, 2.0, 3.0], "target": [0, 0, 0]})
+        schema = make_schema(("x", "continuous"), ("target", "binary"))
+        ctx = make_ctx(df, df.copy(), target_column="target", schema=schema)
+        result = self.evaluator.evaluate(ctx)
+
+        assert set(result.keys()) == self.EXPECTED_KEYS
+        assert all(math.isnan(v) for v in result.values())
+
+    def test_returns_all_keys_on_valid_input(self):
+        """Key-completeness: all three keys present for a valid binary task."""
+        rng = np.random.default_rng(0)
+        n = 100
+        df = pd.DataFrame({"x": rng.normal(0, 1, n), "target": rng.integers(0, 2, n)})
+        schema = make_schema(("x", "continuous"), ("target", "binary"))
+        ctx = make_ctx(df, df.copy(), target_column="target", schema=schema)
+        result = self.evaluator.evaluate(ctx)
+
+        assert set(result.keys()) == self.EXPECTED_KEYS
 
 
 # ===================================================================
@@ -46,7 +67,9 @@ class TestTSTRGuards:
 # ===================================================================
 
 class TestTSTRBinary:
+    """Binary classification path: target has exactly two classes → emits ``tstr_auc``."""
 
+    evaluator = TSTREvaluator()
     @pytest.fixture()
     def separable_data(self):
         """Linearly separable binary task: y=1 when x > 0."""
@@ -67,7 +90,7 @@ class TestTSTRBinary:
             target_column="target",
             schema=schema,
         )
-        result = evaluator.evaluate(ctx)
+        result = self.evaluator.evaluate(ctx)
 
         assert "tstr_auc" in result
         assert result["tstr_auc"] > 0.85
@@ -87,18 +110,19 @@ class TestTSTRBinary:
             target_column="target",
             schema=schema,
         )
-        result = evaluator.evaluate(ctx)
+        result = self.evaluator.evaluate(ctx)
 
-        assert 0.2 < result["tstr_auc"] < 0.8
+        assert 0.35 < result["tstr_auc"] < 0.65
 
     def test_binary_emits_tstr_auc_key(self, separable_data):
+        """Binary path: tstr_auc computed; tstr_accuracy and tstr_rmse are nan."""
         df, schema = separable_data
         ctx = make_ctx(df, df.copy(), target_column="target", schema=schema)
-        result = evaluator.evaluate(ctx)
+        result = self.evaluator.evaluate(ctx)
 
         assert "tstr_auc" in result
-        assert "tstr_accuracy" not in result
-        assert "tstr_rmse" not in result
+        assert math.isnan(result["tstr_accuracy"])
+        assert math.isnan(result["tstr_rmse"])
 
 
 # ===================================================================
@@ -106,8 +130,12 @@ class TestTSTRBinary:
 # ===================================================================
 
 class TestTSTRCategorical:
+    """Multi-class classification path: target has >2 classes → emits ``tstr_accuracy``."""
+
+    evaluator = TSTREvaluator()
 
     def test_multiclass_emits_accuracy_key(self):
+        """Categorical target → accuracy computed; auc and rmse are nan."""
         rng = np.random.default_rng(0)
         n = 200
         x = rng.normal(0, 1, n)
@@ -116,10 +144,10 @@ class TestTSTRCategorical:
         schema = make_schema(("x", "continuous"), ("target", "categorical"))
 
         ctx = make_ctx(df, df.copy(), target_column="target", schema=schema)
-        result = evaluator.evaluate(ctx)
+        result = self.evaluator.evaluate(ctx)
 
         assert "tstr_accuracy" in result
-        assert "tstr_auc" not in result
+        assert math.isnan(result["tstr_auc"])
 
 
 # ===================================================================
@@ -127,6 +155,9 @@ class TestTSTRCategorical:
 # ===================================================================
 
 class TestTSTRRegression:
+    """Regression path: continuous target → emits ``tstr_rmse``."""
+
+    evaluator = TSTREvaluator()
 
     def test_perfect_linear_gives_low_rmse(self):
         """y = 2*x + 1 → perfectly learnable."""
@@ -138,12 +169,13 @@ class TestTSTRRegression:
         schema = make_schema(("x", "continuous"), ("target", "continuous"))
 
         ctx = make_ctx(df, df.copy(), target_column="target", schema=schema)
-        result = evaluator.evaluate(ctx)
+        result = self.evaluator.evaluate(ctx)
 
         assert "tstr_rmse" in result
         assert result["tstr_rmse"] < 0.1
 
     def test_regression_emits_rmse_key(self):
+        """Continuous target → rmse computed; auc and accuracy are nan."""
         rng = np.random.default_rng(0)
         n = 100
         df = pd.DataFrame({
@@ -153,8 +185,8 @@ class TestTSTRRegression:
         schema = make_schema(("x", "continuous"), ("target", "continuous"))
 
         ctx = make_ctx(df, df.copy(), target_column="target", schema=schema)
-        result = evaluator.evaluate(ctx)
+        result = self.evaluator.evaluate(ctx)
 
         assert "tstr_rmse" in result
-        assert "tstr_auc" not in result
-        assert "tstr_accuracy" not in result
+        assert math.isnan(result["tstr_auc"])
+        assert math.isnan(result["tstr_accuracy"])

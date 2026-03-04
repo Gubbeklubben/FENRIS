@@ -9,11 +9,9 @@ Where the formula allows an exact analytic result (e.g. Wasserstein shift of
 
 Note on the NaN contract (Code Structure Guide §7.1.2)
 ------------------------------------------------------
-The spec requires evaluators to return ``float("nan")`` for inapplicable
-metrics rather than omitting the key.  The current implementations return an
-empty ``{}`` dict instead.  Tests below verify the *actual* behaviour; an
-``assert result == {}`` comment marks each such assertion so it is easy to
-find when the implementation is updated to full spec compliance.
+Evaluators emit ``float("nan")`` for inapplicable metrics rather than
+omitting the key.  Tests assert that inapplicable metrics are ``nan`` and
+that the full expected key set is always present.
 """
 
 import math
@@ -81,12 +79,13 @@ class TestMomentReduction:
         assert result["mean_abs_diff"] == pytest.approx(3.0, abs=1e-9)
         assert result["std_abs_diff"] == pytest.approx(0.0, abs=1e-9)
 
-    def test_no_numeric_columns_returns_empty(self):
-        """No numeric columns → no applicable metrics.  Returns {} (see NaN contract note)."""
+    def test_no_numeric_columns_emits_nan_keys(self):
+        """No numeric columns → both keys present but nan (NaN contract §7.1.2)."""
         ctx = make_ctx(CATEGORICAL_DF, CATEGORICAL_DF.copy())
         result = self.evaluator.evaluate(ctx)
 
-        assert result == {}  # spec: should emit nan keys; current impl returns {}
+        assert math.isnan(result["mean_abs_diff"])
+        assert math.isnan(result["std_abs_diff"])
 
     def test_returns_both_keys(self):
         """Sanity-check that both expected keys are present in the output."""
@@ -134,12 +133,14 @@ class TestDistributionSimilarity:
 
         assert result["ks_mean"] > 0.99
 
-    def test_no_numeric_columns_returns_empty(self):
-        """No numeric columns → no applicable metrics.  Returns {} (see NaN contract note)."""
+    def test_no_numeric_columns_emits_nan_keys(self):
+        """No numeric columns → all keys present but nan (NaN contract §7.1.2)."""
         ctx = make_ctx(CATEGORICAL_DF, CATEGORICAL_DF.copy())
         result = self.evaluator.evaluate(ctx)
 
-        assert result == {}  # spec: should emit nan keys; current impl returns {}
+        assert math.isnan(result["ks_mean"])
+        assert math.isnan(result["wasserstein_mean"])
+        assert math.isnan(result["t_stat_mean_abs"])
 
     def test_returns_all_keys(self):
         """Sanity-check that all three expected keys are present."""
@@ -192,12 +193,12 @@ class TestCategoricalTvMean:
 
         assert result["categorical_tv_mean"] == pytest.approx(0.5, abs=1e-9)
 
-    def test_no_categorical_columns_returns_empty(self):
-        """No categorical columns → no applicable metrics.  Returns {} (see NaN contract note)."""
+    def test_no_categorical_columns_emits_nan_key(self):
+        """No categorical columns → key present but nan (NaN contract §7.1.2)."""
         ctx = make_ctx(NUMERIC_DF, NUMERIC_DF.copy())
         result = self.evaluator.evaluate(ctx)
 
-        assert result == {}  # spec: should emit nan keys; current impl returns {}
+        assert math.isnan(result["categorical_tv_mean"])
 
     def test_nan_values_treated_as_category(self):
         """NaN is mapped to __NA__ so it shouldn't crash."""
@@ -226,14 +227,14 @@ class TestCorrFroDiff:
 
         assert result["corr_fro_diff"] == pytest.approx(0.0, abs=1e-9)
 
-    def test_fewer_than_two_columns_returns_empty(self):
-        """Correlation is undefined for a single column.  Returns {} (see NaN contract note)."""
+    def test_fewer_than_two_columns_emits_nan_key(self):
+        """Single numeric column → key present but nan (NaN contract §7.1.2)."""
         real = pd.DataFrame({"x": [1.0, 2.0, 3.0]})
         syn = pd.DataFrame({"x": [4.0, 5.0, 6.0]})
         ctx = make_ctx(real, syn)
         result = self.evaluator.evaluate(ctx)
 
-        assert result == {}  # spec: should emit nan keys; current impl returns {}
+        assert math.isnan(result["corr_fro_diff"])
 
     def test_perfect_positive_vs_negative_correlation(self):
         """
@@ -251,9 +252,9 @@ class TestCorrFroDiff:
         expected = 2 * math.sqrt(2)
         assert result["corr_fro_diff"] == pytest.approx(expected, abs=1e-6)
 
-    def test_only_categorical_returns_empty(self):
-        """No numeric columns → correlation undefined.  Returns {} (see NaN contract note)."""
+    def test_only_categorical_emits_nan_key(self):
+        """No numeric columns → key present but nan (NaN contract §7.1.2)."""
         ctx = make_ctx(CATEGORICAL_DF, CATEGORICAL_DF.copy())
         result = self.evaluator.evaluate(ctx)
 
-        assert result == {}  # spec: should emit nan keys; current impl returns {}
+        assert math.isnan(result["corr_fro_diff"])
