@@ -1,16 +1,23 @@
+import math
+
 import numpy as np
 from sklearn.linear_model import LogisticRegression, Ridge
 from sklearn.metrics import roc_auc_score, accuracy_score, mean_squared_error
-from sklearn.pipeline import Pipeline
 
 from fedbench.core.eval import Evaluator, EvalContext
-from fedbench.util.metrics import make_tabular_preprocessor
+from fedbench.util.metrics import fit_tabular_model
 
 
 class TSTREvaluator(Evaluator):
     def evaluate(self, ctx: EvalContext) -> dict[str, float]:
+        metrics = {
+            "tstr_auc": math.nan,
+            "tstr_accuracy": math.nan,
+            "tstr_rmse": math.nan,
+        }
+
         if ctx.target_column is None or ctx.test_df is None:
-            return {}
+            return metrics
 
         D_syn = ctx.synthetic_df
         D_test = ctx.test_df
@@ -21,59 +28,25 @@ class TSTREvaluator(Evaluator):
         X_test = D_test.drop(columns=[y_col])
         y_test = D_test[y_col]
 
-        preprocessor = make_tabular_preprocessor(X_syn)
+        if ctx.schema.kind_of(y_col) in ["binary", "categorical"]:
+            model = LogisticRegression(
+                max_iter=1000,
+                solver="lbfgs",
+                random_state=ctx.seed
+            )
+            pipe = fit_tabular_model(X_syn, y_syn, model)
 
-        match ctx.schema.kind_of(y_col):
+            if ctx.schema.kind_of(y_col) == "binary":
+                y_proba = pipe.predict_proba(X_test)[:, 1]
+                metrics["tstr_auc"] = roc_auc_score(y_test, y_proba)
+            else:
+                y_pred = pipe.predict(X_test)
+                metrics["tstr_accuracy"] = accuracy_score(y_test, y_pred)
 
-            # Binary classification
-            case "binary":
-                model = LogisticRegression(
-                    max_iter=1000,
-                    solver="lbfgs",
-                    random_state=ctx.seed
-                )
-                pipe = Pipeline([
-                    ("pre", preprocessor),
-                    ("model", model)
-                ])
+        else:
+            model = Ridge(random_state=ctx.seed)
+            pipe = fit_tabular_model(X_syn, y_syn, model)
+            y_pred = pipe.predict(X_test)
+            metrics["tstr_rmse"] = np.sqrt(mean_squared_error(y_test, y_pred))
 
-                pipe.fit(X_syn, y_syn)
-                proba = pipe.predict_proba(X_test)[:, 1]
-
-                return {
-                    "tstr_auc": roc_auc_score(y_test, proba)
-                }
-
-            # Multiclass classification
-            case "categorical":
-                model = LogisticRegression(
-                    max_iter=1000,
-                    solver="lbfgs",
-                    random_state=ctx.seed
-                )
-                pipe = Pipeline([
-                    ("pre", preprocessor),
-                    ("model", model)
-                ])
-
-                pipe.fit(X_syn, y_syn)
-                pred = pipe.predict(X_test)
-
-                return {
-                    "tstr_accuracy": accuracy_score(y_test, pred)
-                }
-
-            # Regression
-            case _:
-                model = Ridge(random_state=ctx.seed)
-                pipe = Pipeline([
-                    ("pre", preprocessor),
-                    ("model", model)
-                ])
-
-                pipe.fit(X_syn, y_syn)
-                pred = pipe.predict(X_test)
-
-                return {
-                    "tstr_rmse": np.sqrt(mean_squared_error(y_test, pred))
-                }
+        return metrics
