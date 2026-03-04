@@ -129,3 +129,46 @@ class TestEdgeCases:
         assert isinstance(result, dict)
         for value in result.values():
             assert isinstance(value, float)
+
+    def test_nan_in_synthetic_no_crash(self, evaluator):
+        """NaN values in synthetic_df must not cause a crash or ±inf output.
+
+        Real generators (e.g. FedTabDiff) can produce NaN samples.  The
+        evaluator must degrade gracefully: return a valid dict of floats
+        where each value is either finite or ``nan`` — never ``±inf``.
+        """
+        real = NUMERIC_DF.copy()
+        syn = NUMERIC_DF.copy()
+        # Scatter NaN into half the rows of every numeric column
+        rng = np.random.default_rng(1)
+        nan_mask = rng.random(syn.shape) < 0.5
+        syn[nan_mask] = float("nan")
+
+        ctx = make_ctx(real, syn)
+        result = evaluator.evaluate(ctx)
+
+        assert isinstance(result, dict)
+        for key, value in result.items():
+            assert isinstance(value, float), f"{key} is not float: {type(value)}"
+            assert not np.isinf(value), f"{key} = {value} is ±inf (forbidden)"
+
+    def test_inf_in_synthetic_no_crash(self, evaluator):
+        """±inf values in synthetic_df must not cause a crash or ±inf output.
+
+        If a generator diverges it can emit ±inf instead of NaN.  The
+        evaluator must still return a valid float dict without re-emitting
+        the infinity upward.
+        """
+        real = NUMERIC_DF.copy()
+        syn = NUMERIC_DF.copy()
+        # Inject +inf and -inf into alternating rows
+        syn.iloc[::3, :] = np.inf
+        syn.iloc[1::3, :] = -np.inf
+
+        ctx = make_ctx(real, syn)
+        result = evaluator.evaluate(ctx)
+
+        assert isinstance(result, dict)
+        for key, value in result.items():
+            assert isinstance(value, float), f"{key} is not float: {type(value)}"
+            assert not np.isinf(value), f"{key} = {value} is ±inf (forbidden)"
