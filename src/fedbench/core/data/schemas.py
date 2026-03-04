@@ -48,16 +48,20 @@ def infer_schema(df: pd.DataFrame) -> TableSchema:
         dtype = col.dtype
 
         kind: Kind
-        if pd.api.types.is_float_dtype(dtype):
-            kind = "continuous"
-        elif col.nunique(dropna=True) <= 2:
+
+        if col.nunique(dropna=True) <= 2:
             kind = "binary"
+        elif col.nunique(dropna=True) <= 10:        # magic number TODO get from config, implement ability to override from CLI
+            kind = "categorical"
         elif pd.api.types.is_integer_dtype(dtype):
             kind = "integer"
+        elif pd.api.types.is_float_dtype(dtype):
+            kind = "continuous"
         else:
             kind = "categorical"
 
-        print(f"{name} ({kind})")
+        # uncomment print statement for debug
+        # print(f"{name} ({kind})")
 
         columns.append(ColumnSchema(name=str(name), kind=kind))
 
