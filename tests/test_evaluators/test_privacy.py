@@ -8,12 +8,11 @@ produces 100 % overlap; fully disjoint data produces 0 %).
 
 Note on the NaN contract (Code Structure Guide §7.1.2)
 ------------------------------------------------------
-The spec requires evaluators to emit ``float("nan")`` for inapplicable
-metrics.  The current implementations return ``{}`` instead; assertions
-marked with ``# spec: ...`` will need updating when the implementation
-is brought into full compliance.
+Evaluators emit ``float("nan")`` for inapplicable metrics rather than
+omitting the key.  Tests assert the full key set is present and values are nan.
 """
 
+import math
 import numpy as np
 import pandas as pd
 import pytest
@@ -85,14 +84,15 @@ class TestDirectOverlap:
 
         assert 0.4 < result["exact_row_match_rate_train"] < 0.6
 
-    def test_disjoint_columns_returns_empty(self):
-        """No shared columns between real and synthetic → no metrics.  Returns {} (see NaN contract note)."""
+    def test_disjoint_columns_emits_nan_keys(self):
+        """No shared columns → all 6 keys present as nan (NaN contract §7.1.2)."""
         real = pd.DataFrame({"a": [1, 2]})
         syn = pd.DataFrame({"b": [3, 4]})
         ctx = make_ctx(real, syn)
         result = self.evaluator.evaluate(ctx)
 
-        assert result == {}  # spec: should emit nan keys; current impl returns {}
+        assert set(result.keys()) == self.EXPECTED_KEYS
+        assert all(math.isnan(v) for v in result.values())
 
     def test_returns_all_keys(self):
         """Key-completeness check: all six expected metric keys must be present."""
@@ -154,16 +154,18 @@ class TestMIA:
         result = self.evaluator.evaluate(ctx)
 
         # Both members and non-members are far from syn → no signal
-        assert 0.2 < result["mia_auc"] < 0.8
+        assert 0.35 < result["mia_auc"] < 0.65
 
-    def test_empty_train_returns_empty(self):
-        """Empty training set → attack has no members; returns {}.  (NaN contract note applies.)"""
+    def test_empty_train_returns_nan_keys(self):
+        """Empty training set → all three MIA keys present as nan (NaN contract §7.1.2)."""
         empty = pd.DataFrame({"x": pd.Series(dtype=float)})
         syn = pd.DataFrame({"x": [1.0, 2.0]})
         ctx = make_ctx(empty, syn, test_df=empty)
         result = self.evaluator.evaluate(ctx)
 
-        assert result == {}  # spec: should emit nan keys; current impl returns {}
+        assert math.isnan(result["mia_auc"])
+        assert math.isnan(result["mia_accuracy"])
+        assert math.isnan(result["mia_advantage"])
 
     def test_returns_all_keys(self):
         """Key-completeness check: all three MIA metric keys must be present."""
@@ -192,14 +194,21 @@ class TestAIA:
 
     evaluator = AIASupervisedAttackEvaluator()
 
-    def test_no_sensitive_columns_returns_empty(self):
-        """No sensitive_columns configured → nothing to infer; returns {}."""
+    GENERIC_NAN_KEYS = {"aia_accuracy", "aia_auc", "aia_rmse"}
+
+    def test_no_sensitive_columns_returns_nan_keys(self):
+        """No sensitive_columns → generic nan result emitted (NaN contract §7.1.2)."""
         df = pd.DataFrame({"x": [1.0, 2.0, 3.0], "y": [0, 1, 0]})
         ctx = make_ctx(df, df.copy(), sensitive_columns=None)
-        assert self.evaluator.evaluate(ctx) == {}
+        result = self.evaluator.evaluate(ctx)
+
+        assert set(result.keys()) == self.GENERIC_NAN_KEYS
+        assert all(math.isnan(v) for v in result.values())
 
         ctx2 = make_ctx(df, df.copy(), sensitive_columns=())
-        assert self.evaluator.evaluate(ctx2) == {}
+        result2 = self.evaluator.evaluate(ctx2)
+        assert set(result2.keys()) == self.GENERIC_NAN_KEYS
+        assert all(math.isnan(v) for v in result2.values())
 
     def test_learnable_binary_sensitive_attr(self):
         """sensitive = (x > 0) → perfectly learnable from x."""
@@ -240,8 +249,8 @@ class TestAIA:
 
         assert "aia_rmse.sens_val" in result
 
-    def test_no_quasi_identifiers_returns_empty(self):
-        """Only sensitive + target columns, nothing else → no QIs → empty."""
+    def test_no_quasi_identifiers_emits_nan_keys(self):
+        """Only sensitive + target columns, no QIs → per-column keys present as nan."""
         df = pd.DataFrame({"target": [0, 1, 0, 1], "sensitive": [1, 0, 1, 0]})
         schema = make_schema(("target", "binary"), ("sensitive", "binary"))
 
@@ -253,4 +262,6 @@ class TestAIA:
         )
         result = self.evaluator.evaluate(ctx)
 
-        assert result == {}
+        assert math.isnan(result["aia_accuracy.sensitive"])
+        assert math.isnan(result["aia_auc.sensitive"])
+        assert math.isnan(result["aia_rmse.sensitive"])

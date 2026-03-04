@@ -6,11 +6,9 @@ all three checks without writing any additional test code.
 
 Note on the NaN contract (Code Structure Guide §7.1.2)
 ------------------------------------------------------
-The spec requires evaluators to emit ``float("nan")`` when a metric is not
-applicable, rather than omitting the key.  The current implementations
-return an empty ``{}`` instead.  Tests in this module accept both behaviours;
-when the implementations are updated to full spec-compliance the assertions
-need no changes.
+Evaluators emit ``float("nan")`` when a metric is not applicable, rather
+than omitting the key.  Tests in this module accept both ``nan`` and finite
+values; only ``±inf`` is forbidden.
 """
 
 import numpy as np
@@ -26,9 +24,10 @@ from fedbench.evaluators.privacy import (
     DirectOverlapDiagnosticEvaluator,
     MIANearestNeighborAttackEvaluator,
 )
+from fedbench.evaluators.fairness import FairnessEvaluator
 from fedbench.evaluators.utility import TSTREvaluator
 
-from .conftest import NUMERIC_DF, _DistSimilarity, _MomentReduction, make_ctx, make_schema
+from .conftest import NUMERIC_DF, _DistSimilarity, _MomentReduction, make_ctx, assert_dicts_nan_safe
 
 
 # ---------------------------------------------------------------------------
@@ -36,7 +35,7 @@ from .conftest import NUMERIC_DF, _DistSimilarity, _MomentReduction, make_ctx, m
 # ---------------------------------------------------------------------------
 # ``_MomentReduction`` and ``_DistSimilarity`` are concrete stub subclasses
 # defined in conftest.py (they satisfy the ABC mixin contract so the classes
-# can be instantiated).  All eight evaluators are tested in one sweep.
+# can be instantiated).  All nine evaluators are tested in one sweep.
 # ---------------------------------------------------------------------------
 
 # All evaluators we want to cross-test
@@ -49,6 +48,7 @@ ALL_EVALUATORS = [
     DirectOverlapDiagnosticEvaluator(),
     MIANearestNeighborAttackEvaluator(),
     AIASupervisedAttackEvaluator(),
+    FairnessEvaluator(),
 ]
 
 ALL_EVALUATOR_IDS = [
@@ -60,14 +60,7 @@ ALL_EVALUATOR_IDS = [
 class TestEdgeCases:
 
     def test_single_row_no_crash(self, evaluator):
-        """Evaluator should not raise on a single-row DataFrame.
-
-        TSTREvaluator currently crashes because sklearn's LogisticRegression
-        requires ≥ 2 classes.  Marked xfail until a guard is added.
-        """
-        if isinstance(evaluator, TSTREvaluator):
-            pytest.xfail("TSTREvaluator lacks a guard for single-class data")
-
+        """Evaluator must not raise on a single-row DataFrame."""
         real = pd.DataFrame({"x": [1.0], "cat": ["a"]})
         syn = pd.DataFrame({"x": [2.0], "cat": ["b"]})
         ctx = make_ctx(real, syn, target_column="cat")
@@ -77,12 +70,16 @@ class TestEdgeCases:
         assert isinstance(result, dict)
 
     def test_deterministic_with_seed(self, evaluator):
-        """Same EvalContext → same result on repeated calls."""
+        """Same EvalContext → same result on repeated calls.
+
+        Uses ``assert_dicts_nan_safe`` instead of ``dict.__eq__`` to avoid
+        relying on CPython’s identity-based short-circuit for ``math.nan``.
+        """
         ctx = make_ctx(NUMERIC_DF, NUMERIC_DF.copy())
         r1 = evaluator.evaluate(ctx)
         r2 = evaluator.evaluate(ctx)
 
-        assert r1 == r2
+        assert_dicts_nan_safe(r1, r2)
 
     def test_result_values_are_finite_or_nan(self, evaluator):
         """No evaluator should return ±infinity for normal inputs.
@@ -97,3 +94,38 @@ class TestEdgeCases:
         for key, value in result.items():
             assert isinstance(value, float), f"{key} is not float: {type(value)}"
             assert not np.isinf(value), f"{key} = {value} is ±inf (forbidden)"
+
+    def test_all_nan_numeric_column(self, evaluator):
+        """Numeric column containing only NaN values must not crash.
+
+        Evaluators that iterate over numeric columns may encounter a column
+        where every value is NaN (e.g. after coercion).  The evaluator should
+        still return a valid dict with float values.
+        """
+        real = pd.DataFrame({
+            "good": [1.0, 2.0, 3.0],
+            "bad":  [float("nan")] * 3,
+        })
+        syn = real.copy()
+        ctx = make_ctx(real, syn)
+        result = evaluator.evaluate(ctx)
+
+        assert isinstance(result, dict)
+        for key, value in result.items():
+            assert isinstance(value, float), f"{key} is not float: {type(value)}"
+
+    def test_synthetic_extra_columns_no_crash(self, evaluator):
+        """Synthetic data may have columns not in real data — must not crash.
+
+        This can happen when synthetic generators add auxiliary columns.
+        Evaluators should silently ignore extra columns.
+        """
+        real = NUMERIC_DF.copy()
+        syn = NUMERIC_DF.copy()
+        syn["extra_col"] = 999.0
+        ctx = make_ctx(real, syn)
+        result = evaluator.evaluate(ctx)
+
+        assert isinstance(result, dict)
+        for value in result.values():
+            assert isinstance(value, float)
