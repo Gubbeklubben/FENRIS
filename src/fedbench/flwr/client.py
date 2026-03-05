@@ -34,7 +34,7 @@ class FedbenchClient:
             algorithm: Algorithm,
             eval_suite: EvaluationSuite,
             to_flwr: FlwrSerializer,
-            from_flwr: FlwrDeserializer) -> None:
+            from_flwr: FlwrDeserializer,) -> None:
 
         self._dataset = dataset
         self._algorithm = algorithm
@@ -46,7 +46,7 @@ class FedbenchClient:
             self,
             seed: int,
             flwr_message: Message,
-            flwr_context: Context) -> Message:
+            flwr_context: Context,) -> Message:
 
         partition_id = self._get_partition_id(flwr_context)
         train_df = self._dataset.load_train_partition(partition_id)
@@ -54,7 +54,7 @@ class FedbenchClient:
 
         request = self._from_flwr(
             flwr_message,
-            synthesizer.arrays_to_ml_framework_map
+            synthesizer.arrays_to_ml_framework_map,
         )
         reply = synthesizer.fed_init(request, seed, self._dataset.schema, train_df)
         return self._to_flwr(update=reply, reply_to=flwr_message)
@@ -67,7 +67,7 @@ class FedbenchClient:
 
         request = self._from_flwr(
             flwr_message,
-            synthesizer.arrays_to_ml_framework_map
+            synthesizer.arrays_to_ml_framework_map,
         )
         reply = synthesizer.train(request, train_df)
         return self._to_flwr(update=reply, reply_to=flwr_message)
@@ -79,7 +79,7 @@ class FedbenchClient:
             num_synthetic_rows: int | None,
             seed: int,
             target_column: str | None,
-            sensitive_columns: tuple[str, ...] | None) -> Message:
+            sensitive_columns: tuple[str, ...] | None,) -> Message:
 
         partition_id = self._get_partition_id(flwr_context)
         train_df = self._dataset.load_train_partition(partition_id)
@@ -88,18 +88,18 @@ class FedbenchClient:
         synthesizer = self._algorithm.create_synthesizer()
         request = self._from_flwr(
             flwr_message,
-            synthesizer.arrays_to_ml_framework_map
+            synthesizer.arrays_to_ml_framework_map,
         )
         synthetic_df = synthesizer.sample(
             request,
             num_synthetic_rows or len(train_df),
-            seed
+            seed,
         )
         if synthetic_df.empty:
             log_warning(__name__, f"Recv empty sample from {synthesizer}.")
             return Message(
                 content=RecordDict({"metrics": MetricRecord()}),
-                reply_to=flwr_message
+                reply_to=flwr_message,
             )
         eval_ctx = EvalContext(
             train_df=train_df,
@@ -116,7 +116,7 @@ class FedbenchClient:
 
         return Message(
             content=RecordDict({"metrics": metrics}),
-            reply_to=flwr_message
+            reply_to=flwr_message,
         )
 
     @staticmethod
@@ -147,7 +147,7 @@ def configure(flwr_message: Message, _: Context) -> Message:
         config,
         build_algorithm_registry(),
         build_partitioner_registry(),
-        build_evaluator_registries()
+        build_evaluator_registries(),
     )
     df = components.df_loader()
     schema = infer_schema(df)
@@ -157,7 +157,7 @@ def configure(flwr_message: Message, _: Context) -> Message:
         schema=schema,
         partitioner=components.partitioner,
         test_size=config.test_size,
-        seed=config.seed
+        seed=config.seed,
     )
     global fedbench_client
     fedbench_client = FedbenchClient(
@@ -165,7 +165,7 @@ def configure(flwr_message: Message, _: Context) -> Message:
         components.algorithm,
         components.eval_suite,
         to_flwr_disable_pickle if config.disable_pickle else to_flwr_pickle,
-        from_flwr_pickle
+        from_flwr_pickle,
     )
     return Message(content=RecordDict(), reply_to=flwr_message)
 
@@ -191,5 +191,5 @@ def evaluate(flwr_message: Message, flwr_context: Context) -> Message:
         cfg.num_synthetic_rows,
         cfg.seed,
         cfg.data.target_col,
-        cfg.data.sensitive_cols
+        cfg.data.sensitive_cols,
     )

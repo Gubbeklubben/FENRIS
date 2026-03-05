@@ -20,5 +20,5 @@ class Partitioner(ABC):
             partition_id: int,
             split: Literal["train", "test"],
             seed: int,
-            test_size: float) -> DataFrame:
+            test_size: float,) -> DataFrame:
         pass

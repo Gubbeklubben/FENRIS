@@ -38,7 +38,7 @@ class FedHelloCoordinator(SingleStepCoordinator):
             self,
             seed: int,
             schema: TableSchema,
-            client_ids: Iterable[int]) -> Iterable[tuple[int, Update]]:
+            client_ids: Iterable[int],) -> Iterable[tuple[int, Update]]:
 
         log_info(str(self), f"Hello from configure_fed_init, {self._name}!")
         rng = np.random.default_rng(seed)
@@ -76,7 +76,7 @@ class FedHelloSynthesizer(Synthesizer):
     def train(
             self,
             request: Update,
-            data: pd.DataFrame) -> Update:
+            data: pd.DataFrame,) -> Update:
 
         log_info(str(self), f"Hello from train, {self._name}!")
         return Update(
@@ -88,7 +88,7 @@ class FedHelloSynthesizer(Synthesizer):
             self,
             request: Update,
             num_rows: int,
-            seed: int) -> pd.DataFrame:
+            seed: int,) -> pd.DataFrame:
 
         log_info(str(self), f"Hello from sample, {self._name}!")
         # noinspection PyUnnecessaryCast

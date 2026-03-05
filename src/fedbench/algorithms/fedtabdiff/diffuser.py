@@ -16,7 +16,7 @@ class Diffuser:
             beta_start: float,
             beta_end: float,
             device: str,
-            scheduler: str
+            scheduler: str,
         ):
 
         self._total_steps = total_steps
@@ -34,12 +34,12 @@ class Diffuser:
 
         match scheduler:
             case "linear":
-                betas = torch.linspace(beta_start, beta_end, self._total_steps)
+                betas = torch.linspace(beta_start, beta_end, self._total_steps,)
             case "quad":
                 betas = torch.linspace(
                     self._beta_start ** 0.5,
                     self._beta_end ** 0.5,
-                    self._total_steps
+                    self._total_steps,
                 ) ** 2
             case _:
                 raise ValueError(f"Unknown scheduler {scheduler}")

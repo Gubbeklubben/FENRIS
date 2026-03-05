@@ -33,17 +33,17 @@ class Coordinator(ABC):
             self,
             seed: int,
             schema: TableSchema,
-            client_ids: Iterable[int]) -> Generator[Iterable[tuple[int, Update]],
+            client_ids: Iterable[int],) -> Generator[Iterable[tuple[int, Update]],
                                                     Iterable[tuple[int, Update]],
-                                                    None]:
+                                                    None,]:
         _ = yield ()
 
     @abstractmethod
     def train(
             self,
-            client_ids: Iterable[int]) -> Generator[Iterable[tuple[int, Update]],
+            client_ids: Iterable[int],) -> Generator[Iterable[tuple[int, Update]],
                                                     Iterable[tuple[int, Update]],
-                                                    None]:
+                                                    None,]:
         pass
 
 
@@ -53,7 +53,7 @@ class SingleStepCoordinator(Coordinator):
             self,
             seed: int,
             schema: TableSchema,
-            client_ids: Iterable[int]) -> Iterable[tuple[int, Update]]:
+            client_ids: Iterable[int],) -> Iterable[tuple[int, Update]]:
         return ()
 
     # noinspection PyMethodMayBeStatic,PyUnusedLocal
@@ -84,17 +84,17 @@ class SingleStepCoordinator(Coordinator):
             self,
             seed: int,
             schema: TableSchema,
-            client_ids: Iterable[int]) -> Generator[Iterable[tuple[int, Update]],
+            client_ids: Iterable[int],) -> Generator[Iterable[tuple[int, Update]],
                                                     Iterable[tuple[int, Update]],
-                                                    None]:
+                                                    None,]:
         replies = yield self.configure_fed_init(seed, schema, client_ids)
         self.aggregate_fed_init(replies)
 
     def train(
             self,
-            client_ids: Iterable[int]) -> Generator[Iterable[tuple[int, Update]],
+            client_ids: Iterable[int],) -> Generator[Iterable[tuple[int, Update]],
                                                     Iterable[tuple[int, Update]],
-                                                    None]:
+                                                    None,]:
         replies = yield self.configure_train(client_ids)
         self.aggregate_train(replies)
 
@@ -115,14 +115,14 @@ class Synthesizer(ABC):
             request: Update,
             seed: int,
             schema: TableSchema,
-            data: DataFrame) -> Update:
+            data: DataFrame,) -> Update:
         return Update()
 
     @abstractmethod
     def train(
             self,
             request: Update,
-            data: DataFrame) -> Update:
+            data: DataFrame,) -> Update:
         pass
 
     @abstractmethod
@@ -130,7 +130,7 @@ class Synthesizer(ABC):
             self,
             request: Update,
             num_rows: int,
-            seed: int) -> DataFrame:
+            seed: int,) -> DataFrame:
         pass
 
 

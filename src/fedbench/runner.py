@@ -30,7 +30,7 @@ def _run(
         run_id: str,
         config: Config,
         commands: Iterable[Command],
-        eventbus: EventBus) -> None:
+        eventbus: EventBus,) -> None:
 
     eventbus.emit(RunStarted(run_id))
     ctx = RunContext(run_id, config, eventbus)
@@ -45,7 +45,7 @@ def _run(
                 RunFailed(run_id, name, str(type(exc)), str(exc)))
             log_error(
                 __name__, f"Error executing command {name}",
-                exc_info=True
+                exc_info=True,
             )
             return
         else:

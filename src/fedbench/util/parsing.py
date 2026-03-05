@@ -106,7 +106,7 @@ def is_optional(annotation: Any) -> bool:
     return False
 
 
-def parse_for_function(func: Callable[..., Any], raw: dict[str, str]) -> dict[str, Any]:
+def parse_for_function(func: Callable[..., Any], raw: dict[str, str],) -> dict[str, Any]:
     sig = inspect.signature(func)
     params = sig.parameters
 

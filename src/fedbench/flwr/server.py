@@ -29,7 +29,7 @@ class FedbenchServer:
             schema: TableSchema,
             to_flwr: FlwrSerializer,
             from_flwr: FlwrDeserializer,
-            eventbus: EventBus) -> None:
+            eventbus: EventBus,) -> None:
 
         self._coordinator = coordinator
         self._seed = seed
@@ -43,7 +43,7 @@ class FedbenchServer:
         generator = self._coordinator.fed_init(
             self._seed,
             self._schema,
-            grid.get_node_ids()
+            grid.get_node_ids(),
         )
         self._send_and_receive(grid, generator, msg_type="query.init")
 
@@ -60,7 +60,7 @@ class FedbenchServer:
             request = self._to_flwr(
                 global_state,
                 message_type=msg_type,
-                dst_node_id=dst_id
+                dst_node_id=dst_id,
             )
             requests.append(request)
             self._eventbus.emit(ServerRequest(dst_id, msg_type=msg_type))
@@ -93,7 +93,7 @@ class FedbenchServer:
             grid: Grid,
             generator: Generator[Iterable[tuple[int, Update]],
                                  Iterable[tuple[int, Update]],
-                                 None],
+                                 None,],
             msg_type: str) -> None:
 
         msg_type = msg_type.split(".")[-1]
@@ -114,7 +114,7 @@ class FedbenchServer:
                 request = self._to_flwr(
                     update,
                     message_type=msg_type,
-                    dst_node_id=dst_id
+                    dst_node_id=dst_id,
                 )
                 requests.append(request)
                 self._eventbus.emit(ServerRequest(dst_id, msg_type=msg_type))
@@ -128,7 +128,7 @@ class FedbenchServer:
     def _get_and_check_global_state(self) -> Update:
         global_state = self._coordinator.global_state
         if not isinstance(global_state, Update):
-            raise RuntimeError(
+            raise RuntimeError(  # nofmt
                 f"{self._coordinator}.global_state returned"
                 f"{type(global_state)}, expected {Update}"
             )
@@ -149,7 +149,7 @@ def configure_clients(grid: Grid, config: Config) -> Iterable[Message]:
         Message(
             content=RecordDict({"config": cfg_jsons}),
             message_type="query.configure",
-            dst_node_id=cid
+            dst_node_id=cid,
         ) for cid in client_ids
     )
     return grid.send_and_receive(messages)

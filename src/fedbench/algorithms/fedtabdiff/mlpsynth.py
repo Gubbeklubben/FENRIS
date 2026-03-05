@@ -17,7 +17,7 @@ def init_linear_layer(input_size: int, hidden_size: int) -> nn.Linear:
 def timestep_embedding(
         timesteps: Tensor,
         dim_out: int,
-        max_period: int = 10000) -> Tensor:
+        max_period: int = 10000,) -> Tensor:
     """
     Create sinusoidal timestep embeddings.
     :param timesteps: a 1-D Tensor of N indices, one per batch element.
@@ -43,7 +43,7 @@ class MLP(nn.Module):  # type: ignore[misc]
     def __init__(
             self,
             hidden_size: Sequence[int],
-            activation: str ="lrelu") -> None:
+            activation: str ="lrelu",) -> None:
 
         super(MLP, self).__init__()
         # init encoder architecture
@@ -91,7 +91,7 @@ class MLPSynthesizer(nn.Module):  # type: ignore[misc]
             n_cat_emb: int | None = None,
             embedding: Tensor | None = None,
             embedding_learned: bool = True,
-            n_classes: int | None = None) -> None:
+            n_classes: int | None = None,) -> None:
         """
         Constructor for initializing the synthesizer
 
@@ -114,7 +114,7 @@ class MLPSynthesizer(nn.Module):  # type: ignore[misc]
         elif n_cat_tokens and n_cat_emb:
             self.embedding = nn.Embedding(n_cat_tokens, n_cat_emb,
                                           max_norm=None,
-                                          scale_grad_by_freq=False)
+                                          scale_grad_by_freq=False,)
             self.embedding.weight.requires_grad = embedding_learned
 
         # embed label
@@ -125,14 +125,14 @@ class MLPSynthesizer(nn.Module):  # type: ignore[misc]
         self.proj = nn.Sequential(
             nn.Linear(d_in, dim_t),
             nn.SiLU(),
-            nn.Linear(dim_t, dim_t)
+            nn.Linear(dim_t, dim_t),
         )
 
         # projection for the time embedding
         self.time_embed = nn.Sequential(
             nn.Linear(dim_t, dim_t),
             nn.SiLU(),
-            nn.Linear(dim_t, dim_t)
+            nn.Linear(dim_t, dim_t),
         )
 
         # used for the output layer

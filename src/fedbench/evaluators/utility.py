@@ -45,7 +45,7 @@ class TSTREvaluator(Evaluator):
             model = LogisticRegression(
                 max_iter=1000,
                 solver="lbfgs",
-                random_state=ctx.seed
+                random_state=ctx.seed,
             )
             pipe = fit_tabular_model(X_syn, y_syn, model)
 

@@ -18,7 +18,7 @@ def resolve_components(ctx: RunContext) -> None:
         ctx.config,
         build_algorithm_registry(),
         build_partitioner_registry(),
-        build_evaluator_registries()
+        build_evaluator_registries(),
     )
     ctx.components = components
 
@@ -50,7 +50,7 @@ def global_sample(ctx: RunContext) -> None:
     ctx.synthetic_df = synthesizer.sample(
         ctx.aggregated_state,
         ctx.config.num_synthetic_rows or 1,
-        ctx.config.seed
+        ctx.config.seed,
     )
 
 

@@ -37,7 +37,7 @@ class FactoryRegistry[T]:
             if ep.name in self._plugins:
                 log_warning(
                     str(self),
-                    f"Ignoring duplicate plugin '{ep.name}' from '{ep.value}'"
+                    f"Ignoring duplicate plugin '{ep.name}' from '{ep.value}'",
                 )
             else:
                 self._plugins[ep.name] = ep

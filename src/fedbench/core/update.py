@@ -24,7 +24,8 @@ class Update:
     extras: dict[str, Extras] = field(default_factory=dict)
 
     def is_empty(self) -> bool:
-        return (not self.arrays
+        return (  # nofmt
+                not self.arrays
                 and not self.objects
                 and not self.metrics
                 and not self.extras)

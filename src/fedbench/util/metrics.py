@@ -26,14 +26,14 @@ def make_tabular_preprocessor(df: pd.DataFrame) -> ColumnTransformer:
         transformers=[
             ("num", Pipeline([
                 ("imputer", SimpleImputer(strategy="median")),
-                ("scaler", StandardScaler())
+                ("scaler", StandardScaler()),
             ]), num_cols),
             ("cat", Pipeline([
                 ("imputer", SimpleImputer(strategy="most_frequent")),
-                ("onehot", OneHotEncoder(handle_unknown="ignore", sparse_output=False))
-            ]), cat_cols)
+                ("onehot", OneHotEncoder(handle_unknown="ignore", sparse_output=False)),
+            ]), cat_cols),
         ],
-        remainder="drop"
+        remainder="drop",
     )
     return preprocessor
 
@@ -42,7 +42,7 @@ def fit_tabular_model(X: pd.DataFrame, y: pd.Series, model: BaseEstimator) -> Pi
     preprocessor = make_tabular_preprocessor(X)
     pipe = Pipeline([
         ("pre", preprocessor),
-        ("model", model)
+        ("model", model),
     ])
     pipe.fit(X, y)
     return pipe
@@ -52,13 +52,13 @@ def get_schema_columns(ctx: EvalContext) -> tuple[list[str], list[str]]:
     """Return (numeric_columns, categorical_columns) present in train."""
     train_cols = set(ctx.train_df.columns)
 
-    numeric = [
+    numeric = [  # nofmt
         c.name
         for c in ctx.schema.columns
         if c.kind in ("continuous", "integer") and c.name in train_cols
     ]
 
-    categorical = [
+    categorical = [  # nofmt
         c.name
         for c in ctx.schema.columns
         if c.kind in ("categorical", "binary") and c.name in train_cols
@@ -86,7 +86,7 @@ def sanitize_numeric_df(
     DataFrame containing only finite numeric values.
     Safe for numpy/scipy/sklearn operations.
     """
-    clean: pd.DataFrame = (
+    clean: pd.DataFrame = (  # nofmt
         df[numeric_cols]
         .apply(pd.to_numeric, errors="coerce")
         .replace([np.inf, -np.inf], np.nan)

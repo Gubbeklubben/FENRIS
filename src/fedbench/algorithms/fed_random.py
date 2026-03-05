@@ -27,7 +27,7 @@ class FedRandomCoordinator(Coordinator):
             self,
             client_ids: Iterable[int]) -> Generator[Iterable[tuple[int, Update]],
                                                     Iterable[tuple[int, Update]],
-                                                    None]:
+                                                    None,]:
         rnd = 0
         update = Update(extras={"federation": {"client_ids": list(client_ids)}})
         dst = next(iter(client_ids))
@@ -57,7 +57,7 @@ class FedRandomCoordinator(Coordinator):
 
             update = Update(extras={
                 "federation": {"client_ids": list(client_ids),
-                               "message": message}
+                               "message": message,}
             })
 
 

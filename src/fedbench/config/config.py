@@ -36,7 +36,7 @@ class Config:
     algorithm: str
     data: DataConfig
     algorithm_kwargs: dict[
-        str, None | bool | str | float | int
+        str, None | bool | str | float | int,
     ] = field(default_factory=dict)
     num_clients: int = 3
     num_rounds: int = 3
@@ -65,7 +65,7 @@ class Config:
         return cls(
             **cfg,
             data=DataConfig(**data_cfg),
-            metrics=MetricsConfig(**metrics_cfg)
+            metrics=MetricsConfig(**metrics_cfg),
         )
 
     def jsons(self) -> str:

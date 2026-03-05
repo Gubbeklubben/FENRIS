@@ -53,7 +53,7 @@ class EventBus:
             self,
             exc_type: type[BaseException] | None,
             exc_val: BaseException | None,
-            exc_tb: TracebackType | None) -> bool | None:
+            exc_tb: TracebackType | None,) -> bool | None:
 
         self.close()
         return None
@@ -65,7 +65,7 @@ class EventBus:
     def register(
             self,
             observer: Observer,
-            event_types: Iterable[type[Event]]) -> None:
+            event_types: Iterable[type[Event]],) -> None:
 
         with self._lock:
             if self._state is not BusState.INITIAL:

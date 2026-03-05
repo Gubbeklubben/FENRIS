@@ -11,7 +11,7 @@ class PartitionedDataset:
             schema: TableSchema,
             partitioner: Partitioner,
             test_size: float,
-            seed: int) -> None:
+            seed: int,) -> None:
 
         self._schema = schema
         self._partitioner = partitioner
@@ -32,12 +32,12 @@ class PartitionedDataset:
             partition_id=partition_id,
             split="train",
             test_size=self._test_size,
-            seed=self._seed)
+            seed=self._seed,)
 
     def load_test_partition(self, partition_id: int) -> DataFrame:
         return self._partitioner.load_partition(
             partition_id=partition_id,
             split="test",
             test_size=self._test_size,
-            seed=self._seed
+            seed=self._seed,
         )

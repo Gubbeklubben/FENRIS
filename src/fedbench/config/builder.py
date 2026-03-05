@@ -14,7 +14,7 @@ from fedbench.core.factory_registry import FactoryRegistry
 def build_config(
         cli_input: dict[str, Any],
         algorithm_registry: FactoryRegistry[Algorithm],
-        partitioner_registry: FactoryRegistry[Partitioner]) -> Config:
+        partitioner_registry: FactoryRegistry[Partitioner],) -> Config:
     # Build dicts containing only kv pairs relevant for the associated cfg
     data_cfg = build_cli_dict(DataConfig, cli_input)
     metrics_cfg = build_cli_dict(MetricsConfig, cli_input)
@@ -34,7 +34,7 @@ def build_config(
 
 
 def build_cli_dict(config_cls: ConfigCls, cli_input: dict[str, Any]) -> dict[str, Any]:
-    return {
+    return {  # nofmt
         f.name: cli_input[f.name]
         for f in fields(config_cls)
         if f.name in cli_input
@@ -76,7 +76,7 @@ def parse_algorithm_kwargs(cfg: dict[str, Any], algorithm_registry: FactoryRegis
     # Parse algorithm kwargs and map to correct types
     cfg["algorithm_kwargs"] = parse_for_function(
         algorithm_registry.load(cfg["algorithm"]),
-        cfg.get("algorithm_kwargs", {})
+        cfg.get("algorithm_kwargs", {}),
     )
 
 
@@ -104,5 +104,5 @@ def parse_partitioner_kwargs(data_cfg: dict[str, Any], cfg: dict[str, Any], part
     partitioner_kwargs["num_partitions"] = cfg.get("num_clients", default_num_clients)
     data_cfg["partitioner_kwargs"] = parse_for_function(
         partitioner_factory,
-        partitioner_kwargs
+        partitioner_kwargs,
     )

@@ -102,7 +102,7 @@ class CategoricalTvMeanEvaluator(Evaluator):
         _, categorical_columns = get_schema_columns(ctx)
         if not categorical_columns:
             return {
-                "categorical_tv_mean": math.nan
+                "categorical_tv_mean": math.nan,
             }
 
         tvs = []
@@ -115,7 +115,7 @@ class CategoricalTvMeanEvaluator(Evaluator):
             tvs.append(tv)
 
         return {
-            "categorical_tv_mean": float(np.mean(tvs))
+            "categorical_tv_mean": float(np.mean(tvs)),
         }
 
 
@@ -124,7 +124,7 @@ class CorrFroDiffEvaluator(Evaluator):
         numeric_columns, _ = get_schema_columns(ctx)
         if len(numeric_columns) < 2:
             return {
-                "corr_fro_diff": math.nan
+                "corr_fro_diff": math.nan,
             }
 
         def safe_corr(df: pd.DataFrame) -> pd.DataFrame:
@@ -141,5 +141,5 @@ class CorrFroDiffEvaluator(Evaluator):
         diff = r_corr.loc[common, common].values - s_corr.loc[common, common].values
 
         return {
-            "corr_fro_diff": float(np.linalg.norm(diff, ord="fro"))
+            "corr_fro_diff": float(np.linalg.norm(diff, ord="fro")),
         }

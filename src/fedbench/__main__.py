@@ -47,7 +47,7 @@ def list_algorithms(
             typer.Option(
                 "--include-locators",
                 help="Show locators for the factories used to create "
-                     "algorithm instances.")] = False) -> None:
+                     "algorithm instances.",)] = False,) -> None:
 
     for metadata in algorithms.metadata():
         print(metadata.name, end="")
@@ -82,8 +82,10 @@ def run(
         num_synthetic_rows: Annotated[int | None, typer.Option()] = None,
         disable_pickle: Annotated[bool | None, typer.Option()] = None) -> None:
 
-    cli_input = {
-        key: value for key, value in locals().items() if value is not None
+    cli_input = {  # nofmt
+        key: value
+        for key, value in locals().items()
+        if value is not None
     }
     config = build_config(cli_input, algorithms, partitioners)
     runner.run(config, pipeline())

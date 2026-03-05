@@ -29,7 +29,7 @@ class ColoredStreamHandler(logging.StreamHandler):  # type: ignore[type-arg]
     # Adapted from flwr.common.logger
     def format(self, record: logging.LogRecord) -> str:
         seperator = " " * (8 - len(record.levelname))
-        log_fmt = (
+        log_fmt = (  # nofmt
             f"{LOG_COLORS[record.levelname]}"
             f"%(levelname)s %(asctime)s{LOG_COLORS["RESET"]}"
             f": {seperator} %(message)s"
@@ -51,7 +51,7 @@ def log(
         source: str,
         message: str,
         level: int = logging.INFO,
-        **kwargs: Any) -> None:
+        **kwargs: Any,) -> None:
 
     msg = f"{source}: {message}" if source else message
     logger.log(level, msg, **kwargs)
