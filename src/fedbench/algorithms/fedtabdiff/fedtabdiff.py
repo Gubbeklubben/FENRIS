@@ -10,7 +10,10 @@ from torch import nn
 from torch import optim, Tensor
 from torch.utils.data import TensorDataset, DataLoader
 
-from fedbench.core.algorithm import Algorithm, Synthesizer, Aggregator
+from fedbench.core.algorithm import (
+    Algorithm, Synthesizer,
+    Coordinator, SingleStepCoordinator
+)
 from fedbench.core.data import TableSchema
 from fedbench.core.logger import (
     ELBOW, TEE,
@@ -239,14 +242,14 @@ class FedTabDiff(Algorithm):
             ),
         }
 
-    def create_aggregator(self) -> Aggregator:
-        return FedTabDiffAggregator(self._cfg)
+    def create_coordinator(self) -> Coordinator:
+        return FedTabDiffCoordinator(self._cfg)
 
     def create_synthesizer(self) -> Synthesizer:
         return FedTabDiffSynthesizer(self._cfg)
 
 
-class FedTabDiffAggregator(Aggregator):
+class FedTabDiffCoordinator(SingleStepCoordinator):
     def __init__(self, cfg: dict[str, Any]) -> None:
         self._cfg: dict[str, Any] = cfg
         self._cat_attrs: list[str] | None = None
@@ -259,7 +262,11 @@ class FedTabDiffAggregator(Aggregator):
     def arrays_to_ml_framework_map(self) -> dict[str, str] | None:
         return {"arrays": "torch"}
 
-    def configure_init(
+    @property
+    def global_state(self) -> Update | None:
+        return self._create_update()
+
+    def configure_fed_init(
             self,
             seed: int,
             schema: TableSchema,
@@ -284,11 +291,11 @@ class FedTabDiffAggregator(Aggregator):
             yield cid, update
 
 
-    def aggregate_init(self, replies: Iterable[Update]) -> Update:
+    def aggregate_fed_init(self, replies: Iterable[tuple[int, Update]]) -> None:
         vocab_classes: set[str] = set()
         num_scaler = None
 
-        for reply in replies:
+        for _, reply in replies:
             if "preproc-objects" in reply.objects:
                 preproc_obj = reply.objects["preproc-objects"]
                 num_scaler = preproc_obj["num-scaler"]
@@ -334,16 +341,14 @@ class FedTabDiffAggregator(Aggregator):
         mlp_synth, _ = init_model(self._cfg | preproc)
         self._state = mlp_synth.state_dict()
 
-        return self._create_update()
-
-    def aggregate_train(self, replies: Iterable[Update]) -> Update:
+    def aggregate_train(self, replies: Iterable[tuple[int, Update]]) -> None:
         if not replies:
             raise ValueError("No replies, can not aggregate.")
 
         num_samples: list[int] = []
         state_dicts: list[dict[str, Tensor]] = []
 
-        for reply in replies:
+        for _, reply in replies:
             # noinspection PyUnnecessaryCast
             num_samples.append(cast(int, reply.metrics["metrics"]["num-samples"]))
             # noinspection PyUnnecessaryCast
@@ -353,7 +358,7 @@ class FedTabDiffAggregator(Aggregator):
         if total <= 0:
             log_warning(str(self), f"Total number of samples: {total}")
             log_warning("", f"\t{ELBOW} Skipping aggregation.")
-            return self._create_update()
+            return
 
         weights = tuple(float(n) / total for n in num_samples)
         keys = tuple(state_dicts[0].keys())
@@ -373,7 +378,6 @@ class FedTabDiffAggregator(Aggregator):
                 aggr_state[key] = result
 
         self._state = aggr_state
-        return self._create_update()
 
     def _create_update(self) -> Update:
         # noinspection PyUnnecessaryCast
@@ -394,7 +398,7 @@ class FedTabDiffSynthesizer(Synthesizer):
         self._max_batches = cfg["max-batches"]
         self._device = cfg["device"]
 
-    def init(
+    def fed_init(
             self,
             request: Update,
             seed: int,
