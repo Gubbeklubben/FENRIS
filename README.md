@@ -28,14 +28,14 @@ poetry env use 3.12
 Minimal example pipeline run:
 
 ```bash
-poetry run python -m fedbench run \
+poetry run fedbench run \
   fed_hello iid-partitioner datasets/breast_cancer.csv
 ```
 
 Example pipeline run with FedTabDiff:
 
 ```bash
-poetry run python -m fedbench run \
+poetry run fedbench run \
   fed_tab_diff iid-partitioner datasets/breast_cancer.csv \
   --algorithm-kwargs "\
     batch_size=128, \

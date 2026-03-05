@@ -24,45 +24,36 @@ def make_tabular_preprocessor(df: pd.DataFrame) -> ColumnTransformer:
     num_cols = df.select_dtypes(include="number").columns.tolist()
     cat_cols = [c for c in df.columns if c not in num_cols]
 
+    # fmt: off
     preprocessor = ColumnTransformer(
         transformers=[
             (
                 "num",
-                Pipeline(
-                    [
-                        ("imputer", SimpleImputer(strategy="median")),
-                        ("scaler", StandardScaler()),
-                    ]
-                ),
+                Pipeline([
+                    ("imputer", SimpleImputer(strategy="median")),
+                    ("scaler", StandardScaler()),
+                ]),
                 num_cols,
             ),
             (
                 "cat",
-                Pipeline(
-                    [
-                        ("imputer", SimpleImputer(strategy="most_frequent")),
-                        (
-                            "onehot",
-                            OneHotEncoder(handle_unknown="ignore", sparse_output=False),
-                        ),
-                    ]
-                ),
+                Pipeline([
+                    ("imputer", SimpleImputer(strategy="most_frequent")),
+                    ("onehot", OneHotEncoder(handle_unknown="ignore", sparse_output=False)),
+                ]),
                 cat_cols,
             ),
         ],
         remainder="drop",
     )
+    # fmt: on
+
     return preprocessor
 
 
 def fit_tabular_model(X: pd.DataFrame, y: pd.Series, model: BaseEstimator) -> Pipeline:
     preprocessor = make_tabular_preprocessor(X)
-    pipe = Pipeline(
-        [
-            ("pre", preprocessor),
-            ("model", model),
-        ]
-    )
+    pipe = Pipeline([("pre", preprocessor), ("model", model)])
     pipe.fit(X, y)
     return pipe
 

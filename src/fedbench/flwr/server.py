@@ -80,7 +80,11 @@ class FedbenchServer:
             metrics = reply.content.metric_records["metrics"]
             self._per_client_metrics[src_id] = dict(metrics)
 
-    def run(self, grid: Grid, num_rounds: int) -> tuple[Update, dict[str, float]]:
+    def run(
+        self,
+        grid: Grid,
+        num_rounds: int,
+    ) -> tuple[Update, dict[str, float]]:
 
         self._eventbus.emit(FedInitStarted())
         self.fed_init(grid)
