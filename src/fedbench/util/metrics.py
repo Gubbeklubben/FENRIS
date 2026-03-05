@@ -1,6 +1,10 @@
-from typing import Literal
+import hashlib
+import math
+from typing import Literal, Any
 
+import numpy as np
 import pandas as pd
+from sklearn.base import BaseEstimator
 from sklearn.compose import ColumnTransformer
 from sklearn.impute import SimpleImputer
 from sklearn.pipeline import Pipeline
@@ -9,6 +13,8 @@ from sklearn.preprocessing import OneHotEncoder, StandardScaler
 from fedbench.core.eval import EvalContext
 
 type TaskType = Literal["binary_classification", "multiclass_classification", "regression"]
+
+NAN_TOKEN = "__NaN__"
 
 
 def make_tabular_preprocessor(df: pd.DataFrame) -> ColumnTransformer:
@@ -24,12 +30,22 @@ def make_tabular_preprocessor(df: pd.DataFrame) -> ColumnTransformer:
             ]), num_cols),
             ("cat", Pipeline([
                 ("imputer", SimpleImputer(strategy="most_frequent")),
-                ("onehot", OneHotEncoder(handle_unknown="ignore"))
+                ("onehot", OneHotEncoder(handle_unknown="ignore", sparse_output=False))
             ]), cat_cols)
         ],
         remainder="drop"
     )
     return preprocessor
+
+
+def fit_tabular_model(X: pd.DataFrame, y: pd.Series, model: BaseEstimator) -> Pipeline:
+    preprocessor = make_tabular_preprocessor(X)
+    pipe = Pipeline([
+        ("pre", preprocessor),
+        ("model", model)
+    ])
+    pipe.fit(X, y)
+    return pipe
 
 
 def get_schema_columns(ctx: EvalContext) -> tuple[list[str], list[str]]:
@@ -60,3 +76,33 @@ def get_quasi_identifiers(
     if target_column:
         qi -= {target_column}
     return sorted(qi)
+
+
+def canonical_value(val: Any) -> str:
+    """Deterministic string representation for a value."""
+    if pd.isna(val):
+        return NAN_TOKEN
+    # explicit bool handling before int (bool is a subclass of int)
+    if isinstance(val, (bool, np.bool_)):
+        return str(int(val))
+    if isinstance(val, (np.floating, float)):
+        return f"{float(val):.8f}"
+    if isinstance(val, (np.integer, int)):
+        return str(int(val))
+    if isinstance(val, str):
+        return val.strip()
+    return str(val)
+
+
+def canonical_row_hash(df: pd.DataFrame) -> pd.Series:
+    df = df.copy()
+    df = df[df.columns.sort_values()]
+
+    def hash_row(row: pd.Series) -> str:
+        canonical = [
+            canonical_value(v) for v in row.values
+        ]
+        joined = "|".join(canonical)
+        return hashlib.md5(joined.encode("utf-8")).hexdigest()
+
+    return df.apply(hash_row, axis=1)

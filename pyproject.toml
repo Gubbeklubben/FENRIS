@@ -23,6 +23,9 @@ dependencies = [
     "torch (>=2.10.0,<3.0.0)"
 ]
 
+[project.scripts]
+fedbench = "fedbench.__main__:app"
+
 [build-system]
 requires = ["poetry-core>=2.0.0,<3.0.0"]
 build-backend = "poetry.core.masonry.api"
@@ -37,6 +40,9 @@ dev = [
     "pytest (>=9.0.2,<10.0.0)",
     "scipy-stubs (>=1.17.0.2,<2.0.0.0)",
     "pandas-stubs (>=3.0.0.260204,<4.0.0.0)",
+]
+algorithms = [
+    "torch (>=2.10.0,<3.0.0)"
 ]
 
 [tool.mypy]

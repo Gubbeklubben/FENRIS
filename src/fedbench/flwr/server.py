@@ -8,7 +8,8 @@ from flwr.serverapp import ServerApp
 from fedbench.config import Config
 from fedbench.core.events import ClientsConfigured
 from fedbench.core.runcontext import RunContext
-from fedbench.flwr.serde import make_serde
+from fedbench.flwr.serde import to_flwr_pickle, from_flwr_pickle, \
+    to_flwr_disable_pickle
 from fedbench.flwr.strategy import FedbenchStrategy
 
 
@@ -50,9 +51,12 @@ def make_server_app(runcontext: RunContext) -> ServerApp:
         eventbus.emit(ClientsConfigured(reply_count))
 
         strategy = FedbenchStrategy(
-            eventbus,
             algorithm.create_aggregator(),
-            *make_serde(config.allow_pickle)
+            config.seed,
+            runcontext.schema,
+            to_flwr=to_flwr_disable_pickle if config.disable_pickle else to_flwr_pickle,
+            from_flwr=from_flwr_pickle,
+            eventbus=eventbus,
         )
         state, metrics = strategy.run(grid, config.num_rounds)
         runcontext.aggregated_state = state

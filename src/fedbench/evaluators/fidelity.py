@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import math
 from abc import ABC
 from typing import Mapping
 
@@ -15,7 +16,10 @@ class MomentReductionMetricsEvaluator(Evaluator, ABC):
     def evaluate(self, ctx: EvalContext) -> Mapping[str, float]:
         numeric_columns, _ = get_schema_columns(ctx)
         if not numeric_columns:
-            return {}
+            return {
+                "mean_abs_diff": math.nan,
+                "std_abs_diff": math.nan,
+            }
 
         mean_abs_diff = []
         std_abs_diff = []
@@ -35,9 +39,14 @@ class MomentReductionMetricsEvaluator(Evaluator, ABC):
 
 class DistributionSimilarityMetricsEvaluator(Evaluator, ABC):
     def evaluate(self, ctx: EvalContext) -> dict[str, float]:
+        metrics = {
+            "ks_mean": math.nan,
+            "wasserstein_mean": math.nan,
+            "t_stat_mean_abs": math.nan,
+        }
         numeric_columns, _ = get_schema_columns(ctx)
         if not numeric_columns:
-            return {}
+            return metrics
 
         ks = []
         wasserstein = []
@@ -59,21 +68,23 @@ class DistributionSimilarityMetricsEvaluator(Evaluator, ABC):
             t_stat, _ = stats.ttest_ind(r, s, equal_var=False)
             t_stats.append(abs(t_stat))
 
-        if not (ks and wasserstein and t_stats):
-            return {}
+        if ks:
+            metrics["ks_mean"] = float(np.nanmean(ks))
+        if wasserstein:
+            metrics["wasserstein_mean"] = float(np.nanmean(wasserstein))
+        if t_stats:
+            metrics["t_stat_mean_abs"] = float(np.nanmean(t_stats))
 
-        return {
-            "ks_mean": float(np.nanmean(ks)),
-            "wasserstein_mean": float(np.nanmean(wasserstein)),
-            "t_stat_mean_abs": float(np.nanmean(t_stats)),
-        }
+        return metrics
 
 
 class CategoricalTvMeanEvaluator(Evaluator):
     def evaluate(self, ctx: EvalContext) -> dict[str, float]:
         _, categorical_columns = get_schema_columns(ctx)
         if not categorical_columns:
-            return {}
+            return {
+                "categorical_tv_mean": math.nan
+            }
 
         tvs = []
         for col in categorical_columns:
@@ -93,12 +104,22 @@ class CorrFroDiffEvaluator(Evaluator):
     def evaluate(self, ctx: EvalContext) -> dict[str, float]:
         numeric_columns, _ = get_schema_columns(ctx)
         if len(numeric_columns) < 2:
-            return {}
+            return {
+                "corr_fro_diff": math.nan
+            }
 
-        r_corr = ctx.train_df[numeric_columns].corr().fillna(0.0)
-        s_corr = ctx.synthetic_df[numeric_columns].corr().fillna(0.0)
+        def safe_corr(df: pd.DataFrame) -> pd.DataFrame:
+            # Drop zero-variance columns
+            non_constant = df.columns[df.nunique(dropna=True) > 1]
+            corr = df[non_constant].corr()
+            return corr.fillna(0.0)
 
-        diff = r_corr.values - s_corr.values
+        r_corr = safe_corr(ctx.train_df[numeric_columns])
+        s_corr = safe_corr(ctx.synthetic_df[numeric_columns])
+
+        # Align matrices (important if columns dropped differently)
+        common = r_corr.index.intersection(s_corr.index)
+        diff = r_corr.loc[common, common].values - s_corr.loc[common, common].values
 
         return {
             "corr_fro_diff": float(np.linalg.norm(diff, ord="fro"))

@@ -1,10 +1,11 @@
 import time
 from dataclasses import dataclass, field
+from datetime import datetime, timezone
 
 
 @dataclass(frozen=True)
 class Event:
-    timestamp: float = field(init=False, default_factory=time.time)
+    timestamp_ns: float = field(init=False, default_factory=time.perf_counter_ns)
 
 
 @dataclass(frozen=True)

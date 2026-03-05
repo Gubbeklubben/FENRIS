@@ -15,7 +15,7 @@ from fedbench.core.update import Update
 
 @dataclass(frozen=True)
 class Components:
-    df_loader: Callable[[], tuple[DataFrame, TableSchema]]
+    df_loader: Callable[[], DataFrame]
     algorithm: Algorithm
     partitioner: Partitioner
     eval_suite: EvaluationSuite
@@ -29,6 +29,8 @@ class RunContext:
         self._config = config
         self._eventbus = eventbus
         self._components: Components | None = None
+        self.df: DataFrame | None = None  # Less strict policy for now
+        self._schema: TableSchema | None = None
         self._aggregated_state: Update | None = None
         self._aggregated_metrics: dict[str, float] | None = None
         # per client metrics?
@@ -57,6 +59,18 @@ class RunContext:
         if self._components is not None:
             raise RuntimeError("Can only set components once.")
         self._components = components
+
+    @property
+    def schema(self) -> TableSchema:
+        if self._schema is None:
+            raise RuntimeError("Property 'schema' accessed before set.")
+        return self._schema
+
+    @schema.setter
+    def schema(self, schema: TableSchema) -> None:
+        if self._schema is not None:
+            raise RuntimeError("Can only set 'schema' once.")
+        self._schema = schema
 
     @property
     def aggregated_state(self) -> Update:
@@ -96,4 +110,8 @@ class RunContext:
     def synthetic_df(self, df: DataFrame) -> None:
         if self._synthetic_df is not None:
             raise RuntimeError("Can only set 'synthetic_df' once.")
+
+        if not isinstance(df, DataFrame):
+            raise ValueError(f"Expected a DataFrame, got {type(df)}.")
+
         self._synthetic_df = df

@@ -4,15 +4,13 @@ from typing import Literal
 import pandas as pd
 from pandas import DataFrame
 
-from fedbench.core.data.schemas import TableSchema, infer_schema
-
 
 def load_csv(
     file_path: str | Path,
     *,
     header: bool = True,
     custom_encodings: dict[str, Literal["float", "int", "object"]] | None = None,
-) -> tuple[DataFrame, TableSchema]:
+) -> DataFrame:
     """
     Load a CSV file into a DataFrame and return a stabile TableSchema.
 
@@ -29,7 +27,7 @@ def load_csv(
 
     Returns
     -------
-    (df, schema)
+    pandas DataFrame
     """
     # Load
     df = pd.read_csv(str(file_path), header=0 if header else None)
@@ -45,8 +43,4 @@ def load_csv(
                     raise ValueError(
                         f"Failed to cast column '{col}' to dtype '{dtype}': {exc}"
                     ) from exc
-
-    # Infer schema (handles both numeric and categorical types)
-    schema = infer_schema(df)
-
-    return df, schema
+    return df

@@ -32,7 +32,8 @@ def test_load_csv_and_schema(sample_df, tmp_path):
     csv_path = tmp_path / "sample.csv"
     sample_df.to_csv(csv_path, index=False)
 
-    df, schema = load_csv(csv_path)
+    df = load_csv(csv_path)
+    schema = infer_schema(df)
 
     assert df.shape == sample_df.shape
     # schema is deterministic
@@ -48,7 +49,8 @@ def test_iid_partitioning(sample_df, built_in_partitioners):
         sample_df,
         infer_schema(sample_df),
         partitioner=built_in_partitioners.call(
-            name="iid-partitioner", num_partitions=2,
+            name="iid-partitioner",
+            factory_kwargs={"num_partitions": 2},
         ),
         test_size=0.2,
         seed=80085
