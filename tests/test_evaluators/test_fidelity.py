@@ -71,8 +71,8 @@ class TestMomentReduction:
 
     def test_single_column(self):
         """Single-column case: mean diff = 3.0, std diff = 0.0 (parallel shift)."""
-        real = pd.DataFrame({"x": [1.0, 2.0, 3.0, 4.0, 5.0]})
-        syn = pd.DataFrame({"x": [4.0, 5.0, 6.0, 7.0, 8.0]})
+        real = pd.DataFrame({"x": [1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0, 9.0, 10.0, 11.0, 12.0]})
+        syn = pd.DataFrame({"x": [4.0, 5.0, 6.0, 7.0, 8.0, 9.0, 10.0, 11.0, 12.0, 13.0, 14.0, 15.0]})
         ctx = make_ctx(real, syn)
         result = self.evaluator.evaluate(ctx)
 
