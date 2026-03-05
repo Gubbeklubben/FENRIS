@@ -1,7 +1,14 @@
+"""
+Fidelity evaluators.
+
+Measures how well the statistical properties of the synthetic data match
+those of the training data. Includes moment comparison, distribution
+similarity tests, categorical total-variation distance, and correlation
+matrix comparison.
+"""
 from __future__ import annotations
 
 import math
-from abc import ABC
 from typing import Mapping
 
 import numpy as np
@@ -12,7 +19,7 @@ from fedbench.core.eval import EvalContext, Evaluator
 from fedbench.util.metrics import get_schema_columns, sanitize_numeric_df, safe_nanmean
 
 
-class MomentReductionMetricsEvaluator(Evaluator, ABC):
+class MomentReductionMetricsEvaluator(Evaluator):
     def evaluate(self, ctx: EvalContext) -> Mapping[str, float]:
         nan_result = {
             "mean_abs_diff": math.nan,
@@ -45,7 +52,7 @@ class MomentReductionMetricsEvaluator(Evaluator, ABC):
         }
 
 
-class DistributionSimilarityMetricsEvaluator(Evaluator, ABC):
+class DistributionSimilarityMetricsEvaluator(Evaluator):
     def evaluate(self, ctx: EvalContext) -> dict[str, float]:
         nan_result = {
             "ks_mean": math.nan,
