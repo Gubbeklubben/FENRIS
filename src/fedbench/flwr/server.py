@@ -1,5 +1,5 @@
 import time
-from collections.abc import Iterable
+from collections.abc import Generator, Iterable
 
 from flwr.common import Context, Message, ConfigRecord, RecordDict
 from flwr.server import Grid
@@ -40,84 +40,36 @@ class FedbenchServer:
         self._per_client_metrics: dict[int, Metrics] = {}
 
     def fed_init(self, grid: Grid) -> None:
-        arrays_map = self._coordinator.arrays_to_ml_framework_map
-        generator = self._coordinator.fed_init(self._seed,
-                                               self._schema,
-                                               grid.get_node_ids())
-        replies: Iterable[tuple[int, Update]] | None = None
-
-        while True:
-            try:
-                if replies is None:
-                    batch = next(generator)
-                else:
-                    batch = generator.send(replies)  # send(None) <=> next
-            except StopIteration:
-                return
-
-            requests = []
-            for cid, update in batch:
-                requests.append(self._to_flwr(update,
-                                              message_type="query.init",
-                                              dst_node_id=cid))
-                self._eventbus.emit(ServerRequest(cid, msg_type="init"))
-
-            replies = []
-            for reply in grid.send_and_receive(requests):
-                client_id = reply.metadata.src_node_id
-                replies.append((client_id, self._from_flwr(reply, arrays_map)))
-                self._eventbus.emit(ClientReply(client_id, msg_type="init"))
+        generator = self._coordinator.fed_init(
+            self._seed,
+            self._schema,
+            grid.get_node_ids()
+        )
+        self._send_and_receive(grid, generator, msg_type="query.init")
 
     def train(self, grid: Grid) -> None:
-        arrays_map = self._coordinator.arrays_to_ml_framework_map
         generator = self._coordinator.train(grid.get_node_ids())
-        replies: Iterable[tuple[int, Update]] | None = None
-
-        while True:
-            try:
-                if replies is None:
-                    batch = next(generator)
-                else:
-                    batch = generator.send(replies)
-            except StopIteration:
-                return
-
-            requests = []
-            for cid, update in batch:
-                requests.append(self._to_flwr(update,
-                                              message_type="train",
-                                              dst_node_id=cid))
-                self._eventbus.emit(ServerRequest(cid, msg_type="train"))
-
-            replies = []
-            for reply in grid.send_and_receive(requests):
-                client_id = reply.metadata.src_node_id
-                replies.append((client_id, self._from_flwr(reply, arrays_map)))
-                self._eventbus.emit(ClientReply(client_id, msg_type="train"))
+        self._send_and_receive(grid, generator, msg_type="train")
 
     def evaluate(self, grid: Grid) -> None:
-        global_state = self._coordinator.global_state
-        if not isinstance(global_state, Update):
-            raise RuntimeError(
-                f"{self._coordinator}.global_state returned {type(global_state)}, "
-                f"expected {Update}"
-            )
+        msg_type = "evaluate"
+        global_state = self._get_and_check_global_state()
         requests = []
-        for cid in grid.get_node_ids():
-            # noinspection PyUnnecessaryCast
+
+        for dst_id in grid.get_node_ids():
             request = self._to_flwr(
                 global_state,
-                message_type="evaluate",
-                dst_node_id=cid
+                message_type=msg_type,
+                dst_node_id=dst_id
             )
-            self._eventbus.emit(ServerRequest(cid, msg_type="evaluate"))
             requests.append(request)
+            self._eventbus.emit(ServerRequest(dst_id, msg_type=msg_type))
 
         for reply in grid.send_and_receive(requests):
-            client_id = reply.metadata.src_node_id
-            self._eventbus.emit(ClientReply(client_id, msg_type="evaluate"))
+            src_id = reply.metadata.src_node_id
+            self._eventbus.emit(ClientReply(src_id, msg_type=msg_type))
             metrics = reply.content.metric_records["metrics"]
-            self._per_client_metrics[client_id] = dict(metrics)
+            self._per_client_metrics[src_id] = dict(metrics)
 
     def run(
             self,
@@ -134,13 +86,53 @@ class FedbenchServer:
             self._eventbus.emit(TrainingCompleted(curr_round, num_rounds))
             self.evaluate(grid)
 
+        return self._get_and_check_global_state(), {}
+
+    def _send_and_receive(
+            self,
+            grid: Grid,
+            generator: Generator[Iterable[tuple[int, Update]],
+                                 Iterable[tuple[int, Update]],
+                                 None],
+            msg_type: str) -> None:
+
+        msg_type = msg_type.split(".")[-1]
+        arrays_map = self._coordinator.arrays_to_ml_framework_map
+        replies: Iterable[tuple[int, Update]] | None = None
+
+        while True:
+            try:
+                if replies is None:
+                    batch = next(generator)
+                else:
+                    batch = generator.send(replies)
+            except StopIteration:
+                return
+
+            requests = []
+            for dst_id, update in batch:
+                request = self._to_flwr(
+                    update,
+                    message_type=msg_type,
+                    dst_node_id=dst_id
+                )
+                requests.append(request)
+                self._eventbus.emit(ServerRequest(dst_id, msg_type=msg_type))
+
+            replies = []
+            for reply in grid.send_and_receive(requests):
+                src_id = reply.metadata.src_node_id
+                replies.append((src_id, self._from_flwr(reply, arrays_map)))
+                self._eventbus.emit(ClientReply(src_id, msg_type=msg_type))
+
+    def _get_and_check_global_state(self) -> Update:
         global_state = self._coordinator.global_state
         if not isinstance(global_state, Update):
             raise RuntimeError(
-                f"{self._coordinator}.global_state returned {type(global_state)}, "
-                f"expected {Update}"
+                f"{self._coordinator}.global_state returned"
+                f"{type(global_state)}, expected {Update}"
             )
-        return global_state, {}
+        return global_state
 
 
 def configure_clients(grid: Grid, config: Config) -> Iterable[Message]:

@@ -35,12 +35,14 @@ class FedRandomCoordinator(Coordinator):
         while True:
             rnd += 1
 
-            log_info(str(self), f"Begin round: {rnd}")
+            log_info(str(self), "")
+            log_info("", f"\t{TEE} Begin internal round: {rnd}")
+
             replies = yield ((dst, update),)
             src, reply = next(iter(replies))
 
             if "abort" in reply.extras["federation"]:
-                log_info(str(self), f"Recv abort fm client {dst}")
+                log_info("", f"\t{ELBOW} Recv abort fm client {dst}")
                 return
 
             # noinspection PyUnnecessaryCast
@@ -48,10 +50,10 @@ class FedRandomCoordinator(Coordinator):
             # noinspection PyUnnecessaryCast
             message = cast(str, reply.extras["federation"]["message"])
 
-            log_info(str(self), f"Forwarding message: {message}")
+            log_info("", f"\t{TEE} Forwarding message: {message}")
             log_info("", f"\t{TEE} From: {src}")
             log_info("", f"\t{TEE} To: {dst}")
-            log_info("", f"\t{ELBOW} End round: {rnd}")
+            log_info("", f"\t{ELBOW} End internal round: {rnd}")
 
             update = Update(extras={
                 "federation": {"client_ids": list(client_ids),
