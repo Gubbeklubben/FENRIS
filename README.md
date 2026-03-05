@@ -52,3 +52,18 @@ poetry run python -m fedbench run \
 ```
 
 The algorithm kwargs do not need to be explicitly specified. They are shown here with their default values for illustration purposes. Note that all algorithm kwargs must be specified in a single comma-separated list contained within a single command line argument (meaning it needs to be quoted if it contains spaces).
+
+## Development Commands
+
+### Check and fix linting issues
+
+poetry run ruff check src/ --fix \
+poetry run ruff format src/
+
+### Type checking
+
+poetry run mypy src/
+
+### Run tests
+
+poetry run pytest tests/
