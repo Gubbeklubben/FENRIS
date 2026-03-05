@@ -40,18 +40,39 @@ dev = [
     "pytest-cov (>=6.0.0,<7.0.0)",
     "scipy-stubs (>=1.17.0.2,<2.0.0.0)",
     "pandas-stubs (>=3.0.0.260204,<4.0.0.0)",
+    "ruff (>=0.9.0)",
 ]
 algorithms = [
     "torch (>=2.10.0,<3.0.0)"
 ]
+
+# --- MYPY CONFIG ---
 
 [tool.mypy]
 mypy_path = ["src"]
 strict = true
 ignore_missing_imports = true
 
-
 [[tool.mypy.overrides]]
 module = "torch.*"
 follow_imports = "skip"
 follow_imports_for_stubs = true
+
+# --- RUFF CONFIG ---
+
+[tool.ruff]
+line-length = 88
+src = ["src"]
+
+[tool.ruff.lint]
+# E, W: pycodestyle (standard errors and warnings)
+# F: pyflakes (unused variables/imports)
+# I: isort (automatic import sorting)
+
+# TODO: add along the way to enforce docstrings
+# DOC: pydoclint (checks that docstrings match function signatures)
+# D: pydocstyle (checks docstring formatting)
+select = ["E", "W", "F", "I"]
+
+[tool.ruff.lint.pydocstyle]
+convention = "numpy"
