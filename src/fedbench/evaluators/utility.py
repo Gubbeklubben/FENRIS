@@ -28,7 +28,13 @@ class TSTREvaluator(Evaluator):
         X_test = D_test.drop(columns=[y_col])
         y_test = D_test[y_col]
 
+        if X_syn.empty:
+            return metrics
+
         if ctx.schema.kind_of(y_col) in ["binary", "categorical"]:
+            if y_syn.nunique() < 2:
+                return metrics
+
             model = LogisticRegression(
                 max_iter=1000,
                 solver="lbfgs",
