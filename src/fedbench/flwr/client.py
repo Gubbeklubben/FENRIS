@@ -14,6 +14,7 @@ from fedbench.core.algorithm import Algorithm
 from fedbench.core.data import PartitionedDataset
 from fedbench.core.data.schemas import infer_schema
 from fedbench.core.eval import EvalContext, EvaluationSuite
+from fedbench.core.logger import log_warning
 from fedbench.flwr.serde import (
     FlwrSerializer, FlwrDeserializer,
     to_flwr_pickle, from_flwr_pickle, to_flwr_disable_pickle
@@ -94,6 +95,12 @@ class FedbenchClient:
             num_synthetic_rows or len(train_df),
             seed
         )
+        if synthetic_df.empty:
+            log_warning(__name__, f"Recv empty sample from {synthesizer}.")
+            return Message(
+                content=RecordDict({"metrics": MetricRecord()}),
+                reply_to=flwr_message
+            )
         eval_ctx = EvalContext(
             train_df=train_df,
             test_df=test_df,

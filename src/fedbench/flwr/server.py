@@ -1,6 +1,5 @@
 import time
 from collections.abc import Iterable
-from typing import cast
 
 from flwr.common import Context, Message, ConfigRecord, RecordDict
 from flwr.server import Grid
@@ -10,12 +9,16 @@ from fedbench.config import Config
 from fedbench.core.algorithm import Coordinator
 from fedbench.core.data import TableSchema
 from fedbench.core.eventbus import EventBus
-from fedbench.core.events import ClientsConfigured, ServerRequest, ClientReply, \
+from fedbench.core.events import (
+    ClientsConfigured, ServerRequest, ClientReply,
     FedInitStarted, FedInitCompleted, TrainingStarted, TrainingCompleted
+)
 from fedbench.core.runcontext import RunContext
 from fedbench.core.update import Update, Metrics
-from fedbench.flwr.serde import to_flwr_pickle, from_flwr_pickle, \
+from fedbench.flwr.serde import (
+    to_flwr_pickle, from_flwr_pickle,
     to_flwr_disable_pickle, FlwrSerializer, FlwrDeserializer
+)
 
 
 class FedbenchServer:
@@ -93,11 +96,17 @@ class FedbenchServer:
                 self._eventbus.emit(ClientReply(client_id, msg_type="train"))
 
     def evaluate(self, grid: Grid) -> None:
+        global_state = self._coordinator.global_state
+        if not isinstance(global_state, Update):
+            raise RuntimeError(
+                f"{self._coordinator}.global_state returned {type(global_state)}, "
+                f"expected {Update}"
+            )
         requests = []
         for cid in grid.get_node_ids():
             # noinspection PyUnnecessaryCast
             request = self._to_flwr(
-                cast(Update, self._coordinator.global_state),
+                global_state,
                 message_type="evaluate",
                 dst_node_id=cid
             )
