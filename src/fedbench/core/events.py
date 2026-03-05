@@ -42,23 +42,23 @@ class ClientsConfigured(Event):
 
 
 @dataclass(frozen=True)
-class AlgorithmInitStarted(Event):
+class FedInitStarted(Event):
     pass
 
 
 @dataclass(frozen=True)
-class AlgorithmInitCompleted(Event):
+class FedInitCompleted(Event):
     pass
 
 
 @dataclass(frozen=True)
-class RoundStarted(Event):
+class TrainingStarted(Event):
     current: int
     total: int
 
 
 @dataclass(frozen=True)
-class RoundCompleted(Event):
+class TrainingCompleted(Event):
     current: int
     total: int
 

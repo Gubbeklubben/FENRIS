@@ -55,7 +55,7 @@ class FedbenchClient:
             flwr_message,
             synthesizer.arrays_to_ml_framework_map
         )
-        reply = synthesizer.init(request, seed, self._dataset.schema, train_df)
+        reply = synthesizer.fed_init(request, seed, self._dataset.schema, train_df)
         return self._to_flwr(update=reply, reply_to=flwr_message)
 
 
