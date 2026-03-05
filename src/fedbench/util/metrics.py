@@ -67,6 +67,47 @@ def get_schema_columns(ctx: EvalContext) -> tuple[list[str], list[str]]:
     return numeric, categorical
 
 
+def sanitize_numeric_df(
+    df: pd.DataFrame,
+    numeric_cols: list[str],
+) -> pd.DataFrame:
+    """
+    Return a numeric-only dataframe safe for statistics.
+
+    Steps
+    -----
+    1. Select numeric columns
+    2. Coerce non-numeric values to NaN
+    3. Replace ±inf with NaN
+    4. Drop rows containing NaN
+
+    Result
+    ------
+    DataFrame containing only finite numeric values.
+    Safe for numpy/scipy/sklearn operations.
+    """
+    clean: pd.DataFrame = (
+        df[numeric_cols]
+        .apply(pd.to_numeric, errors="coerce")
+        .replace([np.inf, -np.inf], np.nan)
+        .dropna()
+    )
+
+    return clean
+
+
+def safe_nanmean(values: list[float]) -> float:
+    """Like ``np.nanmean`` but returns ``nan`` silently for all-NaN inputs.
+
+    ``np.nanmean`` emits a ``RuntimeWarning: Mean of empty slice`` when every
+    element is NaN.  This helper avoids that by returning ``math.nan``
+    directly when no finite values remain.
+    """
+    arr = np.asarray(values, dtype=float)
+    finite = arr[~np.isnan(arr)]
+    return float(np.mean(finite)) if finite.size else math.nan
+
+
 def get_quasi_identifiers(
     all_columns: set[str],
     sensitive_column: str,

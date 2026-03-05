@@ -6,7 +6,8 @@ from sklearn.linear_model import LogisticRegression, Ridge
 from sklearn.metrics import accuracy_score, mean_squared_error, roc_auc_score
 
 from fedbench.core.eval import Evaluator, EvalContext
-from fedbench.util.metrics import get_quasi_identifiers, get_schema_columns, fit_tabular_model, canonical_row_hash
+from fedbench.util.metrics import get_quasi_identifiers, get_schema_columns, fit_tabular_model, canonical_row_hash, \
+    sanitize_numeric_df
 from fedbench.util.parsing import to_snake_case
 
 MAX_MIA_SYNTHETIC = 5000
@@ -86,10 +87,9 @@ class MIANearestNeighborAttackEvaluator(Evaluator):
         if not numeric_cols:
             return nan_result
 
-        # --- numeric-only, NaN-free ---
-        rt = ctx.train_df[numeric_cols].apply(pd.to_numeric, errors="coerce").dropna()
-        rh = ctx.test_df[numeric_cols].apply(pd.to_numeric, errors="coerce").dropna()
-        sx = ctx.synthetic_df[numeric_cols].apply(pd.to_numeric, errors="coerce").dropna()
+        rt = sanitize_numeric_df(ctx.train_df, numeric_cols)
+        rh = sanitize_numeric_df(ctx.test_df, numeric_cols)
+        sx = sanitize_numeric_df(ctx.synthetic_df, numeric_cols)
 
         if rt.empty or rh.empty or sx.empty:
             return nan_result
