@@ -9,85 +9,85 @@ import pandas as pd
 from scipy import stats
 
 from fedbench.core.eval import EvalContext, Evaluator
-from fedbench.util.metrics import get_schema_columns
-
-
-def _safe_nanmean(values: list[float]) -> float:
-    """Like ``np.nanmean`` but returns ``nan`` silently for all-NaN inputs.
-
-    ``np.nanmean`` emits a ``RuntimeWarning: Mean of empty slice`` when every
-    element is NaN.  This helper avoids that by returning ``math.nan``
-    directly when no finite values remain.
-    """
-    arr = np.asarray(values, dtype=float)
-    finite = arr[~np.isnan(arr)]
-    return float(np.mean(finite)) if finite.size else math.nan
+from fedbench.util.metrics import get_schema_columns, sanitize_numeric_df, safe_nanmean
 
 
 class MomentReductionMetricsEvaluator(Evaluator, ABC):
     def evaluate(self, ctx: EvalContext) -> Mapping[str, float]:
+        nan_result = {
+            "mean_abs_diff": math.nan,
+            "std_abs_diff": math.nan,
+        }
+
         numeric_columns, _ = get_schema_columns(ctx)
         if not numeric_columns:
-            return {
-                "mean_abs_diff": math.nan,
-                "std_abs_diff": math.nan,
-            }
+            return nan_result
+
+        r_df = sanitize_numeric_df(ctx.train_df, numeric_columns)
+        s_df = sanitize_numeric_df(ctx.synthetic_df, numeric_columns)
+
+        if r_df.empty or s_df.empty:
+            return nan_result
 
         mean_abs_diff = []
         std_abs_diff = []
 
         for col in numeric_columns:
-            r = pd.to_numeric(ctx.train_df[col], errors="coerce")
-            s = pd.to_numeric(ctx.synthetic_df[col], errors="coerce")
+            r = r_df[col]
+            s = s_df[col]
 
             mean_abs_diff.append(abs(r.mean() - s.mean()))
             std_abs_diff.append(abs(r.std() - s.std()))
 
         return {
-            "mean_abs_diff": _safe_nanmean(mean_abs_diff),
-            "std_abs_diff": _safe_nanmean(std_abs_diff),
+            "mean_abs_diff": safe_nanmean(mean_abs_diff),
+            "std_abs_diff": safe_nanmean(std_abs_diff),
         }
 
 
 class DistributionSimilarityMetricsEvaluator(Evaluator, ABC):
     def evaluate(self, ctx: EvalContext) -> dict[str, float]:
-        metrics = {
+        nan_result = {
             "ks_mean": math.nan,
             "wasserstein_mean": math.nan,
             "t_stat_mean_abs": math.nan,
         }
+
         numeric_columns, _ = get_schema_columns(ctx)
         if not numeric_columns:
-            return metrics
+            return nan_result
+
+        r_df = sanitize_numeric_df(ctx.train_df, numeric_columns)
+        s_df = sanitize_numeric_df(ctx.synthetic_df, numeric_columns)
+
+        if r_df.empty or s_df.empty:
+            return nan_result
 
         ks = []
         wasserstein = []
         t_stats = []
 
         for col in numeric_columns:
-            r = ctx.train_df[col].astype(float).dropna()
-            s = ctx.synthetic_df[col].astype(float).dropna()
+            r = r_df[col]
+            s = s_df[col]
 
             if len(r) == 0 or len(s) == 0:
                 continue
 
             ks_stat, _ = stats.ks_2samp(r, s)
-            ks.append(ks_stat)
+            ks.append(float(ks_stat))
 
             wasserstein_distance = stats.wasserstein_distance(r, s)
-            wasserstein.append(wasserstein_distance)
+            wasserstein.append(float(wasserstein_distance))
 
-            t_stat, _ = stats.ttest_ind(r, s, equal_var=False)
-            t_stats.append(abs(t_stat))
+            ttest_res = stats.ttest_ind(r, s, equal_var=False)
+            t_stats.append(abs(ttest_res.statistic))
 
-        if ks:
-            metrics["ks_mean"] = _safe_nanmean(ks)
-        if wasserstein:
-            metrics["wasserstein_mean"] = _safe_nanmean(wasserstein)
-        if t_stats:
-            metrics["t_stat_mean_abs"] = _safe_nanmean(t_stats)
-
-        return metrics
+        return {
+            "ks_mean": safe_nanmean(ks),
+            "wasserstein_mean": safe_nanmean(wasserstein),
+            "t_stat_mean_abs": safe_nanmean(t_stats),
+        }
 
 
 class CategoricalTvMeanEvaluator(Evaluator):
