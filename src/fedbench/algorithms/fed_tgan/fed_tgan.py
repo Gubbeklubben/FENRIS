@@ -1,12 +1,17 @@
 from collections.abc import Iterable
+from typing import Any, Literal
 
 import pandas as pd
 import numpy as np
+import torch
 
 from fedbench.core.algorithm import Aggregator, Synthesizer, Algorithm
 from fedbench.core.data import load_csv
 from fedbench.core.update import Update
-from fedbench.core.logging import log_calls
+from fedbench.core.logger import debug_calls
+
+from fedbench.algorithms.fed_tgan.generator import Generator
+from fedbench.algorithms.fed_tgan.discriminator import Discriminator
 
 
 _some_state = {
@@ -15,24 +20,53 @@ _some_state = {
 }
 
 
+def init_model(cfg: dict[str, Any]) -> tuple[Generator, Discriminator]:
+    # Initialize generator and discriminator with provided config dict after these are implemented
+    return
+
+
 class FedTGAN(Algorithm):
+    def __init__(
+            self,
+            batch_size: int = 32,
+            learning_rate: float = 1e-2,    # starting point, adjust if needed
+            fraction_evaluate: float = 0.5,
+            num_server_rounds: int = 3,
+            local_epochs: int = 3,
+        ):
+
+        # TODO error handling, in the same vein as below:
+        if learning_rate <= 0 or learning_rate > 0.1:
+            raise ValueError("Expecting 0 < learning_rate <= 0.1")
+
+        self._cfg = {
+            "batch-size": batch_size,
+            "learning-rate": learning_rate,
+            "fraction-evaluate": fraction_evaluate,
+            "num-server-rounds": num_server_rounds,
+            "local-epochs": local_epochs,
+            "device": torch.device(
+                "cuda" if torch.cuda.is_available() else "cpu"
+            ),
+        }
+
     @classmethod
     def create_aggregator(cls) -> Aggregator:
-        return FedTGANAggregator()
+        return FedTGANAggregator(cls._cfg)
 
     @classmethod
     def create_synthesizer(cls) -> Synthesizer:
-        return FedTGANSynthesizer()
+        return FedTGANSynthesizer(cls._cfg)
 
 
 class FedTGANAggregator(Aggregator):
-    @log_calls(__name__)
+    @debug_calls(__name__)
     def aggregate_init(self, replies: Iterable[Update]) -> Update:
         update = Update()
         update.objects["my-state"] = _some_state
         return update
 
-    @log_calls(__name__)
+    @debug_calls(__name__)
     def aggregate_train(
             self,
             replies: Iterable[Update]) -> Update:
@@ -42,7 +76,7 @@ class FedTGANAggregator(Aggregator):
 
 
 class FedTGANSynthesizer(Synthesizer):
-    @log_calls(__name__)
+    @debug_calls(__name__)
     def train(
             self,
             request: Update,
@@ -52,7 +86,7 @@ class FedTGANSynthesizer(Synthesizer):
         update.objects["my-state"] = _some_state
         return update
 
-    @log_calls(__name__)
+    @debug_calls(__name__)
     def sample(
             self,
             request: Update,
