@@ -1,3 +1,14 @@
+"""
+Privacy evaluators.
+
+Includes three complementary privacy diagnostics:
+
+* **Direct overlap** — detects exact or near-exact row memorisation.
+* **Membership inference attack (MIA)** — nearest-neighbour shadow-model
+  attack estimating whether a record was used during training.
+* **Attribute inference attack (AIA)** — supervised attack that tries to
+  infer a sensitive attribute from quasi-identifier columns.
+"""
 import math
 
 import numpy as np
@@ -14,11 +25,12 @@ MAX_MIA_SYNTHETIC = 5000
 DEFAULT_MIA_K = 1000
 
 
-# ============================================================
-# 10.4.1 Direct overlap / memorization diagnostics
-# ============================================================
-
 class DirectOverlapDiagnosticEvaluator(Evaluator):
+    """Detect exact and near-exact row memorisation in the synthetic dataset.
+
+    Computes exact-match rates and partial-match rates (top-1/2/3 most-unique
+    columns) between the synthetic data and the training set.
+    """
     def evaluate(self, ctx: EvalContext) -> dict[str, float]:
         train, syn = ctx.train_df, ctx.synthetic_df
         common = sorted(set(train.columns) & set(syn.columns))
@@ -67,11 +79,13 @@ class DirectOverlapDiagnosticEvaluator(Evaluator):
         }
 
 
-# ============================================================
-# 10.4.2 Membership inference attack (nearest neighbor)
-# ============================================================
-
 class MIANearestNeighborAttackEvaluator(Evaluator):
+    """Nearest-neighbour membership inference attack.
+
+    Labels training records as *members* and held-out records as
+    *non-members*, then scores each record by its negative distance to the
+    nearest synthetic sample. Reports AUC, accuracy, and advantage.
+    """
     def evaluate(self, ctx: EvalContext) -> dict[str, float]:
         nan_result = {
             "mia_auc": math.nan,
@@ -135,11 +149,13 @@ class MIANearestNeighborAttackEvaluator(Evaluator):
         }
 
 
-# ============================================================
-# 10.4.3 Attribute inference attack (supervised)
-# ============================================================
-
 class AIASupervisedAttackEvaluator(Evaluator):
+    """Supervised attribute inference attack.
+
+    Trains a classifier (or regressor) on the synthetic data to predict a
+    sensitive attribute from quasi-identifier columns, then evaluates on
+    real held-out data. Reports accuracy, AUC, and RMSE per sensitive column.
+    """
     def evaluate(self, ctx: EvalContext) -> dict[str, float]:
         nan_result = {
             "aia_accuracy": math.nan,

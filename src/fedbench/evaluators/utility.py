@@ -1,3 +1,10 @@
+"""
+Utility evaluators.
+
+Measures the downstream predictive usefulness of the synthetic data
+using a Train-on-Synthetic / Test-on-Real (TSTR) approach with
+logistic regression (classification) or ridge regression (regression).
+"""
 import math
 
 import numpy as np

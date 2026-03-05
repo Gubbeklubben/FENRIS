@@ -5,7 +5,8 @@ import numpy as np
 import pandas as pd
 from numpy.typing import NDArray
 
-from fedbench.core.algorithm import Aggregator, Algorithm
+from fedbench.core.algorithm import Coordinator, Algorithm, \
+    SingleStepCoordinator
 from fedbench.core.algorithm import Synthesizer
 from fedbench.core.data import TableSchema
 from fedbench.core.logger import log_info
@@ -16,26 +17,30 @@ class FedHello(Algorithm):
     def __init__(self, name: str = "Stranger") -> None:
         self._name = name
 
-    def create_aggregator(self) -> Aggregator:
-        return FedHelloAggregator(self._name)
+    def create_coordinator(self) -> Coordinator:
+        return FedHelloCoordinator(self._name)
 
     def create_synthesizer(self) -> Synthesizer:
         return FedHelloSynthesizer(self._name)
 
 
-class FedHelloAggregator(Aggregator):
+class FedHelloCoordinator(SingleStepCoordinator):
     def __init__(self, name: str) -> None:
         self._name = name
         self._state: list[NDArray[np.int_]] | None = None
         self._df: pd.DataFrame | None = None
 
-    def configure_init(
+    @property
+    def global_state(self) -> Update | None:
+        return self._create_update()
+
+    def configure_fed_init(
             self,
             seed: int,
             schema: TableSchema,
             client_ids: Iterable[int]) -> Iterable[tuple[int, Update]]:
 
-        log_info(str(self), f"Hello from configure_init, {self._name}!")
+        log_info(str(self), f"Hello from configure_fed_init, {self._name}!")
         rng = np.random.default_rng(seed)
         self._state = [rng.integers(0, 100, (3, 3)) for _ in range(10)]
 
@@ -43,19 +48,17 @@ class FedHelloAggregator(Aggregator):
         for cid in client_ids:
             yield cid, update
 
-    def aggregate_init(self, replies: Iterable[Update]) -> Update:
-        log_info(str(self), f"Hello from aggregate_init, {self._name}!")
-        return self._create_update()
+    def aggregate_fed_init(self, replies: Iterable[tuple[int, Update]]) -> None:
+        log_info(str(self), f"Hello from aggregate_fed_init, {self._name}!")
 
     def aggregate_train(
             self,
-            replies: Iterable[Update]) -> Update:
+            replies: Iterable[tuple[int, Update]]) -> None:
 
         replies = list(replies)
-        reply = replies[0]
+        reply = replies[0][1]
         self._df = reply.objects["objects"]["df"]
         log_info(str(self), f"Hello from aggregate_train, {self._name}!")
-        return self._create_update()
 
     def _create_update(self) -> Update:
         # noinspection PyUnnecessaryCast

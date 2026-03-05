@@ -1,5 +1,5 @@
 from abc import ABC, abstractmethod
-from collections.abc import Iterable
+from collections.abc import Iterable, Generator
 
 from pandas import DataFrame
 
@@ -7,11 +7,8 @@ from fedbench.core.data import TableSchema
 from fedbench.core.update import Update
 
 
-class Aggregator(ABC):
-    """Server side algorithm component.
-
-    An instance lives for one entire simulation.
-    """
+class Coordinator(ABC):
+    """Server side algorithm component."""
 
     def __repr__(self) -> str:
         return f"<{self.__class__.__name__}>"
@@ -20,32 +17,91 @@ class Aggregator(ABC):
     def arrays_to_ml_framework_map(self) -> dict[str, str] | None:
         return None
 
+    # We could choose to return global state from aggregate hooks.
+    # However, the contract is: The returned Update contains the
+    # current global state, one way or the other, such that the framework
+    # can feed it into Synthesizer.sample and expect it to sample
+    # using whatever the current global state is.
+    # Therefore, I prefer to let the coordinator keep this state,
+    # and ask for it when needed.
+    @property
+    def global_state(self) -> Update | None:
+        return None
+
+    # noinspection PyMethodMayBeStatic,PyUnusedLocal
+    def fed_init(
+            self,
+            seed: int,
+            schema: TableSchema,
+            client_ids: Iterable[int]) -> Generator[Iterable[tuple[int, Update]],
+                                                    Iterable[tuple[int, Update]],
+                                                    None]:
+        _ = yield ()
+
     @abstractmethod
-    def configure_init(
+    def train(
+            self,
+            client_ids: Iterable[int]) -> Generator[Iterable[tuple[int, Update]],
+                                                    Iterable[tuple[int, Update]],
+                                                    None]:
+        pass
+
+
+class SingleStepCoordinator(Coordinator):
+    # noinspection PyMethodMayBeStatic,PyUnusedLocal
+    def configure_fed_init(
             self,
             seed: int,
             schema: TableSchema,
             client_ids: Iterable[int]) -> Iterable[tuple[int, Update]]:
-        pass
+        return ()
 
-    @abstractmethod
-    def aggregate_init(
+    # noinspection PyMethodMayBeStatic,PyUnusedLocal
+    def aggregate_fed_init(
             self,
-            replies: Iterable[Update]) -> Update:
-        pass
+            replies: Iterable[tuple[int, Update]]) -> None:
+        return None
+
+    def configure_train(
+            self,
+            client_ids: Iterable[int]) -> Iterable[tuple[int, Update]]:
+
+        state = self.global_state
+        if state is None:
+            raise RuntimeError(
+                f"{self}: No global state, can not use default 'configure_train'"
+            )
+        for cid in client_ids:
+            yield cid, state
 
     @abstractmethod
     def aggregate_train(
             self,
-            replies: Iterable[Update]) -> Update:
+            replies: Iterable[tuple[int, Update]]) -> None:
         pass
+
+    def fed_init(
+            self,
+            seed: int,
+            schema: TableSchema,
+            client_ids: Iterable[int]) -> Generator[Iterable[tuple[int, Update]],
+                                                    Iterable[tuple[int, Update]],
+                                                    None]:
+        replies = yield self.configure_fed_init(seed, schema, client_ids)
+        self.aggregate_fed_init(replies)
+
+    def train(
+            self,
+            client_ids: Iterable[int]) -> Generator[Iterable[tuple[int, Update]],
+                                                    Iterable[tuple[int, Update]],
+                                                    None]:
+        replies = yield self.configure_train(client_ids)
+        self.aggregate_train(replies)
 
 
 class Synthesizer(ABC):
-    """Client side algorithm component.
+    """The framework view of the model to train and sample from."""
 
-    Instances live and die inside one training or evaluation round.
-    """
     def __repr__(self) -> str:
         return f"<{self.__class__.__name__}>"
 
@@ -54,7 +110,7 @@ class Synthesizer(ABC):
         return None
 
     # noinspection PyMethodMayBeStatic,PyUnusedLocal
-    def init(
+    def fed_init(
             self,
             request: Update,
             seed: int,
@@ -79,11 +135,13 @@ class Synthesizer(ABC):
 
 
 class Algorithm(ABC):
+    """Algorithm entry point."""
+
     def __repr__(self) -> str:
         return f"<{self.__class__.__name__}>"
 
     @abstractmethod
-    def create_aggregator(self) -> Aggregator:
+    def create_coordinator(self) -> Coordinator:
         pass
 
     @abstractmethod
