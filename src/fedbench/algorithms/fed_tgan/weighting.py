@@ -26,7 +26,20 @@ def compute_jsd(p: NDArray[np.floating], q: NDArray[np.floating]) -> float:
 def compute_wd(
     samples_a: NDArray[np.floating], samples_b: NDArray[np.floating]
 ) -> float:
-    """First Wasserstein Distance between two 1-D sample arrays."""
+    """First Wasserstein Distance between two 1-D sample arrays.
+
+    Parameters
+    ----------
+    samples_a
+        1-D array of samples from distribution A.
+    samples_b
+        1-D array of samples from distribution B.
+
+    Returns
+    -------
+    float
+        Wasserstein distance (earth mover's distance).
+    """
     return float(wasserstein_distance(samples_a, samples_b))
 
 
@@ -98,7 +111,9 @@ def compute_client_weights(
     Returns
     -------
     list of float
-        Weights (one per client), summing to 1.0.
+        Similarity-weighted client weights (one per client), summing to ~1.0.
+        Weights are higher for clients whose data is more similar to the
+        global table distribution, and for clients with larger datasets.
     """
     n_clients = len(client_sample_counts)
     all_columns = cat_columns + cont_columns
@@ -126,6 +141,8 @@ def compute_client_weights(
             continue
 
         global_total = sum(global_freq.values())
+        if global_total == 0:
+            continue
         global_dist = np.array([global_freq.get(c, 0) / global_total for c in all_cats])
 
         for i, client_freq in enumerate(cat_freqs):

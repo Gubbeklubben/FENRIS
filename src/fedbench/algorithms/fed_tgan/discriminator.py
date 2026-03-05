@@ -74,7 +74,12 @@ class Discriminator(nn.Module):  # type: ignore[misc]
         interpolates = alpha * real_data + ((1 - alpha) * fake_data)
         interpolates.requires_grad_(True)
 
+        # Disable dropout so the gradient penalty is deterministic
+        was_training = self.training
+        self.eval()
         disc_interpolates = self(interpolates)
+        if was_training:
+            self.train()
 
         gradients = torch.autograd.grad(
             outputs=disc_interpolates,
@@ -92,4 +97,16 @@ class Discriminator(nn.Module):  # type: ignore[misc]
         return gradient_penalty
 
     def forward(self, input_: Tensor) -> Tensor:
+        """Discriminate packed data.
+
+        Parameters
+        ----------
+        input_
+            Packed or unpacked data tensor.
+
+        Returns
+        -------
+        Tensor
+            Discriminator score (1-D).
+        """
         return self.seq(input_.view(-1, self.pacdim))

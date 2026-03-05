@@ -96,7 +96,7 @@ class FedbenchServer:
                                  None],
             msg_type: str) -> None:
 
-        msg_type = msg_type.split(".")[-1]
+        event_type = msg_type.split(".")[-1]
         arrays_map = self._coordinator.arrays_to_ml_framework_map
         replies: Iterable[tuple[int, Update]] | None = None
 
@@ -117,13 +117,13 @@ class FedbenchServer:
                     dst_node_id=dst_id
                 )
                 requests.append(request)
-                self._eventbus.emit(ServerRequest(dst_id, msg_type=msg_type))
+                self._eventbus.emit(ServerRequest(dst_id, msg_type=event_type))
 
             replies = []
             for reply in grid.send_and_receive(requests):
                 src_id = reply.metadata.src_node_id
                 replies.append((src_id, self._from_flwr(reply, arrays_map)))
-                self._eventbus.emit(ClientReply(src_id, msg_type=msg_type))
+                self._eventbus.emit(ClientReply(src_id, msg_type=event_type))
 
     def _get_and_check_global_state(self) -> Update:
         global_state = self._coordinator.global_state

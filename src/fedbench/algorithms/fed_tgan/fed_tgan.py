@@ -13,6 +13,7 @@ from collections.abc import Iterable
 from typing import Any, cast
 
 import numpy as np
+import pandas as pd
 import torch
 from pandas import DataFrame
 from torch import nn, optim, Tensor
@@ -42,7 +43,20 @@ from .weighting import compute_client_weights
 
 
 def _split_cat_num(schema: TableSchema) -> tuple[list[str], list[str]]:
-    """Split column names into categorical and continuous lists."""
+    """Split column names by kind into categorical and continuous lists.
+
+    Parameters
+    ----------
+    schema
+        Table schema defining column names and their semantic kinds.
+
+    Returns
+    -------
+    tuple
+        Two lists: (categorical_column_names, continuous_column_names).
+        Categorical includes both ``categorical`` and ``binary`` kinds.
+        Continuous includes both ``continuous`` and ``integer`` kinds.
+    """
     cat_attrs = [c.name for c in schema.columns if c.kind in ("categorical", "binary")]
     num_attrs = [c.name for c in schema.columns if c.kind in ("continuous", "integer")]
     return cat_attrs, num_attrs
@@ -57,7 +71,8 @@ def _gumbel_softmax(
     hard: bool = False,
     eps: float = 1e-10,
 ) -> Tensor:
-    """Gumbel-Softmax with automatic NaN retry (up to 10 attempts)."""
+    """Gumbel-Softmax with logit clamping for numerical stability."""
+    logits = logits.clamp(-20.0, 20.0)
     for _ in range(10):
         transformed = torch.nn.functional.gumbel_softmax(
             logits, tau=tau, hard=hard, eps=eps, dim=-1
@@ -71,7 +86,24 @@ def _apply_activate(
     data: Tensor,
     output_info: list[list[SpanInfo]],
 ) -> Tensor:
-    """Apply proper activation functions to generator output."""
+    """Apply column-specific activation functions to generator output.
+
+    Reconstructs tabular structure by applying ``tanh`` to continuous
+    components and Gumbel-Softmax to discrete components, according to
+    the encoding layout defined in *output_info*.
+
+    Parameters
+    ----------
+    data
+        Raw generator output (batch_size, total_data_dim).
+    output_info
+        Per-column encoding metadata with activation function specs.
+
+    Returns
+    -------
+    Tensor
+        Activated data with the same shape as input.
+    """
     data_t: list[Tensor] = []
     st = 0
     for col_info in output_info:
@@ -91,7 +123,27 @@ def _cond_loss(
     mask: Tensor,
     output_info: list[list[SpanInfo]],
 ) -> Tensor:
-    """Cross-entropy loss on the conditioned discrete column."""
+    """Compute cross-entropy loss for conditioned discrete column generation.
+
+    Enforces consistency between the generated samples and their
+    target conditional column assignments during training.
+
+    Parameters
+    ----------
+    fake
+        Generator output (batch_size, data_dim).
+    cond
+        One-hot encoded conditional vector (batch_size, cond_dim).
+    mask
+        Binary mask indicating which rows are conditioned (batch_size, n_discrete).
+    output_info
+        Encoding layout describing data and conditional dimensions.
+
+    Returns
+    -------
+    Tensor
+        Scalar cross-entropy loss, masked over batches.
+    """
     loss: list[Tensor] = []
     st = 0
     st_c = 0
@@ -185,6 +237,8 @@ class FedTGANCoordinator(SingleStepCoordinator):
         self._cat_attrs: list[str] = []
         self._num_attrs: list[str] = []
         self._int_attrs: list[str] = []
+        self._binary_attrs: list[str] = []
+        self._schema_column_order: list[str] = []
         self._transformer: GlobalDataTransformer | None = None
         self._client_weights: list[float] = []
         self._category_probs: np.ndarray = np.array([])
@@ -211,9 +265,9 @@ class FedTGANCoordinator(SingleStepCoordinator):
             torch.cuda.manual_seed(seed)
 
         self._cat_attrs, self._num_attrs = _split_cat_num(schema)
-        self._int_attrs = [
-            c.name for c in schema.columns if c.kind == "integer"
-        ]
+        self._int_attrs = [c.name for c in schema.columns if c.kind == "integer"]
+        self._schema_column_order = [c.name for c in schema.columns]
+        self._binary_attrs = [c.name for c in schema.columns if c.kind == "binary"]
 
         for cid in client_ids:
             update = Update()
@@ -257,9 +311,7 @@ class FedTGANCoordinator(SingleStepCoordinator):
         # Flat probability vector over all categories (for sampling)
         if category_probs_per_col:
             self._category_probs = np.concatenate(category_probs_per_col)
-            self._category_probs = (
-                self._category_probs / self._category_probs.sum()
-            )
+            self._category_probs = self._category_probs / self._category_probs.sum()
         else:
             self._category_probs = np.array([], dtype=np.float64)
 
@@ -367,6 +419,8 @@ class FedTGANCoordinator(SingleStepCoordinator):
                     "log-frequency": self._cfg["log-frequency"],
                     "category-probs": self._category_probs.tolist(),
                     "integer-columns": self._int_attrs,
+                    "binary-columns": self._binary_attrs,
+                    "schema-column-order": self._schema_column_order,
                 },
             },
         )
@@ -496,12 +550,11 @@ class FedTGANSynthesizer(Synthesizer):
                 condvec = sampler.sample_condvec(batch_size)
 
                 if condvec is None:
-                    c1, m1, col, opt = None, None, None, None
+                    c1, col, opt = None, None, None
                     real = sampler.sample_data(train_data, batch_size, col, opt)
                 else:
-                    c1, m1, col, opt = condvec
+                    c1, _m1, col, opt = condvec
                     c1 = torch.from_numpy(c1).to(self._device)
-                    m1 = torch.from_numpy(m1).to(self._device)
                     fakez = torch.cat([fakez, c1], dim=1)
                     perm = np.arange(batch_size)
                     np.random.shuffle(perm)
@@ -511,7 +564,7 @@ class FedTGANSynthesizer(Synthesizer):
                     c2 = c1[perm]
 
                 fake = generator(fakez)
-                fakeact = _apply_activate(fake, output_info)
+                fakeact = _apply_activate(fake, output_info).detach()
 
                 real_t = torch.from_numpy(real.astype("float32")).to(self._device)
 
@@ -531,8 +584,7 @@ class FedTGANSynthesizer(Synthesizer):
                 loss_d = -(torch.mean(y_real) - torch.mean(y_fake))
 
                 optimizer_d.zero_grad(set_to_none=False)
-                pen.backward(retain_graph=True)
-                loss_d.backward()
+                (loss_d + pen).backward()
                 optimizer_d.step()
 
             # ── Generator step ──
@@ -628,9 +680,7 @@ class FedTGANSynthesizer(Synthesizer):
 
         # Recover category probabilities for data-aware sampling
         raw_probs = model_info.get("category-probs")
-        category_probs = (
-            np.array(raw_probs, dtype=np.float64) if raw_probs else None
-        )
+        category_probs = np.array(raw_probs, dtype=np.float64) if raw_probs else None
 
         data_list: list[np.ndarray] = []
         steps = num_rows // batch_size + 1
@@ -661,6 +711,19 @@ class FedTGANSynthesizer(Synthesizer):
         for col in int_cols:
             if col in result.columns:
                 result[col] = result[col].round().astype(int)
+
+        # Restore binary columns to int (inverse_transform returns strings)
+        binary_cols = model_info.get("binary-columns", [])
+        for col in binary_cols:
+            if col in result.columns:
+                result[col] = (
+                    pd.to_numeric(result[col], errors="coerce").fillna(0).astype(int)
+                )
+
+        # Restore original schema column order
+        schema_order = model_info.get("schema-column-order")
+        if schema_order:
+            result = result[[c for c in schema_order if c in result.columns]]
 
         log_info(str(self), f"Sampled {len(result)} rows.")
         return result

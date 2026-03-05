@@ -14,7 +14,13 @@ from fedbench.algorithms.fed_tgan.data_transformer import SpanInfo
 
 
 class DataSampler:
-    """Samples conditional vectors and matching real data for GAN training."""
+    """Samples conditional vectors and matching real data for GAN training.
+
+    Implements CTGAN's training-by-sampling strategy: samples discrete
+    columns proportionally to prevent mode collapse on rare categories.
+    Maintains per-category row indices and probability tables for efficient
+    conditional sampling during training.
+    """
 
     def __init__(
         self,
@@ -161,12 +167,15 @@ class DataSampler:
     ) -> NDArray[np.floating]:
         """Sample real data rows, optionally matching the conditional vector.
 
+        When *col* and *opt* are provided, exactly ``len(col)`` rows are
+        returned (one per conditional entry); *n* is ignored in that case.
+
         Parameters
         ----------
         data
             Encoded training data matrix.
         n
-            Number of rows to sample.
+            Number of rows to sample (used only when ``col is None``).
         col
             Discrete column indices from ``sample_condvec``.
         opt

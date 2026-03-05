@@ -31,14 +31,18 @@ class Residual(nn.Module):  # type: ignore[misc]
 class Generator(nn.Module):  # type: ignore[misc]
     """Generator for Fed-TGAN / CTGAN.
 
+    Generates synthetic data by stacking residual blocks, where each block
+    concatenates its output with the input, linearly growing the hidden
+    dimension. Final layer projects to the encoded data dimension.
+
     Parameters
     ----------
     embedding_dim
-        Size of the random noise vector + conditional vector.
+        Size of input (noise + conditional vector concatenated).
     generator_dim
-        Sequence of hidden layer sizes for Residual blocks.
+        Sequence of hidden layer sizes for each Residual block.
     data_dim
-        Output dimension (encoded data dimension).
+        Output dimension (total encoded data size).
     """
 
     def __init__(
@@ -57,4 +61,16 @@ class Generator(nn.Module):  # type: ignore[misc]
         self.seq = nn.Sequential(*seq)
 
     def forward(self, input_: Tensor) -> Tensor:
+        """Generate synthetic data from noise + conditional vector.
+
+        Parameters
+        ----------
+        input_
+            Concatenated noise and conditional vector (batch_size, embedding_dim).
+
+        Returns
+        -------
+        Tensor
+            Generated data (batch_size, data_dim).
+        """
         return self.seq(input_)

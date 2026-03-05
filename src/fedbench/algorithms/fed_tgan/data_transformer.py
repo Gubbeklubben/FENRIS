@@ -21,12 +21,36 @@ from sklearn.preprocessing import OneHotEncoder
 
 @dataclass(frozen=True)
 class SpanInfo:
+    """Metadata for an encoded column span.
+
+    Attributes
+    ----------
+    dim
+        Number of output dimensions for this column.
+    activation_fn
+        Activation function type: ``"tanh"`` for continuous, ``"softmax"``.for discrete.
+    """
+
     dim: int
     activation_fn: Literal["tanh", "softmax"]
 
 
 @dataclass(frozen=True)
 class ColumnTransformInfo:
+    """Metadata describing the transformation of one input column.
+
+    Attributes
+    ----------
+    column_name
+        Name of the original table column.
+    column_type
+        ``"continuous"`` or ``"discrete"``.
+    output_info
+        List of ``SpanInfo`` objects describing the encoded layout.
+    output_dimensions
+        Total number of output dimensions for this column.
+    """
+
     column_name: str
     column_type: Literal["continuous", "discrete"]
     output_info: list[SpanInfo]
@@ -58,6 +82,9 @@ def fit_local_continuous(
         Keys ``"means"``, ``"covariances"``, ``"weights"`` — serialisable
         via ``Update.extras`` / ``Update.objects``.
     """
+    if len(column_data) == 0:
+        return {"means": [], "covariances": [], "weights": []}
+
     gm = BayesianGaussianMixture(
         n_components=min(len(column_data), max_clusters),
         weight_concentration_prior_type="dirichlet_process",
@@ -77,7 +104,18 @@ def fit_local_continuous(
 
 
 def fit_local_discrete(column_data: pd.Series) -> dict[str, int]:
-    """Compute category frequency distribution for a single discrete column."""
+    """Compute category frequency distribution for a single discrete column.
+
+    Parameters
+    ----------
+    column_data
+        Series of categorical values from one column.
+
+    Returns
+    -------
+    dict
+        Mapping ``{str(category): count}`` for all observed categories.
+    """
     counts = column_data.value_counts()
     return {str(k): int(v) for k, v in counts.items()}
 
@@ -91,6 +129,7 @@ def merge_vgm_models(
     max_clusters: int = 10,
     weight_threshold: float = 0.005,
     seed: int = 42,
+    max_total_samples: int = 100_000,
 ) -> dict[str, Any]:
     """Merge local VGM parameters into a global VGM.
 
@@ -110,6 +149,10 @@ def merge_vgm_models(
         Components with weight below this value are pruned.
     seed
         Random seed for sample generation.
+    max_total_samples
+        Hard cap on total synthetic samples generated across all clients.
+        Client proportions are preserved but scaled down when the raw
+        total exceeds this limit.
 
     Returns
     -------
@@ -119,7 +162,15 @@ def merge_vgm_models(
     rng = np.random.default_rng(seed)
     all_samples: list[NDArray[Any]] = []
 
-    for vgm_params, n_samples in zip(local_vgms, client_sample_counts, strict=True):
+    # Scale down sample counts if the total would exceed the cap
+    raw_total = sum(client_sample_counts)
+    if raw_total > max_total_samples:
+        scale = max_total_samples / raw_total
+        scaled_counts = [max(1, int(n * scale)) for n in client_sample_counts]
+    else:
+        scaled_counts = list(client_sample_counts)
+
+    for vgm_params, n_samples in zip(local_vgms, scaled_counts, strict=True):
         means = np.array(vgm_params["means"])
         covs = np.array(vgm_params["covariances"])
         weights = np.array(vgm_params["weights"])
@@ -167,7 +218,18 @@ def merge_vgm_models(
 def merge_category_frequencies(
     local_freqs: list[dict[str, int]],
 ) -> dict[str, int]:
-    """Merge category frequency distributions from all clients."""
+    """Merge category frequency distributions from all clients.
+
+    Parameters
+    ----------
+    local_freqs
+        Per-client frequency dicts, each mapping ``{category: count}``.
+
+    Returns
+    -------
+    dict
+        Global frequency dict with summed counts for all categories.
+    """
     merged: dict[str, int] = {}
     for freq in local_freqs:
         for cat, count in freq.items():
@@ -183,7 +245,8 @@ class GlobalDataTransformer:
 
     Built from merged VGM parameters (continuous) and merged category sets
     (discrete). Mirrors the encoding scheme from CTGAN but with no
-    dependency on ctgan/rdt.
+    dependency on external ``ctgan`` or ``rdt`` libraries, enabling
+    stateless serialization across federated clients.
     """
 
     def __init__(self) -> None:
