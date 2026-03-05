@@ -5,9 +5,12 @@ import numpy as np
 import pandas as pd
 from numpy.typing import NDArray
 
-from fedbench.core.algorithm import Coordinator, Algorithm, \
-    SingleStepCoordinator
-from fedbench.core.algorithm import Synthesizer
+from fedbench.core.algorithm import (
+    Algorithm,
+    Coordinator,
+    SingleStepCoordinator,
+    Synthesizer,
+)
 from fedbench.core.data import TableSchema
 from fedbench.core.logger import log_info
 from fedbench.core.update import Update
@@ -35,10 +38,11 @@ class FedHelloCoordinator(SingleStepCoordinator):
         return self._create_update()
 
     def configure_fed_init(
-            self,
-            seed: int,
-            schema: TableSchema,
-            client_ids: Iterable[int],) -> Iterable[tuple[int, Update]]:
+        self,
+        seed: int,
+        schema: TableSchema,
+        client_ids: Iterable[int],
+    ) -> Iterable[tuple[int, Update]]:
 
         log_info(str(self), f"Hello from configure_fed_init, {self._name}!")
         rng = np.random.default_rng(seed)
@@ -51,9 +55,7 @@ class FedHelloCoordinator(SingleStepCoordinator):
     def aggregate_fed_init(self, replies: Iterable[tuple[int, Update]]) -> None:
         log_info(str(self), f"Hello from aggregate_fed_init, {self._name}!")
 
-    def aggregate_train(
-            self,
-            replies: Iterable[tuple[int, Update]]) -> None:
+    def aggregate_train(self, replies: Iterable[tuple[int, Update]]) -> None:
 
         replies = list(replies)
         reply = replies[0][1]
@@ -74,21 +76,20 @@ class FedHelloSynthesizer(Synthesizer):
         self._name = name
 
     def train(
-            self,
-            request: Update,
-            data: pd.DataFrame,) -> Update:
+        self,
+        request: Update,
+        data: pd.DataFrame,
+    ) -> Update:
 
         log_info(str(self), f"Hello from train, {self._name}!")
-        return Update(
-            arrays=request.arrays,
-            objects={"objects": {"df": data}}
-        )
+        return Update(arrays=request.arrays, objects={"objects": {"df": data}})
 
     def sample(
-            self,
-            request: Update,
-            num_rows: int,
-            seed: int,) -> pd.DataFrame:
+        self,
+        request: Update,
+        num_rows: int,
+        seed: int,
+    ) -> pd.DataFrame:
 
         log_info(str(self), f"Hello from sample, {self._name}!")
         # noinspection PyUnnecessaryCast
@@ -96,4 +97,3 @@ class FedHelloSynthesizer(Synthesizer):
             return cast(pd.DataFrame, request.objects["objects"]["df"])[:num_rows]
         except IndexError:
             return cast(pd.DataFrame, request.objects["objects"]["df"])
-

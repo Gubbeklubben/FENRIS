@@ -1,6 +1,6 @@
 import hashlib
 import math
-from typing import Literal, Any
+from typing import Any, Literal
 
 import numpy as np
 import pandas as pd
@@ -12,7 +12,9 @@ from sklearn.preprocessing import OneHotEncoder, StandardScaler
 
 from fedbench.core.eval import EvalContext
 
-type TaskType = Literal["binary_classification", "multiclass_classification", "regression"]
+type TaskType = Literal[
+    "binary_classification", "multiclass_classification", "regression"
+]
 
 NAN_TOKEN = "__NaN__"
 
@@ -24,14 +26,29 @@ def make_tabular_preprocessor(df: pd.DataFrame) -> ColumnTransformer:
 
     preprocessor = ColumnTransformer(
         transformers=[
-            ("num", Pipeline([
-                ("imputer", SimpleImputer(strategy="median")),
-                ("scaler", StandardScaler()),
-            ]), num_cols),
-            ("cat", Pipeline([
-                ("imputer", SimpleImputer(strategy="most_frequent")),
-                ("onehot", OneHotEncoder(handle_unknown="ignore", sparse_output=False)),
-            ]), cat_cols),
+            (
+                "num",
+                Pipeline(
+                    [
+                        ("imputer", SimpleImputer(strategy="median")),
+                        ("scaler", StandardScaler()),
+                    ]
+                ),
+                num_cols,
+            ),
+            (
+                "cat",
+                Pipeline(
+                    [
+                        ("imputer", SimpleImputer(strategy="most_frequent")),
+                        (
+                            "onehot",
+                            OneHotEncoder(handle_unknown="ignore", sparse_output=False),
+                        ),
+                    ]
+                ),
+                cat_cols,
+            ),
         ],
         remainder="drop",
     )
@@ -40,10 +57,12 @@ def make_tabular_preprocessor(df: pd.DataFrame) -> ColumnTransformer:
 
 def fit_tabular_model(X: pd.DataFrame, y: pd.Series, model: BaseEstimator) -> Pipeline:
     preprocessor = make_tabular_preprocessor(X)
-    pipe = Pipeline([
-        ("pre", preprocessor),
-        ("model", model),
-    ])
+    pipe = Pipeline(
+        [
+            ("pre", preprocessor),
+            ("model", model),
+        ]
+    )
     pipe.fit(X, y)
     return pipe
 
@@ -52,13 +71,13 @@ def get_schema_columns(ctx: EvalContext) -> tuple[list[str], list[str]]:
     """Return (numeric_columns, categorical_columns) present in train."""
     train_cols = set(ctx.train_df.columns)
 
-    numeric = [  # nofmt
+    numeric = [
         c.name
         for c in ctx.schema.columns
         if c.kind in ("continuous", "integer") and c.name in train_cols
     ]
 
-    categorical = [  # nofmt
+    categorical = [
         c.name
         for c in ctx.schema.columns
         if c.kind in ("categorical", "binary") and c.name in train_cols
@@ -86,7 +105,7 @@ def sanitize_numeric_df(
     DataFrame containing only finite numeric values.
     Safe for numpy/scipy/sklearn operations.
     """
-    clean: pd.DataFrame = (  # nofmt
+    clean: pd.DataFrame = (
         df[numeric_cols]
         .apply(pd.to_numeric, errors="coerce")
         .replace([np.inf, -np.inf], np.nan)
@@ -140,9 +159,7 @@ def canonical_row_hash(df: pd.DataFrame) -> pd.Series:
     df = df[df.columns.sort_values()]
 
     def hash_row(row: pd.Series) -> str:
-        canonical = [
-            canonical_value(v) for v in row.values
-        ]
+        canonical = [canonical_value(v) for v in row.values]
         joined = "|".join(canonical)
         return hashlib.md5(joined.encode("utf-8")).hexdigest()
 

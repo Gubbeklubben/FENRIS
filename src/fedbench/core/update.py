@@ -10,11 +10,23 @@ if TYPE_CHECKING:
     import torch
 
 
-type Arrays  = list[NDArray[Any]] | dict[str, torch.Tensor]
+type Arrays = list[NDArray[Any]] | dict[str, torch.Tensor]
 type Objects = dict[str, Any]
 type Metrics = dict[str, int | float | list[int] | list[float]]
-type Extras  = dict[str, str | bool | int | float | bytes
-               | list[str] | list[bool] | list[int] | list[float] | list[bytes]]
+type Extras = dict[
+    str,
+    str
+    | bool
+    | int
+    | float
+    | bytes
+    | list[str]
+    | list[bool]
+    | list[int]
+    | list[float]
+    | list[bytes],
+]
+
 
 @dataclass(frozen=True)  # Can not replace top level dicts once created
 class Update:
@@ -24,8 +36,9 @@ class Update:
     extras: dict[str, Extras] = field(default_factory=dict)
 
     def is_empty(self) -> bool:
-        return (  # nofmt
-                not self.arrays
-                and not self.objects
-                and not self.metrics
-                and not self.extras)
+        return (
+            not self.arrays
+            and not self.objects
+            and not self.metrics
+            and not self.extras
+        )

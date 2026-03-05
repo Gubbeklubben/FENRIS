@@ -1,5 +1,5 @@
 from abc import ABC, abstractmethod
-from collections.abc import Iterable, Generator
+from collections.abc import Generator, Iterable
 
 from pandas import DataFrame
 
@@ -30,41 +30,46 @@ class Coordinator(ABC):
 
     # noinspection PyMethodMayBeStatic,PyUnusedLocal
     def fed_init(
-            self,
-            seed: int,
-            schema: TableSchema,
-            client_ids: Iterable[int],) -> Generator[Iterable[tuple[int, Update]],
-                                                    Iterable[tuple[int, Update]],
-                                                    None,]:
+        self,
+        seed: int,
+        schema: TableSchema,
+        client_ids: Iterable[int],
+    ) -> Generator[
+        Iterable[tuple[int, Update]],
+        Iterable[tuple[int, Update]],
+        None,
+    ]:
         _ = yield ()
 
     @abstractmethod
     def train(
-            self,
-            client_ids: Iterable[int],) -> Generator[Iterable[tuple[int, Update]],
-                                                    Iterable[tuple[int, Update]],
-                                                    None,]:
+        self,
+        client_ids: Iterable[int],
+    ) -> Generator[
+        Iterable[tuple[int, Update]],
+        Iterable[tuple[int, Update]],
+        None,
+    ]:
         pass
 
 
 class SingleStepCoordinator(Coordinator):
     # noinspection PyMethodMayBeStatic,PyUnusedLocal
     def configure_fed_init(
-            self,
-            seed: int,
-            schema: TableSchema,
-            client_ids: Iterable[int],) -> Iterable[tuple[int, Update]]:
+        self,
+        seed: int,
+        schema: TableSchema,
+        client_ids: Iterable[int],
+    ) -> Iterable[tuple[int, Update]]:
         return ()
 
     # noinspection PyMethodMayBeStatic,PyUnusedLocal
-    def aggregate_fed_init(
-            self,
-            replies: Iterable[tuple[int, Update]]) -> None:
+    def aggregate_fed_init(self, replies: Iterable[tuple[int, Update]]) -> None:
         return None
 
     def configure_train(
-            self,
-            client_ids: Iterable[int]) -> Iterable[tuple[int, Update]]:
+        self, client_ids: Iterable[int]
+    ) -> Iterable[tuple[int, Update]]:
 
         state = self.global_state
         if state is None:
@@ -75,26 +80,30 @@ class SingleStepCoordinator(Coordinator):
             yield cid, state
 
     @abstractmethod
-    def aggregate_train(
-            self,
-            replies: Iterable[tuple[int, Update]]) -> None:
+    def aggregate_train(self, replies: Iterable[tuple[int, Update]]) -> None:
         pass
 
     def fed_init(
-            self,
-            seed: int,
-            schema: TableSchema,
-            client_ids: Iterable[int],) -> Generator[Iterable[tuple[int, Update]],
-                                                    Iterable[tuple[int, Update]],
-                                                    None,]:
+        self,
+        seed: int,
+        schema: TableSchema,
+        client_ids: Iterable[int],
+    ) -> Generator[
+        Iterable[tuple[int, Update]],
+        Iterable[tuple[int, Update]],
+        None,
+    ]:
         replies = yield self.configure_fed_init(seed, schema, client_ids)
         self.aggregate_fed_init(replies)
 
     def train(
-            self,
-            client_ids: Iterable[int],) -> Generator[Iterable[tuple[int, Update]],
-                                                    Iterable[tuple[int, Update]],
-                                                    None,]:
+        self,
+        client_ids: Iterable[int],
+    ) -> Generator[
+        Iterable[tuple[int, Update]],
+        Iterable[tuple[int, Update]],
+        None,
+    ]:
         replies = yield self.configure_train(client_ids)
         self.aggregate_train(replies)
 
@@ -111,26 +120,29 @@ class Synthesizer(ABC):
 
     # noinspection PyMethodMayBeStatic,PyUnusedLocal
     def fed_init(
-            self,
-            request: Update,
-            seed: int,
-            schema: TableSchema,
-            data: DataFrame,) -> Update:
+        self,
+        request: Update,
+        seed: int,
+        schema: TableSchema,
+        data: DataFrame,
+    ) -> Update:
         return Update()
 
     @abstractmethod
     def train(
-            self,
-            request: Update,
-            data: DataFrame,) -> Update:
+        self,
+        request: Update,
+        data: DataFrame,
+    ) -> Update:
         pass
 
     @abstractmethod
     def sample(
-            self,
-            request: Update,
-            num_rows: int,
-            seed: int,) -> DataFrame:
+        self,
+        request: Update,
+        num_rows: int,
+        seed: int,
+    ) -> DataFrame:
         pass
 
 

@@ -4,7 +4,7 @@ from typing import Mapping
 from fedbench.algorithms import register_builtin_algorithms
 from fedbench.core.algorithm import Algorithm
 from fedbench.core.data import Partitioner
-from fedbench.core.eval import Evaluator, Category
+from fedbench.core.eval import Category, Evaluator
 from fedbench.core.factory_registry import FactoryRegistry
 from fedbench.evaluators import register_builtin_evaluators
 from fedbench.partitioners import register_builtin_partitioners
@@ -33,7 +33,8 @@ def build_evaluator_registries() -> Mapping[str, FactoryRegistry[Evaluator]]:
         category.value: FactoryRegistry(
             group=f"{__package__}.evaluators.{category}",
             product_cls=Evaluator,  # type: ignore[type-abstract]
-        ) for category in Category,
+        )
+        for category in Category
     }
     register_builtin_evaluators(registries)
     return MappingProxyType(registries)

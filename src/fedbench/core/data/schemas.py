@@ -1,10 +1,12 @@
 from __future__ import annotations
 
-import pandas as pd
 from dataclasses import dataclass, field
-from typing import Tuple, Literal
+from typing import Literal, Tuple
+
+import pandas as pd
 
 Kind = Literal["continuous", "categorical", "binary", "integer"]
+
 
 # --------------------------------------------------------------------------- #
 # Column → keeps the column name (string) and a broad Semantic *kind*
@@ -13,6 +15,7 @@ Kind = Literal["continuous", "categorical", "binary", "integer"]
 class ColumnSchema:
     name: str
     kind: Kind
+
 
 # --------------------------------------------------------------------------- #
 # Table keeps an ordered tuple of ColumnSchema objects
@@ -51,7 +54,9 @@ def infer_schema(df: pd.DataFrame) -> TableSchema:
 
         if col.nunique(dropna=True) <= 2:
             kind = "binary"
-        elif col.nunique(dropna=True) <= 10:        # magic number TODO get from config, implement ability to override from CLI
+        elif (
+            col.nunique(dropna=True) <= 10
+        ):  # magic number TODO get from config, implement ability to override from CLI
             kind = "categorical"
         elif pd.api.types.is_integer_dtype(dtype):
             kind = "integer"
@@ -66,4 +71,3 @@ def infer_schema(df: pd.DataFrame) -> TableSchema:
         columns.append(ColumnSchema(name=str(name), kind=kind))
 
     return TableSchema(tuple(columns))
-

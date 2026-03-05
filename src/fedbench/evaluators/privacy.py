@@ -9,6 +9,7 @@ Includes three complementary privacy diagnostics:
 * **Attribute inference attack (AIA)** — supervised attack that tries to
   infer a sensitive attribute from quasi-identifier columns.
 """
+
 import math
 
 import numpy as np
@@ -16,9 +17,14 @@ import pandas as pd
 from sklearn.linear_model import LogisticRegression, Ridge
 from sklearn.metrics import accuracy_score, mean_squared_error, roc_auc_score
 
-from fedbench.core.eval import Evaluator, EvalContext
-from fedbench.util.metrics import get_quasi_identifiers, get_schema_columns, fit_tabular_model, canonical_row_hash, \
-    sanitize_numeric_df
+from fedbench.core.eval import EvalContext, Evaluator
+from fedbench.util.metrics import (
+    canonical_row_hash,
+    fit_tabular_model,
+    get_quasi_identifiers,
+    get_schema_columns,
+    sanitize_numeric_df,
+)
 from fedbench.util.parsing import to_snake_case
 
 MAX_MIA_SYNTHETIC = 5000
@@ -31,6 +37,7 @@ class DirectOverlapDiagnosticEvaluator(Evaluator):
     Computes exact-match rates and partial-match rates (top-1/2/3 most-unique
     columns) between the synthetic data and the training set.
     """
+
     def evaluate(self, ctx: EvalContext) -> dict[str, float]:
         train, syn = ctx.train_df, ctx.synthetic_df
         common = sorted(set(train.columns) & set(syn.columns))
@@ -86,6 +93,7 @@ class MIANearestNeighborAttackEvaluator(Evaluator):
     *non-members*, then scores each record by its negative distance to the
     nearest synthetic sample. Reports AUC, accuracy, and advantage.
     """
+
     def evaluate(self, ctx: EvalContext) -> dict[str, float]:
         nan_result = {
             "mia_auc": math.nan,
@@ -143,8 +151,8 @@ class MIANearestNeighborAttackEvaluator(Evaluator):
             "mia_auc": roc_auc_score(y, scores),
             "mia_accuracy": accuracy_score(y, scores > threshold),
             "mia_advantage": (
-                    np.mean(scores[y == 1] > threshold)
-                    - np.mean(scores[y == 0] > threshold)
+                np.mean(scores[y == 1] > threshold)
+                - np.mean(scores[y == 0] > threshold)
             ),
         }
 
@@ -156,6 +164,7 @@ class AIASupervisedAttackEvaluator(Evaluator):
     sensitive attribute from quasi-identifier columns, then evaluates on
     real held-out data. Reports accuracy, AUC, and RMSE per sensitive column.
     """
+
     def evaluate(self, ctx: EvalContext) -> dict[str, float]:
         nan_result = {
             "aia_accuracy": math.nan,
@@ -200,16 +209,22 @@ class AIASupervisedAttackEvaluator(Evaluator):
 
                 if len(np.unique(y_syn)) == 2:
                     y_proba = pipe.predict_proba(X_test)[:, 1]
-                    metrics[f"aia_auc.{sensitive_column_normalized}"] = roc_auc_score(y_test, y_proba)
+                    metrics[f"aia_auc.{sensitive_column_normalized}"] = roc_auc_score(
+                        y_test, y_proba
+                    )
 
                 y_pred = pipe.predict(X_test)
 
-                metrics[f"aia_accuracy.{sensitive_column_normalized}"] = accuracy_score(y_test, y_pred)
+                metrics[f"aia_accuracy.{sensitive_column_normalized}"] = accuracy_score(
+                    y_test, y_pred
+                )
 
             else:  # regression
                 model = Ridge(random_state=ctx.seed)
                 pipe = fit_tabular_model(X_syn, y_syn, model)
                 y_pred = pipe.predict(X_test)
-                metrics[f"aia_rmse.{sensitive_column_normalized}"] = math.sqrt(mean_squared_error(y_test, y_pred))
+                metrics[f"aia_rmse.{sensitive_column_normalized}"] = math.sqrt(
+                    mean_squared_error(y_test, y_pred)
+                )
 
         return metrics or nan_result

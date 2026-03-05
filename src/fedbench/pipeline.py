@@ -7,8 +7,8 @@ from fedbench.core.pipeline import Command
 from fedbench.core.runcontext import RunContext
 from fedbench.registries import (
     build_algorithm_registry,
+    build_evaluator_registries,
     build_partitioner_registry,
-    build_evaluator_registries
 )
 from fedbench.resolver import resolve_components as _resolve_components
 
@@ -36,6 +36,7 @@ def infer_schema(ctx: RunContext) -> None:
 
 def federated_train_eval_loop(ctx: RunContext) -> None:
     from flwr.simulation import run_simulation
+
     from fedbench.flwr import client_app, make_server_app
 
     run_simulation(

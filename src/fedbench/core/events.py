@@ -1,6 +1,5 @@
 import time
 from dataclasses import dataclass, field
-from datetime import datetime, timezone
 
 
 @dataclass(frozen=True)

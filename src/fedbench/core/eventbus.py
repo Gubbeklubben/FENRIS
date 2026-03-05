@@ -7,14 +7,14 @@ from types import TracebackType
 from typing import Protocol, Self, cast
 
 from fedbench.core.events import Event
-from fedbench.core.logger import log_warning, log_error
+from fedbench.core.logger import log_error, log_warning
 
 
 class BusState(Enum):
     INITIAL = 0
-    OPEN    = 1
+    OPEN = 1
     CLOSING = 2
-    CLOSED  = 3
+    CLOSED = 3
 
 
 class Observer(Protocol):
@@ -43,17 +43,18 @@ class EventBus:
         self._lock = threading.Lock()
 
     def __repr__(self) -> str:
-        return f"{self.__class__.__name__} <{ self._state}>"
+        return f"{self.__class__.__name__} <{self._state}>"
 
     def __enter__(self) -> Self:
         self.open()
         return self
 
     def __exit__(
-            self,
-            exc_type: type[BaseException] | None,
-            exc_val: BaseException | None,
-            exc_tb: TracebackType | None,) -> bool | None:
+        self,
+        exc_type: type[BaseException] | None,
+        exc_val: BaseException | None,
+        exc_tb: TracebackType | None,
+    ) -> bool | None:
 
         self.close()
         return None
@@ -63,9 +64,10 @@ class EventBus:
         return self._state
 
     def register(
-            self,
-            observer: Observer,
-            event_types: Iterable[type[Event]],) -> None:
+        self,
+        observer: Observer,
+        event_types: Iterable[type[Event]],
+    ) -> None:
 
         with self._lock:
             if self._state is not BusState.INITIAL:
@@ -117,7 +119,7 @@ class EventBus:
             if self._state in (BusState.CLOSING, BusState.CLOSED):
                 return False
 
-            self._state = BusState.CLOSING # No more events in
+            self._state = BusState.CLOSING  # No more events in
 
         self._event_queue.join()
         self._event_queue.put_nowait(None)
@@ -139,10 +141,7 @@ class EventBus:
             try:
                 for entry in self._frozen_observers:
                     if entry.failures > 0:
-                        log_warning(
-                            str(self),
-                            "Ignoring previously failed observer"
-                        )
+                        log_warning(str(self), "Ignoring previously failed observer")
                         continue
 
                     if isinstance(event, entry.event_types):
@@ -151,11 +150,8 @@ class EventBus:
                             entry.observer(event)
                         except Exception:
                             log_error(
-                                str(self), f"Exception in observer: ",
-                                exc_info=True
+                                str(self), "Exception in observer: ", exc_info=True
                             )
                             entry.failures += 1
             finally:
                 self._event_queue.task_done()
-
-

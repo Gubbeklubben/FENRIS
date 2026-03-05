@@ -1,10 +1,8 @@
 from typing import Literal, cast
 
 from datasets import Dataset  # type: ignore
-from flwr_datasets.partitioner import (
-    Partitioner as FlwrPartitioner,
-    IidPartitioner
-)
+from flwr_datasets.partitioner import IidPartitioner
+from flwr_datasets.partitioner import Partitioner as FlwrPartitioner
 from pandas import DataFrame
 
 from fedbench.core.data.partitioner import Partitioner
@@ -27,14 +25,16 @@ class FlwrDelegatePartitioner(Partitioner):
         self._flwr_partitioner.dataset = Dataset.from_pandas(df)
 
     def load_partition(
-            self,
-            partition_id: int,
-            split: Literal["train", "test"],
-            seed: int,
-            test_size: float,) -> DataFrame:
+        self,
+        partition_id: int,
+        split: Literal["train", "test"],
+        seed: int,
+        test_size: float,
+    ) -> DataFrame:
 
-        return cast(DataFrame,
-            self._flwr_partitioner
-            .load_partition(partition_id)
+        return cast(
+            DataFrame,
+            self._flwr_partitioner.load_partition(partition_id)
             .train_test_split(test_size=test_size, seed=seed)[split]
-            .with_format("pandas")[:],)
+            .with_format("pandas")[:],
+        )

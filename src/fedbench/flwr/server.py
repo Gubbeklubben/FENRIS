@@ -1,7 +1,7 @@
 import time
 from collections.abc import Generator, Iterable
 
-from flwr.common import Context, Message, ConfigRecord, RecordDict
+from flwr.common import ConfigRecord, Context, Message, RecordDict
 from flwr.server import Grid
 from flwr.serverapp import ServerApp
 
@@ -10,26 +10,35 @@ from fedbench.core.algorithm import Coordinator
 from fedbench.core.data import TableSchema
 from fedbench.core.eventbus import EventBus
 from fedbench.core.events import (
-    ClientsConfigured, ServerRequest, ClientReply,
-    FedInitStarted, FedInitCompleted, TrainingStarted, TrainingCompleted
+    ClientReply,
+    ClientsConfigured,
+    FedInitCompleted,
+    FedInitStarted,
+    ServerRequest,
+    TrainingCompleted,
+    TrainingStarted,
 )
 from fedbench.core.runcontext import RunContext
-from fedbench.core.update import Update, Metrics
+from fedbench.core.update import Metrics, Update
 from fedbench.flwr.serde import (
-    to_flwr_pickle, from_flwr_pickle,
-    to_flwr_disable_pickle, FlwrSerializer, FlwrDeserializer
+    FlwrDeserializer,
+    FlwrSerializer,
+    from_flwr_pickle,
+    to_flwr_disable_pickle,
+    to_flwr_pickle,
 )
 
 
 class FedbenchServer:
     def __init__(
-            self,
-            coordinator: Coordinator,
-            seed: int,
-            schema: TableSchema,
-            to_flwr: FlwrSerializer,
-            from_flwr: FlwrDeserializer,
-            eventbus: EventBus,) -> None:
+        self,
+        coordinator: Coordinator,
+        seed: int,
+        schema: TableSchema,
+        to_flwr: FlwrSerializer,
+        from_flwr: FlwrDeserializer,
+        eventbus: EventBus,
+    ) -> None:
 
         self._coordinator = coordinator
         self._seed = seed
@@ -71,10 +80,7 @@ class FedbenchServer:
             metrics = reply.content.metric_records["metrics"]
             self._per_client_metrics[src_id] = dict(metrics)
 
-    def run(
-            self,
-            grid: Grid,
-            num_rounds: int) -> tuple[Update, dict[str, float]]:
+    def run(self, grid: Grid, num_rounds: int) -> tuple[Update, dict[str, float]]:
 
         self._eventbus.emit(FedInitStarted())
         self.fed_init(grid)
@@ -89,12 +95,15 @@ class FedbenchServer:
         return self._get_and_check_global_state(), {}
 
     def _send_and_receive(
-            self,
-            grid: Grid,
-            generator: Generator[Iterable[tuple[int, Update]],
-                                 Iterable[tuple[int, Update]],
-                                 None,],
-            msg_type: str) -> None:
+        self,
+        grid: Grid,
+        generator: Generator[
+            Iterable[tuple[int, Update]],
+            Iterable[tuple[int, Update]],
+            None,
+        ],
+        msg_type: str,
+    ) -> None:
 
         msg_type = msg_type.split(".")[-1]
         arrays_map = self._coordinator.arrays_to_ml_framework_map
@@ -128,7 +137,7 @@ class FedbenchServer:
     def _get_and_check_global_state(self) -> Update:
         global_state = self._coordinator.global_state
         if not isinstance(global_state, Update):
-            raise RuntimeError(  # nofmt
+            raise RuntimeError(
                 f"{self._coordinator}.global_state returned"
                 f"{type(global_state)}, expected {Update}"
             )
@@ -150,7 +159,8 @@ def configure_clients(grid: Grid, config: Config) -> Iterable[Message]:
             content=RecordDict({"config": cfg_jsons}),
             message_type="query.configure",
             dst_node_id=cid,
-        ) for cid in client_ids
+        )
+        for cid in client_ids
     )
     return grid.send_and_receive(messages)
 

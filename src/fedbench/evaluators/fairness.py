@@ -7,6 +7,7 @@ classifier whose predictions are stratified by a protected (sensitive)
 attribute. Reports demographic parity, equal opportunity, and equalized
 odds differences across groups.
 """
+
 from __future__ import annotations
 
 import math
@@ -21,15 +22,15 @@ from fedbench.util.parsing import to_snake_case
 
 
 def _per_group_confusion(
-        y_true: np.ndarray,
-        y_pred: np.ndarray,
-        sensitive: np.ndarray,
-        min_group_size: int = 30,
+    y_true: np.ndarray,
+    y_pred: np.ndarray,
+    sensitive: np.ndarray,
+    min_group_size: int = 30,
 ) -> dict[str, dict[str, int]]:
     """Return per-group TP/FP/TN/FN counts, skipping small groups."""
     out: dict[str, dict[str, int]] = {}
     for g in pd.unique(pd.Series(sensitive)):
-        mask = (sensitive == g)
+        mask = sensitive == g
         if int(mask.sum()) < min_group_size:
             continue
         yt = y_true[mask]
@@ -45,7 +46,7 @@ def _per_group_confusion(
 
 
 def _fairness_metrics_from_counts(
-        group_counts: dict[str, dict[str, int]],
+    group_counts: dict[str, dict[str, int]],
 ) -> tuple[float, float, float]:
     """Compute the three fairness metrics from per-group confusion counts.
 
@@ -109,12 +110,12 @@ def _fairness_metrics_from_counts(
 
 
 def _evaluate_for_sensitive_column(
-        train_df: pd.DataFrame,
-        syn_df: pd.DataFrame,
-        target_column: str,
-        sensitive_column: str,
-        seed: int,
-        min_group_size: int = 30,
+    train_df: pd.DataFrame,
+    syn_df: pd.DataFrame,
+    target_column: str,
+    sensitive_column: str,
+    seed: int,
+    min_group_size: int = 30,
 ) -> tuple[float, float, float]:
 
     nan_result = (math.nan, math.nan, math.nan)
@@ -126,7 +127,8 @@ def _evaluate_for_sensitive_column(
                 return nan_result
 
     feature_columns = [
-        col for col in syn_df.columns
+        col
+        for col in syn_df.columns
         if col not in (sensitive_column, target_column) and col in train_df.columns
     ]
     if not feature_columns:
@@ -215,7 +217,6 @@ class FairnessEvaluator(Evaluator):
         metrics: dict[str, float] = {}
 
         for sensitive_column in ctx.sensitive_columns or []:
-
             dp, eo, eopp = _evaluate_for_sensitive_column(
                 ctx.train_df,
                 ctx.synthetic_df,

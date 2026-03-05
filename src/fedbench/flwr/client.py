@@ -2,11 +2,11 @@ from typing import cast
 
 from flwr.clientapp import ClientApp
 from flwr.common import (
-    Message,
-    Context,
-    RecordDict,
     ConfigRecord,
+    Context,
+    Message,
     MetricRecord,
+    RecordDict,
 )
 
 from fedbench.config import Config
@@ -16,25 +16,29 @@ from fedbench.core.data.schemas import infer_schema
 from fedbench.core.eval import EvalContext, EvaluationSuite
 from fedbench.core.logger import log_warning
 from fedbench.flwr.serde import (
-    FlwrSerializer, FlwrDeserializer,
-    to_flwr_pickle, from_flwr_pickle, to_flwr_disable_pickle
+    FlwrDeserializer,
+    FlwrSerializer,
+    from_flwr_pickle,
+    to_flwr_disable_pickle,
+    to_flwr_pickle,
 )
 from fedbench.registries import (
     build_algorithm_registry,
-    build_partitioner_registry,
     build_evaluator_registries,
+    build_partitioner_registry,
 )
 from fedbench.resolver import resolve_components
 
 
 class FedbenchClient:
     def __init__(
-            self,
-            dataset: PartitionedDataset,
-            algorithm: Algorithm,
-            eval_suite: EvaluationSuite,
-            to_flwr: FlwrSerializer,
-            from_flwr: FlwrDeserializer,) -> None:
+        self,
+        dataset: PartitionedDataset,
+        algorithm: Algorithm,
+        eval_suite: EvaluationSuite,
+        to_flwr: FlwrSerializer,
+        from_flwr: FlwrDeserializer,
+    ) -> None:
 
         self._dataset = dataset
         self._algorithm = algorithm
@@ -43,10 +47,11 @@ class FedbenchClient:
         self._from_flwr = from_flwr
 
     def init(
-            self,
-            seed: int,
-            flwr_message: Message,
-            flwr_context: Context,) -> Message:
+        self,
+        seed: int,
+        flwr_message: Message,
+        flwr_context: Context,
+    ) -> Message:
 
         partition_id = self._get_partition_id(flwr_context)
         train_df = self._dataset.load_train_partition(partition_id)
@@ -58,7 +63,6 @@ class FedbenchClient:
         )
         reply = synthesizer.fed_init(request, seed, self._dataset.schema, train_df)
         return self._to_flwr(update=reply, reply_to=flwr_message)
-
 
     def train(self, flwr_message: Message, flwr_context: Context) -> Message:
         partition_id = self._get_partition_id(flwr_context)
@@ -73,13 +77,14 @@ class FedbenchClient:
         return self._to_flwr(update=reply, reply_to=flwr_message)
 
     def evaluate(
-            self,
-            flwr_message: Message,
-            flwr_context: Context,
-            num_synthetic_rows: int | None,
-            seed: int,
-            target_column: str | None,
-            sensitive_columns: tuple[str, ...] | None,) -> Message:
+        self,
+        flwr_message: Message,
+        flwr_context: Context,
+        num_synthetic_rows: int | None,
+        seed: int,
+        target_column: str | None,
+        sensitive_columns: tuple[str, ...] | None,
+    ) -> Message:
 
         partition_id = self._get_partition_id(flwr_context)
         train_df = self._dataset.load_train_partition(partition_id)

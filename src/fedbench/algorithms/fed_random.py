@@ -1,10 +1,10 @@
 import random
-from typing import Iterable, Generator, cast
+from typing import Generator, Iterable, cast
 
 from pandas import DataFrame
 
-from fedbench.core.algorithm import Algorithm, Synthesizer, Coordinator
-from fedbench.core.logger import log_info, TEE, ELBOW
+from fedbench.core.algorithm import Algorithm, Coordinator, Synthesizer
+from fedbench.core.logger import ELBOW, TEE, log_info
 from fedbench.core.update import Update
 
 
@@ -24,10 +24,12 @@ class FedRandomCoordinator(Coordinator):
         return Update(objects={"objects": {"state": object()}})
 
     def train(
-            self,
-            client_ids: Iterable[int]) -> Generator[Iterable[tuple[int, Update]],
-                                                    Iterable[tuple[int, Update]],
-                                                    None,]:
+        self, client_ids: Iterable[int]
+    ) -> Generator[
+        Iterable[tuple[int, Update]],
+        Iterable[tuple[int, Update]],
+        None,
+    ]:
         rnd = 0
         update = Update(extras={"federation": {"client_ids": list(client_ids)}})
         dst = next(iter(client_ids))
@@ -55,10 +57,14 @@ class FedRandomCoordinator(Coordinator):
             log_info("", f"\t{TEE} To: {dst}")
             log_info("", f"\t{ELBOW} End internal round: {rnd}")
 
-            update = Update(extras={
-                "federation": {"client_ids": list(client_ids),
-                               "message": message,}
-            })
+            update = Update(
+                extras={
+                    "federation": {
+                        "client_ids": list(client_ids),
+                        "message": message,
+                    }
+                }
+            )
 
 
 class FedRandomSynthesizer(Synthesizer):
