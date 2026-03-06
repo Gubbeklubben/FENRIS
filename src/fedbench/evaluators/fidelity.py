@@ -6,6 +6,7 @@ those of the training data. Includes moment comparison, distribution
 similarity tests, categorical total-variation distance, and correlation
 matrix comparison.
 """
+
 from __future__ import annotations
 
 import math
@@ -16,7 +17,7 @@ import pandas as pd
 from scipy import stats
 
 from fedbench.core.eval import EvalContext, Evaluator
-from fedbench.util.metrics import get_schema_columns, sanitize_numeric_df, safe_nanmean
+from fedbench.util.metrics import get_schema_columns, safe_nanmean, sanitize_numeric_df
 
 
 class MomentReductionMetricsEvaluator(Evaluator):
@@ -102,7 +103,7 @@ class CategoricalTvMeanEvaluator(Evaluator):
         _, categorical_columns = get_schema_columns(ctx)
         if not categorical_columns:
             return {
-                "categorical_tv_mean": math.nan
+                "categorical_tv_mean": math.nan,
             }
 
         tvs = []
@@ -115,7 +116,7 @@ class CategoricalTvMeanEvaluator(Evaluator):
             tvs.append(tv)
 
         return {
-            "categorical_tv_mean": float(np.mean(tvs))
+            "categorical_tv_mean": float(np.mean(tvs)),
         }
 
 
@@ -124,7 +125,7 @@ class CorrFroDiffEvaluator(Evaluator):
         numeric_columns, _ = get_schema_columns(ctx)
         if len(numeric_columns) < 2:
             return {
-                "corr_fro_diff": math.nan
+                "corr_fro_diff": math.nan,
             }
 
         def safe_corr(df: pd.DataFrame) -> pd.DataFrame:
@@ -141,5 +142,5 @@ class CorrFroDiffEvaluator(Evaluator):
         diff = r_corr.loc[common, common].values - s_corr.loc[common, common].values
 
         return {
-            "corr_fro_diff": float(np.linalg.norm(diff, ord="fro"))
+            "corr_fro_diff": float(np.linalg.norm(diff, ord="fro")),
         }

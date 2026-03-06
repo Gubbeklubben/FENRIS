@@ -7,8 +7,8 @@ from fedbench.core.pipeline import Command
 from fedbench.core.runcontext import RunContext
 from fedbench.registries import (
     build_algorithm_registry,
+    build_evaluator_registries,
     build_partitioner_registry,
-    build_evaluator_registries
 )
 from fedbench.resolver import resolve_components as _resolve_components
 
@@ -18,7 +18,7 @@ def resolve_components(ctx: RunContext) -> None:
         ctx.config,
         build_algorithm_registry(),
         build_partitioner_registry(),
-        build_evaluator_registries()
+        build_evaluator_registries(),
     )
     ctx.components = components
 
@@ -36,6 +36,7 @@ def infer_schema(ctx: RunContext) -> None:
 
 def federated_train_eval_loop(ctx: RunContext) -> None:
     from flwr.simulation import run_simulation
+
     from fedbench.flwr import client_app, make_server_app
 
     run_simulation(
@@ -50,7 +51,7 @@ def global_sample(ctx: RunContext) -> None:
     ctx.synthetic_df = synthesizer.sample(
         ctx.aggregated_state,
         ctx.config.num_synthetic_rows or 1,
-        ctx.config.seed
+        ctx.config.seed,
     )
 
 

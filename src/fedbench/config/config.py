@@ -1,5 +1,5 @@
 import json
-from dataclasses import dataclass, field, asdict
+from dataclasses import asdict, dataclass, field
 from typing import Literal, Self
 
 from fedbench.core.eval import Category
@@ -11,9 +11,9 @@ type ConfigCls = type[DataConfig] | type[MetricsConfig] | type[Config]
 class DataConfig:
     dataset: str
     partitioner: str
-    partitioner_kwargs: dict[
-        str, None | bool | str | float | int
-    ] = field(default_factory=dict)
+    partitioner_kwargs: dict[str, None | bool | str | float | int] = field(
+        default_factory=dict
+    )
     target_col: str | None = None
     sensitive_cols: tuple[str, ...] = field(default_factory=tuple)
 
@@ -36,7 +36,8 @@ class Config:
     algorithm: str
     data: DataConfig
     algorithm_kwargs: dict[
-        str, None | bool | str | float | int
+        str,
+        None | bool | str | float | int,
     ] = field(default_factory=dict)
     num_clients: int = 3
     num_rounds: int = 3
@@ -53,9 +54,13 @@ class Config:
         if self.num_rounds < 1:
             raise ValueError(f"Number of rounds {self.num_rounds} is not supported")
         if self.test_size <= 0.0 or self.test_size >= 1.0:
-            raise ValueError(f"Test size {self.test_size} is not supported, must be between 0 and 1")
+            raise ValueError(
+                f"Test size {self.test_size} is not supported, must be between 0 and 1"
+            )
         if self.num_synthetic_rows is not None and self.num_synthetic_rows < 1:
-            raise ValueError(f"Number of synthetic rows {self.num_synthetic_rows} is not supported")
+            raise ValueError(
+                f"Number of synthetic rows {self.num_synthetic_rows} is not supported"
+            )
 
     @classmethod
     def parse_jsons(cls, jsons: str) -> Self:
@@ -65,7 +70,7 @@ class Config:
         return cls(
             **cfg,
             data=DataConfig(**data_cfg),
-            metrics=MetricsConfig(**metrics_cfg)
+            metrics=MetricsConfig(**metrics_cfg),
         )
 
     def jsons(self) -> str:

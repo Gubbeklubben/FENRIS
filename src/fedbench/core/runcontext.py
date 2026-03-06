@@ -7,7 +7,7 @@ from pandas import DataFrame
 
 from fedbench.config import Config
 from fedbench.core.algorithm import Algorithm
-from fedbench.core.data import TableSchema, Partitioner
+from fedbench.core.data import Partitioner, TableSchema
 from fedbench.core.eval import EvaluationSuite
 from fedbench.core.eventbus import EventBus
 from fedbench.core.update import Update
@@ -75,9 +75,7 @@ class RunContext:
     @property
     def aggregated_state(self) -> Update:
         if self._aggregated_state is None:
-            raise RuntimeError(
-                "Property 'aggregated_state' accessed before set."
-            )
+            raise RuntimeError("Property 'aggregated_state' accessed before set.")
         return self._aggregated_state
 
     @aggregated_state.setter
@@ -89,13 +87,11 @@ class RunContext:
     @property
     def aggregated_metrics(self) -> Mapping[str, float]:
         if self._aggregated_metrics is None:
-            raise RuntimeError(
-                "Property 'aggregated_metrics' accessed before set."
-            )
+            raise RuntimeError("Property 'aggregated_metrics' accessed before set.")
         return MappingProxyType(self._aggregated_metrics)
 
     @aggregated_metrics.setter
-    def aggregated_metrics(self, metrics: dict[str,float]) -> None:
+    def aggregated_metrics(self, metrics: dict[str, float]) -> None:
         if self._aggregated_metrics is not None:
             raise RuntimeError("Can only set 'aggregated_metrics' once.")
         self._aggregated_metrics = metrics
