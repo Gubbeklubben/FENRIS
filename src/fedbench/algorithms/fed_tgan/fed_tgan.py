@@ -29,7 +29,7 @@ class FedTGAN(Algorithm):
     def __init__(
             self,
             batch_size: int = 32,
-            learning_rate: float = 1e-2,    # starting point, adjust if needed
+            learning_rate: float = 1e-2,
             fraction_evaluate: float = 0.5,
             num_server_rounds: int = 3,
             local_epochs: int = 3,
@@ -50,11 +50,9 @@ class FedTGAN(Algorithm):
             ),
         }
 
-    @classmethod
     def create_aggregator(cls) -> Aggregator:
         return FedTGANAggregator(cls._cfg)
 
-    @classmethod
     def create_synthesizer(cls) -> Synthesizer:
         return FedTGANSynthesizer(cls._cfg)
 
