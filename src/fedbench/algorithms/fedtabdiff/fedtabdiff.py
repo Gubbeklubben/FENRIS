@@ -60,16 +60,13 @@ def init_model(cfg: dict[str, Any]) -> tuple[MLPSynthesizer, Diffuser]:
         n_classes=None,
         embedding_learned=False,
     )
-    diffuser = (
-        Diffuser(
-            total_steps=cfg["diffusion-steps"],
-            beta_start=cfg["diffusion-beta-start"],
-            beta_end=cfg["diffusion-beta-end"],
-            device=cfg["device"],
-            scheduler=cfg["scheduler"],
-        ),
+    diffuser = Diffuser(
+        total_steps=cfg["diffusion-steps"],
+        beta_start=cfg["diffusion-beta-start"],
+        beta_end=cfg["diffusion-beta-end"],
+        device=cfg["device"],
+        scheduler=cfg["scheduler"],
     )
-
     return synthesizer, diffuser
 
 
