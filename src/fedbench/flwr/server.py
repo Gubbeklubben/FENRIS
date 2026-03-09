@@ -189,7 +189,7 @@ def make_server_app(runcontext: RunContext) -> ServerApp:
         server = FedbenchServer(
             algorithm.create_coordinator(),
             config.seed,
-            runcontext.schema,
+            runcontext.dataset.schema,
             to_flwr=to_flwr_disable_pickle if config.disable_pickle else to_flwr_pickle,
             from_flwr=from_flwr_pickle,
             eventbus=eventbus,

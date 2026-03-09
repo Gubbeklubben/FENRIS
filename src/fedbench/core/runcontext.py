@@ -7,7 +7,7 @@ from pandas import DataFrame
 
 from fedbench.config import Config
 from fedbench.core.algorithm import Algorithm
-from fedbench.core.data import Partitioner, TableSchema
+from fedbench.core.data import PartitionedDataset, Partitioner
 from fedbench.core.eval import EvaluationSuite
 from fedbench.core.eventbus import EventBus
 from fedbench.core.update import Update
@@ -29,8 +29,7 @@ class RunContext:
         self._config = config
         self._eventbus = eventbus
         self._components: Components | None = None
-        self.df: DataFrame | None = None  # Less strict policy for now
-        self._schema: TableSchema | None = None
+        self._dataset: PartitionedDataset | None = None
         self._aggregated_state: Update | None = None
         self._aggregated_metrics: dict[str, float] | None = None
         # per client metrics?
@@ -61,16 +60,16 @@ class RunContext:
         self._components = components
 
     @property
-    def schema(self) -> TableSchema:
-        if self._schema is None:
-            raise RuntimeError("Property 'schema' accessed before set.")
-        return self._schema
+    def dataset(self) -> PartitionedDataset:
+        if self._dataset is None:
+            raise RuntimeError("Property 'dataset' accessed before set.")
+        return self._dataset
 
-    @schema.setter
-    def schema(self, schema: TableSchema) -> None:
-        if self._schema is not None:
-            raise RuntimeError("Can only set 'schema' once.")
-        self._schema = schema
+    @dataset.setter
+    def dataset(self, dataset: PartitionedDataset) -> None:
+        if self._dataset is not None:
+            raise RuntimeError("Can only set 'dataset' once.")
+        self._dataset = dataset
 
     @property
     def aggregated_state(self) -> Update:

@@ -2,6 +2,7 @@ import json
 from collections.abc import Iterable
 from pathlib import Path
 
+from fedbench.core.data import PartitionedDataset
 from fedbench.core.data.schemas import infer_schema as _infer_schema
 from fedbench.core.pipeline import Command
 from fedbench.core.runcontext import RunContext
@@ -23,15 +24,16 @@ def resolve_components(ctx: RunContext) -> None:
     ctx.components = components
 
 
-def load_df(ctx: RunContext) -> None:
-    ctx.df = ctx.components.df_loader()
-
-
-def infer_schema(ctx: RunContext) -> None:
-    if ctx.df is None:
-        raise RuntimeError("No dataset loaded, can not infer schema.")
-    ctx.schema = _infer_schema(ctx.df)
-    ctx.df = None  # Not needed atm. so forget it and free some memory.
+def load_dataset(ctx: RunContext) -> None:
+    df = ctx.components.df_loader()
+    schema = _infer_schema(df)
+    ctx.dataset = PartitionedDataset(
+        df,
+        schema,
+        ctx.components.partitioner,
+        ctx.config.test_size,
+        ctx.config.seed,
+    )
 
 
 def federated_train_eval_loop(ctx: RunContext) -> None:
@@ -56,9 +58,7 @@ def global_sample(ctx: RunContext) -> None:
 
 
 def global_evaluate(ctx: RunContext) -> None:
-    # I imagine some of the metrics may be relevant here, but not all?
-    # We can create a test set by concatenating all test sets from
-    # partitioner.
+    # Server's evaluation data can be retrieved using ctx.dataset.load_global_holdout()
     pass
 
 
@@ -74,8 +74,7 @@ def write_artifacts(ctx: RunContext) -> None:
 
 def pipeline() -> Iterable[Command]:
     yield resolve_components
-    yield load_df
-    yield infer_schema
+    yield load_dataset
     yield federated_train_eval_loop
     yield global_sample
     yield global_evaluate
