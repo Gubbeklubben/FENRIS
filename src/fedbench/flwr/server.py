@@ -169,11 +169,11 @@ def configure_clients(grid: Grid, config: Config) -> Iterable[Message]:
     return grid.send_and_receive(messages)
 
 
-def make_server_app(runcontext: RunContext) -> ServerApp:
+def make_server_app(ctx: RunContext) -> ServerApp:
     app = ServerApp()
-    config = runcontext.config
-    eventbus = runcontext.eventbus
-    algorithm = runcontext.components.algorithm
+    config = ctx.config
+    eventbus = ctx.eventbus
+    algorithm = ctx.algorithm
 
     @app.main()
     def main(grid: Grid, _: Context) -> None:
@@ -189,13 +189,13 @@ def make_server_app(runcontext: RunContext) -> ServerApp:
         server = FedbenchServer(
             algorithm.create_coordinator(),
             config.seed,
-            runcontext.dataset.schema,
+            ctx.dataset.schema,
             to_flwr=to_flwr_disable_pickle if config.disable_pickle else to_flwr_pickle,
             from_flwr=from_flwr_pickle,
             eventbus=eventbus,
         )
         state, metrics = server.run(grid, config.num_rounds)
-        runcontext.aggregated_state = state
-        runcontext.aggregated_metrics = metrics
+        ctx.aggregated_state = state
+        ctx.aggregated_metrics = metrics
 
     return app

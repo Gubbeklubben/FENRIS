@@ -27,7 +27,12 @@ from fedbench.registries import (
     build_evaluator_registries,
     build_partitioner_registry,
 )
-from fedbench.resolver import resolve_components
+from fedbench.resolver import (
+    resolve_algorithm,
+    resolve_df_loader,
+    resolve_evaluators,
+    resolve_partitioner,
+)
 
 
 class FedbenchClient:
@@ -148,27 +153,26 @@ def configure(flwr_message: Message, _: Context) -> Message:
     # noinspection PyUnnecessaryCast
     config = Config.parse_jsons(cast(str, cfg_record["jsons"]))
 
-    components = resolve_components(
-        config,
-        build_algorithm_registry(),
-        build_partitioner_registry(),
-        build_evaluator_registries(),
-    )
-    df = components.df_loader()
+    df_loader = resolve_df_loader(config)
+    algorithm = resolve_algorithm(config, build_algorithm_registry())
+    partitioner = resolve_partitioner(config, build_partitioner_registry())
+    eval_suite = resolve_evaluators(config, build_evaluator_registries())
+
+    df = df_loader()
     schema = infer_schema(df)
 
     dataset = PartitionedDataset(
         df=df,
         schema=schema,
-        partitioner=components.partitioner,
+        partitioner=partitioner,
         test_size=config.test_size,
         seed=config.seed,
     )
     global fedbench_client
     fedbench_client = FedbenchClient(
         dataset,
-        components.algorithm,
-        components.eval_suite,
+        algorithm,
+        eval_suite,
         to_flwr_disable_pickle if config.disable_pickle else to_flwr_pickle,
         from_flwr_pickle,
     )
