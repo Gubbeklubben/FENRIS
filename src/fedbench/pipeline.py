@@ -12,10 +12,10 @@ from fedbench.registries import (
     build_partitioner_registry,
 )
 from fedbench.resolver import (
-    resolve_df_loader,
     resolve_algorithm,
-    resolve_partitioner,
+    resolve_df_loader,
     resolve_evaluators,
+    resolve_partitioner,
 )
 
 
@@ -50,6 +50,7 @@ def load_dataset(ctx: RunContext) -> None:
 
 def federated_train_eval_loop(ctx: RunContext) -> None:
     from flwr.simulation import run_simulation
+
     from fedbench.flwr import client_app, make_server_app
 
     run_simulation(

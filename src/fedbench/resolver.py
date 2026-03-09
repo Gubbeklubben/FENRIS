@@ -1,5 +1,5 @@
 import functools
-from collections.abc import Mapping, Callable
+from collections.abc import Callable, Mapping
 
 from pandas import DataFrame
 

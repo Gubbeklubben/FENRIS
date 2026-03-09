@@ -36,12 +36,10 @@ class _RunCtxField[T]:
         self._name = f"_{name}"
 
     @overload
-    def __get__(self, instance: None, owner: type[object]) -> _RunCtxField[T]:
-        ...
+    def __get__(self, instance: None, owner: type[object]) -> _RunCtxField[T]: ...
 
     @overload
-    def __get__(self, instance: object, owner: type[object]) -> T:
-        ...
+    def __get__(self, instance: object, owner: type[object]) -> T: ...
 
     def __get__(
         self, instance: object | None, owner: type[object]
@@ -51,9 +49,7 @@ class _RunCtxField[T]:
             return self
 
         if not hasattr(instance, self._name):
-            raise AttributeError(
-                f"{instance}: '{self.name}' accessed before set."
-            )
+            raise AttributeError(f"{instance}: '{self.name}' accessed before set.")
         # noinspection PyUnnecessaryCast
         return cast(T, getattr(instance, self._name))
 
@@ -65,6 +61,7 @@ class _RunCtxField[T]:
 
 
 class RunContext:
+    # fmt: off
     algorithm          = _RunCtxField[Algorithm]()
     df_loader          = _RunCtxField[Callable[[], DataFrame]]()
     partitioner        = _RunCtxField[Partitioner]()
@@ -73,6 +70,7 @@ class RunContext:
     aggregated_state   = _RunCtxField[Update]()
     aggregated_metrics = _RunCtxField[Mapping[str, float]]()
     synthetic_df       = _RunCtxField[DataFrame]()
+    # fmt: on
 
     def __init__(self, run_id: str, config: Config, eventbus: EventBus) -> None:
         self._run_id = run_id

@@ -28,10 +28,10 @@ from fedbench.registries import (
     build_partitioner_registry,
 )
 from fedbench.resolver import (
-    resolve_df_loader,
     resolve_algorithm,
-    resolve_partitioner,
+    resolve_df_loader,
     resolve_evaluators,
+    resolve_partitioner,
 )
 
 
