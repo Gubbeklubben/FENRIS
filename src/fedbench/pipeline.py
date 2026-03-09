@@ -11,26 +11,38 @@ from fedbench.registries import (
     build_evaluator_registries,
     build_partitioner_registry,
 )
-from fedbench.resolver import resolve_components as _resolve_components
+from fedbench.resolver import (
+    resolve_df_loader,
+    resolve_algorithm,
+    resolve_partitioner,
+    resolve_evaluators,
+)
 
 
 def resolve_components(ctx: RunContext) -> None:
-    components = _resolve_components(
+    ctx.df_loader = resolve_df_loader(ctx.config)
+
+    ctx.algorithm = resolve_algorithm(
         ctx.config,
         build_algorithm_registry(),
+    )
+    ctx.partitioner = resolve_partitioner(
+        ctx.config,
         build_partitioner_registry(),
+    )
+    ctx.eval_suite = resolve_evaluators(
+        ctx.config,
         build_evaluator_registries(),
     )
-    ctx.components = components
 
 
 def load_dataset(ctx: RunContext) -> None:
-    df = ctx.components.df_loader()
+    df = ctx.df_loader()
     schema = _infer_schema(df)
     ctx.dataset = PartitionedDataset(
         df,
         schema,
-        ctx.components.partitioner,
+        ctx.partitioner,
         ctx.config.test_size,
         ctx.config.seed,
     )
@@ -38,7 +50,6 @@ def load_dataset(ctx: RunContext) -> None:
 
 def federated_train_eval_loop(ctx: RunContext) -> None:
     from flwr.simulation import run_simulation
-
     from fedbench.flwr import client_app, make_server_app
 
     run_simulation(
@@ -49,7 +60,7 @@ def federated_train_eval_loop(ctx: RunContext) -> None:
 
 
 def global_sample(ctx: RunContext) -> None:
-    synthesizer = ctx.components.algorithm.create_synthesizer()
+    synthesizer = ctx.algorithm.create_synthesizer()
     ctx.synthetic_df = synthesizer.sample(
         ctx.aggregated_state,
         ctx.config.num_synthetic_rows or 1,
