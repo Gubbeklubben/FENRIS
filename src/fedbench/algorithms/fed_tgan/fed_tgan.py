@@ -21,8 +21,15 @@ _some_state = {
 
 
 def init_model(cfg: dict[str, Any]) -> tuple[Generator, Discriminator]:
-    # Initialize generator and discriminator with provided config dict after these are implemented
-    return
+    generator = Generator(
+        latent_dim=cfg["latent_dim"],
+        output_dim=cfg["output_dim"]
+    )
+    discriminator = Discriminator(
+        input_dim=cfg["input_dim"]
+    )
+
+    return generator, discriminator
 
 
 class FedTGAN(Algorithm):
