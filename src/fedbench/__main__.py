@@ -1,4 +1,4 @@
-from typing import Annotated, Literal
+from typing import Annotated, Literal, Optional
 
 import typer
 
@@ -8,11 +8,14 @@ from fedbench.pipeline import pipeline
 from fedbench.registries import (
     build_algorithm_registry,
     build_partitioner_registry,
+    build_evaluator_registries,
+    Component,
 )
 from fedbench.util.parsing import split_outside_brackets
 
 algorithms = build_algorithm_registry()
 partitioners = build_partitioner_registry()
+evaluators = build_evaluator_registries()
 
 app = typer.Typer()
 
@@ -41,42 +44,58 @@ def new(name: str) -> None:
 
 
 @app.command()
-def list_algorithms(
-    include_locator: Annotated[
+def show(
+    components: Annotated[
+        Optional[list[Component]],
+        typer.Argument(
+            help="Components to show. If omitted, all components are shown.",
+        ),
+    ] = None,
+    include_locators: Annotated[
         bool,
         typer.Option(
             "--include-locators",
-            help="Show locators for the factories used to create algorithm instances.",
+            help="Show locators for the factories used to create instances.",
         ),
     ] = False,
 ) -> None:
     """
-    List available algorithms.
+    Show available algorithms, partitioners, and/or evaluators.
+
+    Examples:\n
+      fedbench show\n
+      fedbench show algorithms\n
+      fedbench show algorithms partitioners --include-locators
     """
+    selected = components if components else list(Component)
 
-    for metadata in algorithms.metadata():
-        print(metadata.name, end="")
-        print(f": {metadata.locator}" if include_locator else "")
+    if Component.algorithms in selected:
+        items = list(algorithms.metadata())
+        width = max(len(m.name) for m in items)
+        print("\n--- ALGORITHMS ---")
+        for metadata in algorithms.metadata():
+            print(f"  {metadata.name.ljust(width)}", end="")
+            print(f"  {metadata.locator}" if include_locators else "")
 
+    if Component.partitioners in selected:
+        items = list(partitioners.metadata())
+        width = max(len(m.name) for m in items)
+        print("\n--- PARTITIONERS ---")
+        for metadata in partitioners.metadata():
+            print(f"  {metadata.name.ljust(width)}", end="")
+            print(f"  {metadata.locator}" if include_locators else "")
 
-@app.command()
-def list_partitioners(
-    include_locator: Annotated[
-        bool,
-        typer.Option(
-            "--include-locators",
-            help="Show locators for the factories used to create "
-            "partitioner instances.",
-        ),
-    ] = False,
-) -> None:
-    """
-    List available partitioners.
-    """
-
-    for metadata in partitioners.metadata():
-        print(metadata.name, end="")
-        print(f": {metadata.locator}" if include_locator else "")
+    if Component.evaluators in selected:
+        for category, registry in evaluators.items():
+            print(f"\n--- EVALUATORS: {category.upper()} ---")
+            registered_items = list(registry.metadata())
+            if not registered_items:
+                print("  (No evaluators registered)")
+                continue
+            width = max(len(m.name) for m in registered_items)
+            for metadata in registered_items:
+                print(f"  {metadata.name.ljust(width)}", end="")
+                print(f"  {metadata.locator}" if include_locators else "")
 
 
 @app.command()
