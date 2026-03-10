@@ -29,32 +29,36 @@ class FedTGAN(Algorithm):
     def __init__(
             self,
             batch_size: int = 32,
+            max_batches: int = 100,
             learning_rate: float = 1e-2,
             fraction_evaluate: float = 0.5,
             num_server_rounds: int = 3,
             local_epochs: int = 3,
+            latent_dim: int = 64,
         ):
 
-        # TODO error handling, in the same vein as below:
+        # TODO basic validation, in the same vein as below:
         if learning_rate <= 0 or learning_rate > 0.1:
             raise ValueError("Expecting 0 < learning_rate <= 0.1")
 
         self._cfg = {
             "batch-size": batch_size,
+            "max-batches": max_batches,
             "learning-rate": learning_rate,
             "fraction-evaluate": fraction_evaluate,
             "num-server-rounds": num_server_rounds,
             "local-epochs": local_epochs,
+            "latent-dim": latent_dim,
             "device": torch.device(
                 "cuda" if torch.cuda.is_available() else "cpu"
             ),
         }
 
-    def create_aggregator(cls) -> Aggregator:
-        return FedTGANAggregator(cls._cfg)
+    def create_aggregator(self) -> Aggregator:
+        return FedTGANAggregator(self._cfg)
 
-    def create_synthesizer(cls) -> Synthesizer:
-        return FedTGANSynthesizer(cls._cfg)
+    def create_synthesizer(self) -> Synthesizer:
+        return FedTGANSynthesizer(self._cfg)
 
 
 class FedTGANAggregator(Aggregator):
