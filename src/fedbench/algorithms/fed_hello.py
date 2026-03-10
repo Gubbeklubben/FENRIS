@@ -7,29 +7,28 @@ from numpy.typing import NDArray
 
 from fedbench.core.algorithm import (
     Algorithm,
-    Coordinator,
-    SingleStepCoordinator,
-    Synthesizer,
-)
+    Coordinator, SingleStepCoordinator,
+    Synthesizer, ComponentSpec, coordinator_spec, synthesizer_spec, )
 from fedbench.core.data import TableSchema
 from fedbench.core.logger import log_info
+from fedbench.core.types import Extras
 from fedbench.core.update import Update
 
 
-class FedHello(Algorithm):
-    def __init__(self, name: str = "Stranger") -> None:
-        self._name = name
-
-    def create_coordinator(self) -> Coordinator:
-        return FedHelloCoordinator(self._name)
-
-    def create_synthesizer(self) -> Synthesizer:
-        return FedHelloSynthesizer(self._name)
-
-
 class FedHelloCoordinator(SingleStepCoordinator):
-    def __init__(self, name: str) -> None:
-        self._name = name
+    def __init__(
+        self,
+        config: Extras | None,
+        artifacts: Update | None,
+    ) -> None:
+
+        super().__init__(None, artifacts)
+        if config is not None:
+            # noinspection PyUnnecessaryCast
+            self._name: str = cast(str, config["name"])
+        else:
+            raise ValueError(f"{self}: Bad framework forgot my config!")
+
         self._state: list[NDArray[np.int_]] | None = None
         self._df: pd.DataFrame | None = None
 
@@ -72,8 +71,19 @@ class FedHelloCoordinator(SingleStepCoordinator):
 
 
 class FedHelloSynthesizer(Synthesizer):
-    def __init__(self, name: str) -> None:
-        self._name = name
+    def __init__(
+        self,
+        config: Extras | None,
+        artifacts: Update | None,
+        client_cache: Update | None = None
+    ) -> None:
+
+        super().__init__(None, artifacts, client_cache)
+        if config is not None:
+            # noinspection PyUnnecessaryCast
+            self._name: str = cast(str, config["name"])
+        else:
+            raise ValueError(f"{self}: Bad framework forgot my config!")
 
     def train(
         self,
@@ -97,3 +107,19 @@ class FedHelloSynthesizer(Synthesizer):
             return cast(pd.DataFrame, request.objects["objects"]["df"])[:num_rows]
         except IndexError:
             return cast(pd.DataFrame, request.objects["objects"]["df"])
+
+
+class FedHello(Algorithm):
+    """Say a federated hello."""
+
+    def __init__(self, name: str = "Stranger") -> None:
+        self._name = name
+
+    @property
+    def coordinator_spec(self) -> ComponentSpec[Coordinator]:
+        return coordinator_spec(FedHelloCoordinator, {"name": self._name})
+
+    @property
+    def synthesizer_spec(self) -> ComponentSpec[Synthesizer]:
+        return synthesizer_spec(FedHelloSynthesizer, {"name":  self._name})
+

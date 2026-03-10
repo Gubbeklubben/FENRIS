@@ -1,29 +1,28 @@
 from abc import ABC, abstractmethod
 from collections.abc import Generator, Iterable
+from dataclasses import dataclass
 
 from pandas import DataFrame
 
 from fedbench.core.data import TableSchema
+from fedbench.core.types import Extras
 from fedbench.core.update import Update
 
 
 class Coordinator(ABC):
     """Server side algorithm component."""
 
+    def __init__(
+        self,
+        config: Extras | None,
+        artifacts: Update | None,
+    ) -> None:
+        self._config = config
+        self._artifacts = artifacts
+
     def __repr__(self) -> str:
         return f"<{self.__class__.__name__}>"
 
-    @property
-    def arrays_to_ml_framework_map(self) -> dict[str, str] | None:
-        return None
-
-    # We could choose to return global state from aggregate hooks.
-    # However, the contract is: The returned Update contains the
-    # current global state, one way or the other, such that the framework
-    # can feed it into Synthesizer.sample and expect it to sample
-    # using whatever the current global state is.
-    # Therefore, I prefer to let the coordinator keep this state,
-    # and ask for it when needed.
     @property
     def global_state(self) -> Update | None:
         return None
@@ -111,12 +110,18 @@ class SingleStepCoordinator(Coordinator):
 class Synthesizer(ABC):
     """The framework view of the model to train and sample from."""
 
+    def __init__(
+        self,
+        config: Extras | None,
+        artifacts: Update | None,
+        client_cache: Update | None = None,
+    ) -> None:
+        self._config = config
+        self._artifacts = artifacts
+        self._client_cache = client_cache
+
     def __repr__(self) -> str:
         return f"<{self.__class__.__name__}>"
-
-    @property
-    def arrays_to_ml_framework_map(self) -> dict[str, str] | None:
-        return None
 
     # noinspection PyMethodMayBeStatic,PyUnusedLocal
     def fed_init(
@@ -146,16 +151,83 @@ class Synthesizer(ABC):
         pass
 
 
+@dataclass(frozen=True)
+class ComponentSpec[T]:
+    cls: type[T]  # Or a factory if we want to be more flexible...
+    config: Extras | None = None
+    arrays_to_ml_framework_map: dict[str, str] | None = None
+
+
+def coordinator_spec(
+    cls: type[Coordinator],
+    config: Extras | None = None,
+    arrays_to_ml_framework_map: dict[str, str] | None = None,
+) -> ComponentSpec[Coordinator]:
+
+    return ComponentSpec[Coordinator](cls, config, arrays_to_ml_framework_map)
+
+
+def synthesizer_spec(
+    cls: type[Synthesizer],
+    config: Extras | None = None,
+    arrays_to_ml_framework_map: dict[str, str] | None = None,
+) -> ComponentSpec[Synthesizer]:
+
+    return ComponentSpec[Synthesizer](cls, config, arrays_to_ml_framework_map)
+
+
+def create_synthesizer(
+    spec: ComponentSpec[Synthesizer],
+    artifacts: Update | None,
+    client_cache: Update | None,
+) -> Synthesizer:
+
+    instance = spec.cls(spec.config, artifacts, client_cache)
+    if not isinstance(instance, Synthesizer):
+        raise TypeError(f"{instance} is not a Synthesizer.")
+    return instance
+
+
+def create_coordinator(
+    spec: ComponentSpec[Coordinator],
+    artifacts: Update | None,
+) -> Coordinator:
+
+    instance =  spec.cls(spec.config, artifacts)
+    if not isinstance(instance, Coordinator):
+        raise TypeError(f"{instance} is not a Coordinator.")
+    return instance
+
+
+@dataclass(frozen=True)
+class Artifacts:
+    coordinator: Update | None = None
+    synthesizer: Update | None = None
+
+
 class Algorithm(ABC):
     """Algorithm entry point."""
 
     def __repr__(self) -> str:
         return f"<{self.__class__.__name__}>"
 
+    @property
     @abstractmethod
-    def create_coordinator(self) -> Coordinator:
+    def coordinator_spec(self) -> ComponentSpec[Coordinator]:
         pass
 
+    @property
     @abstractmethod
-    def create_synthesizer(self) -> Synthesizer:
+    def synthesizer_spec(self) -> ComponentSpec[Synthesizer]:
         pass
+
+    # noinspection PyMethodMayBeStatic,PyUnusedLocal
+    def global_init(
+        self,
+        seed: int,
+        schema: TableSchema,
+        dataset: DataFrame,
+    ) -> Artifacts | None:
+        """Do algorithm specific preprocessing on the full dataset."""
+
+        return None

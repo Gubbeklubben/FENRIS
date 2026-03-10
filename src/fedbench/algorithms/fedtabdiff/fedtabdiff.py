@@ -1,4 +1,5 @@
-from collections.abc import Iterable
+import functools
+from collections.abc import Iterable, Callable
 from typing import Any, Iterator, Literal, cast
 
 import numpy as np
@@ -11,14 +12,14 @@ from torch.utils.data import DataLoader, TensorDataset
 
 from fedbench.core.algorithm import (
     Algorithm,
-    Coordinator,
     SingleStepCoordinator,
-    Synthesizer,
+    Synthesizer, ComponentSpec, Coordinator, synthesizer_spec, coordinator_spec,
+    Artifacts,
 )
 from fedbench.core.data import TableSchema
 from fedbench.core.logger import ELBOW, TEE, log_debug, log_info, log_warning
-from fedbench.core.update import Extras, Objects, Update
-
+from fedbench.core.types import Extras, Objects
+from fedbench.core.update import Update
 # Relative imports for algorithm specifics.
 from .diffuser import Diffuser
 from .mlpsynth import MLPSynthesizer
@@ -183,86 +184,19 @@ def decode_samples(
     return sample_decoded
 
 
-class FedTabDiff(Algorithm):
+class FedTabDiffCoordinator(SingleStepCoordinator):
     def __init__(
         self,
-        batch_size: int = 128,
-        max_batches: int = 10,
-        n_cat_emb: int = 2,
-        learning_rate: float = 1e-4,
-        mlp_layers: list[int] | None = None,
-        activation: str = "lrelu",
-        diffusion_steps: int = 500,
-        diffusion_beta_start: float = 1e-4,
-        diffusion_beta_end: float = 0.02,
-        scheduler: Literal["linear", "quad"] = "linear",
-    ):
+        config: Extras | None,
+        artifacts: Update | None,
+    ) -> None:
 
-        # Validation apparently not done by mlp_synth/diffuser components.
-        # Note: AI used to suggest appropriate ranges for hard fail. There
-        # are values well within ranges that might still make the algorithm
-        # blow up.
-        if n_cat_emb < 1:
-            raise ValueError("Expecting n_cat_emb >= 1.")
-
-        if learning_rate <= 0 or learning_rate > 0.1:
-            raise ValueError("Expecting 0 < learning_rate <= 0.1")
-
-        if mlp_layers is None:
-            mlp_layers = [512, 512]
-
-        if not mlp_layers:
-            raise ValueError("Expecting non-empty mlp_layers.")
-
-        for value in mlp_layers:
-            if not isinstance(value, int):
-                raise ValueError("Expecting int sequence mlp_layers.")
-
-        if diffusion_steps < 1:
-            raise ValueError("Expecting diffusion_steps >= 1.")
-
-        if diffusion_beta_start <= 0:
-            raise ValueError("Expecting diffusion_beta_start > 0.")
-
-        if diffusion_beta_end >= 1:
-            raise ValueError("Expecting diffusion_beta_end < 1.")
-
-        if diffusion_beta_start >= diffusion_beta_end:
-            raise ValueError("Expecting diffusion_beta_start < diffusion_beta_end")
-
-        self._cfg = {
-            "batch-size": batch_size,
-            "max-batches": max_batches,
-            "n-cat-emb": n_cat_emb,
-            "learning-rate": learning_rate,
-            "mlp-layers": mlp_layers,
-            "activation": activation,
-            "diffusion-steps": diffusion_steps,
-            "diffusion-beta-start": diffusion_beta_start,
-            "diffusion-beta-end": diffusion_beta_end,
-            "scheduler": scheduler,
-            "device": torch.device("cuda" if torch.cuda.is_available() else "cpu"),
-        }
-
-    def create_coordinator(self) -> Coordinator:
-        return FedTabDiffCoordinator(self._cfg)
-
-    def create_synthesizer(self) -> Synthesizer:
-        return FedTabDiffSynthesizer(self._cfg)
-
-
-class FedTabDiffCoordinator(SingleStepCoordinator):
-    def __init__(self, cfg: dict[str, Any]) -> None:
-        self._cfg: dict[str, Any] = cfg
+        super().__init__(config, artifacts)
         self._cat_attrs: list[str] | None = None
         self._num_attrs: list[str] | None = None
         self._client_preproc_objects: Objects | None = None
         self._client_preproc_extras: Extras | None = None
         self._state: dict[str, Tensor] | None = None
-
-    @property
-    def arrays_to_ml_framework_map(self) -> dict[str, str] | None:
-        return {"arrays": "torch"}
 
     @property
     def global_state(self) -> Update | None:
@@ -334,13 +268,13 @@ class FedTabDiffCoordinator(SingleStepCoordinator):
             "cat-attrs": cat_attrs,
             "num-attrs": num_attrs,
             "n-cat-tokens": len(vocab_classes),
-            "cat-dim": self._cfg["n-cat-emb"] * len(cat_attrs),
-            "encoded-dim": self._cfg["n-cat-emb"] * len(cat_attrs) + len(num_attrs),
+            "cat-dim": self._config["n-cat-emb"] * len(cat_attrs),
+            "encoded-dim": self._config["n-cat-emb"] * len(cat_attrs) + len(num_attrs),
         }
         self._client_preproc_extras = extras
 
         preproc = self._client_preproc_objects | self._client_preproc_extras
-        mlp_synth, _ = init_model(self._cfg | preproc)
+        mlp_synth, _ = init_model(self._config | preproc)
         self._state = mlp_synth.state_dict()
 
     def aggregate_train(self, replies: Iterable[tuple[int, Update]]) -> None:
@@ -390,15 +324,45 @@ class FedTabDiffCoordinator(SingleStepCoordinator):
         )
 
 
-class FedTabDiffSynthesizer(Synthesizer):
-    @property
-    def arrays_to_ml_framework_map(self) -> dict[str, str] | None:
-        return {"arrays": "torch"}
+def make_mlp_synth_factory(
+    config: Extras,
+    artifacts: Update
+) -> Callable[[], MLPSynthesizer]:
 
-    def __init__(self, cfg: dict[str, Any]) -> None:
-        self._cfg = cfg
-        self._max_batches = cfg["max-batches"]
-        self._device = cfg["device"]
+    return functools.partial(
+        MLPSynthesizer,
+        d_in=artifacts.extras["encoded-dim"],
+        hidden_layers=config["mlp-layers"],
+        activation=config["activation"],
+        n_cat_tokens=artifacts.extras["n-cat-tokens"],
+        n_cat_emb=config["n-cat-emb"],
+        n_classes=None,
+        embedding_learned=False,
+    )
+
+
+def make_diffuser_factory(config: Extras) -> Callable[[torch.device], Diffuser]:
+    return functools.partial(
+        Diffuser,
+        total_steps=config["diffusion-steps"],
+        beta_start=config["diffusion-beta-start"],
+        beta_end=config["diffusion-beta-end"],
+        scheduler=config["scheduler"],
+    )
+
+
+class FedTabDiffSynthesizer(Synthesizer):
+    def __init__(
+        self,
+        config: Extras | None,
+        artifacts: Update | None,
+        client_cache: Update | None
+    ) -> None:
+
+        super().__init__(config, artifacts, client_cache)
+        self._device = torch.device(
+            "cuda" if torch.cuda.is_available() else "cpu"
+        )
 
     def fed_init(
         self,
@@ -449,12 +413,12 @@ class FedTabDiffSynthesizer(Synthesizer):
         arrays = request.arrays["arrays"]
         preproc = request.objects["preproc-objects"] | request.extras["preproc-extras"]
 
-        mlp_synth, diffuser = init_model(self._cfg | preproc)
+        mlp_synth, diffuser = init_model(self._config | preproc)
         mlp_synth.load_state_dict(arrays)
         # set_parameters(mlp_synth, arrays)
         optimizer = optim.Adam(
             filter(lambda p: p.requires_grad, mlp_synth.parameters()),
-            lr=self._cfg["learning-rate"],
+            lr=self._config["learning-rate"],
         )
 
         # init loss function
@@ -475,7 +439,7 @@ class FedTabDiffSynthesizer(Synthesizer):
             torch.tensor(num_scaled, dtype=torch.float),
         )
         torch_loader = DataLoader(
-            tensor_dataset, batch_size=self._cfg["batch-size"], shuffle=True
+            tensor_dataset, batch_size=self._config["batch-size"], shuffle=True
         )
 
         # Adapt unsupervised fedbench training to orig alg loop
@@ -553,7 +517,7 @@ class FedTabDiffSynthesizer(Synthesizer):
         arrays = request.arrays["arrays"]
         preproc = request.objects["preproc-objects"] | request.extras["preproc-extras"]
 
-        mlp_synth, diffuser = init_model(self._cfg | preproc)
+        mlp_synth, diffuser = init_model(self._config | preproc)
         mlp_synth.load_state_dict(arrays)
         mlp_synth.to(self._device)
 
@@ -561,7 +525,7 @@ class FedTabDiffSynthesizer(Synthesizer):
             mlp_synth,
             diffuser,
             encoded_dim=preproc["encoded-dim"],
-            last_diff_step=self._cfg["diffusion-steps"],
+            last_diff_step=self._config["diffusion-steps"],
             n_samples=num_rows,
             label=None,
         )
@@ -569,7 +533,7 @@ class FedTabDiffSynthesizer(Synthesizer):
         return decode_samples(
             tensor,
             cat_dim=preproc["cat-dim"],
-            n_cat_emb=self._cfg["n-cat-emb"],
+            n_cat_emb=self._config["n-cat-emb"],
             num_attrs=preproc["num-attrs"],
             cat_attrs=preproc["cat-attrs"],
             num_scaler=preproc["num-scaler"],
@@ -577,3 +541,81 @@ class FedTabDiffSynthesizer(Synthesizer):
             label_encoder=preproc["label-encoder"],
             embeddings=mlp_synth.get_embeddings(),
         )
+
+
+class FedTabDiff(Algorithm):
+    def __init__(
+        self,
+        batch_size: int = 128,
+        max_batches: int = 10,
+        n_cat_emb: int = 2,
+        learning_rate: float = 1e-4,
+        mlp_layers: list[int] | None = None,
+        activation: str = "lrelu",
+        diffusion_steps: int = 500,
+        diffusion_beta_start: float = 1e-4,
+        diffusion_beta_end: float = 0.02,
+        scheduler: Literal["linear", "quad"] = "linear",
+    ):
+
+        # Validation apparently not done by mlp_synth/diffuser components.
+        # Note: AI used to suggest appropriate ranges for hard fail. There
+        # are values well within ranges that might still make the algorithm
+        # blow up.
+        if n_cat_emb < 1:
+            raise ValueError("Expecting n_cat_emb >= 1.")
+
+        if learning_rate <= 0 or learning_rate > 0.1:
+            raise ValueError("Expecting 0 < learning_rate <= 0.1")
+
+        if mlp_layers is None:
+            mlp_layers = [512, 512]
+
+        if not mlp_layers:
+            raise ValueError("Expecting non-empty mlp_layers.")
+
+        for value in mlp_layers:
+            if not isinstance(value, int):
+                raise ValueError("Expecting int sequence mlp_layers.")
+
+        if diffusion_steps < 1:
+            raise ValueError("Expecting diffusion_steps >= 1.")
+
+        if diffusion_beta_start <= 0:
+            raise ValueError("Expecting diffusion_beta_start > 0.")
+
+        if diffusion_beta_end >= 1:
+            raise ValueError("Expecting diffusion_beta_end < 1.")
+
+        if diffusion_beta_start >= diffusion_beta_end:
+            raise ValueError("Expecting diffusion_beta_start < diffusion_beta_end")
+
+        self._config = {
+            "batch-size": batch_size,
+            "max-batches": max_batches,
+            "n-cat-emb": n_cat_emb,
+            "learning-rate": learning_rate,
+            "mlp-layers": mlp_layers,
+            "activation": activation,
+            "diffusion-steps": diffusion_steps,
+            "diffusion-beta-start": diffusion_beta_start,
+            "diffusion-beta-end": diffusion_beta_end,
+            "scheduler": scheduler,
+        }
+
+    @property
+    def coordinator_spec(self) -> ComponentSpec[Coordinator]:
+        return coordinator_spec(FedTabDiffCoordinator, self._config)
+
+    @property
+    def synthesizer_spec(self) -> ComponentSpec[Synthesizer]:
+        return synthesizer_spec(FedTabDiffSynthesizer, self._config)
+
+    def global_init(
+        self,
+        seed: int,
+        schema: TableSchema,
+        dataset: DataFrame
+    ) -> Artifacts | None:
+        pass
+

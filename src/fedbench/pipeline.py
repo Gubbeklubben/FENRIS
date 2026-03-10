@@ -3,6 +3,7 @@ import math
 from collections.abc import Iterable
 from pathlib import Path
 
+from fedbench.core.algorithm import create_synthesizer, Artifacts
 from fedbench.core.data import PartitionedDataset
 from fedbench.core.data.schemas import infer_schema as _infer_schema
 from fedbench.core.eval import CentralizedEvalContext
@@ -51,6 +52,18 @@ def load_dataset(ctx: RunContext) -> None:
     )
 
 
+def global_init(ctx: RunContext) -> None:
+    artifacts: Artifacts | None = ctx.algorithm.global_init(
+        ctx.config.seed,
+        ctx.dataset.schema,
+        ctx.dataset.df
+    )
+    if artifacts is not None:
+        ctx.algorithm_artifacts = artifacts
+    else:
+        ctx.algorithm_artifacts = Artifacts(None, None)
+
+
 def federated_train_eval_loop(ctx: RunContext) -> None:
     from flwr.simulation import run_simulation
 
@@ -68,7 +81,11 @@ def aggregate_per_client_metrics(ctx: RunContext) -> None:
 
 
 def global_sample(ctx: RunContext) -> None:
-    synthesizer = ctx.algorithm.create_synthesizer()
+    synthesizer = create_synthesizer(
+        spec=ctx.algorithm.synthesizer_spec,
+        artifacts=ctx.algorithm_artifacts.synthesizer,
+        client_cache=None
+    )
     ctx.synthetic_df = synthesizer.sample(
         ctx.aggregated_state,
         ctx.config.num_synthetic_rows or 1000,
@@ -115,6 +132,7 @@ def write_artifacts(ctx: RunContext) -> None:
 def pipeline() -> Iterable[Command]:
     yield resolve_components
     yield load_dataset
+    yield global_init
     yield federated_train_eval_loop
     yield aggregate_per_client_metrics
     yield global_sample
