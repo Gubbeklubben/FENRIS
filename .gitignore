@@ -206,5 +206,15 @@ marimo/_static/
 marimo/_lsp/
 __marimo__/
 
-# .idea
-/.idea/
+# idea files
+.idea/
+
+# Artifacts
+out/
+
+# vscode files
+.vscode/
+
+# helper docs
+docs/
+

@@ -1,3 +1,11 @@
+"""
+Plugin-aware factory registry.
+
+Provides :class:`FactoryRegistry`, a generic registry that maps string
+keys to callables (factories) and supports both built-in registrations
+and third-party plugins discovered via Python package entry points.
+"""
+
 import importlib
 import inspect
 import keyword
@@ -20,7 +28,7 @@ class FactoryRegistry[T]:
         self._group = group
 
         if not isinstance(product_cls, type):
-            raise TypeError(f"product_cls must be a type.")
+            raise TypeError("product_cls must be a type.")
         self._product_cls = product_cls
 
         self._builtins: dict[str, str] = {}
@@ -30,14 +38,16 @@ class FactoryRegistry[T]:
             if ep.name in self._plugins:
                 log_warning(
                     str(self),
-                    f"Ignoring duplicate plugin '{ep.name}' from '{ep.value}'"
+                    f"Ignoring duplicate plugin '{ep.name}' from '{ep.value}'",
                 )
             else:
                 self._plugins[ep.name] = ep
 
     def __repr__(self) -> str:
-        return (f"{self.__class__.__name__}(group={self.group}, "
-                f"product_cls={self._product_cls})")
+        return (
+            f"{self.__class__.__name__}(group={self.group}, "
+            f"product_cls={self._product_cls})"
+        )
 
     def __iter__(self) -> Iterator[str]:
         yield from self._builtins.keys()

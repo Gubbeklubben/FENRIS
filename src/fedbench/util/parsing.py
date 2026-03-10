@@ -1,7 +1,7 @@
 import inspect
 import re
 from types import UnionType
-from typing import get_origin, Any, get_args, Callable, Union, Literal
+from typing import Any, Callable, Literal, Union, get_args, get_origin
 
 
 def split_outside_brackets(s: str) -> list[str]:
@@ -14,22 +14,22 @@ def split_outside_brackets(s: str) -> list[str]:
     depth_brack = 0
 
     for ch in s:
-        if ch == '(':
+        if ch == "(":
             depth_paren += 1
-        elif ch == ')':
+        elif ch == ")":
             depth_paren -= 1
-        elif ch == '[':
+        elif ch == "[":
             depth_brack += 1
-        elif ch == ']':
+        elif ch == "]":
             depth_brack -= 1
 
-        if ch == ',' and depth_paren == 0 and depth_brack == 0:
-            result.append(''.join(current).strip())
+        if ch == "," and depth_paren == 0 and depth_brack == 0:
+            result.append("".join(current).strip())
             current = []
         else:
             current.append(ch)
 
-    result.append(''.join(current).strip())
+    result.append("".join(current).strip())
     return result
 
 
@@ -91,9 +91,7 @@ def coerce(value: str, annotation: Any) -> Any:
             if coerced == lit:
                 return lit
 
-        raise TypeError(
-            f"Expected one of {literals}, got {value!r}"
-        )
+        raise TypeError(f"Expected one of {literals}, got {value!r}")
 
     # Fallback: call the type directly
     return annotation(value)
@@ -106,14 +104,19 @@ def is_optional(annotation: Any) -> bool:
     return False
 
 
-def parse_for_function(func: Callable[..., Any], raw: dict[str, str]) -> dict[str, Any]:
+def parse_for_function(
+    func: Callable[..., Any],
+    raw: dict[str, str],
+) -> dict[str, Any]:
     sig = inspect.signature(func)
     params = sig.parameters
 
     # Reject unknown parameters
     unknown = set(raw) - set(params)
     if unknown:
-        raise TypeError(f"Unknown parameters for {func.__name__}: {', '.join(sorted(unknown))}")
+        raise TypeError(
+            f"Unknown parameters for {func.__name__}: {', '.join(sorted(unknown))}"
+        )
 
     # Parse and validate required params
     parsed = {}
@@ -125,10 +128,12 @@ def parse_for_function(func: Callable[..., Any], raw: dict[str, str]) -> dict[st
             parsed[name] = coerce(raw[name], param.annotation)
         else:
             if not optional:
-                raise TypeError(f"Missing required parameter for {func.__name__}: {name}")
+                raise TypeError(
+                    f"Missing required parameter for {func.__name__}: {name}"
+                )
 
     return parsed
 
 
 def to_snake_case(text: str) -> str:
-    return re.sub(r'[^a-z_]+', '_', text.lower())
+    return re.sub(r"[^a-z_]+", "_", text.lower())

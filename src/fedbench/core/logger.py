@@ -31,7 +31,7 @@ class ColoredStreamHandler(logging.StreamHandler):  # type: ignore[type-arg]
         seperator = " " * (8 - len(record.levelname))
         log_fmt = (
             f"{LOG_COLORS[record.levelname]}"
-            f"%(levelname)s %(asctime)s{LOG_COLORS["RESET"]}"
+            f"%(levelname)s %(asctime)s{LOG_COLORS['RESET']}"
             f": {seperator} %(message)s"
         )
         formatter = logging.Formatter(log_fmt)
@@ -48,10 +48,11 @@ logger.addHandler(handler)
 
 
 def log(
-        source: str,
-        message: str,
-        level: int = logging.INFO,
-        **kwargs: Any) -> None:
+    source: str,
+    message: str,
+    level: int = logging.INFO,
+    **kwargs: Any,
+) -> None:
 
     msg = f"{source}: {message}" if source else message
     logger.log(level, msg, **kwargs)
@@ -68,6 +69,7 @@ pformat = functools.partial(pformat, indent=2, width=70, compact=True)
 P = ParamSpec("P")
 R = TypeVar("R")
 
+
 def debug_calls(modulename: str) -> Callable[[Callable[P, R]], Callable[P, R]]:
     def decorator(func: Callable[P, R]) -> Callable[P, R]:
         @functools.wraps(func)
@@ -79,5 +81,7 @@ def debug_calls(modulename: str) -> Callable[[Callable[P, R]], Callable[P, R]]:
             log_debug("", f"\t{ELBOW} return value: {pformat(ret)}")
             log_debug("", "")
             return ret
+
         return wrapper
+
     return decorator

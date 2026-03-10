@@ -1,3 +1,13 @@
+"""
+Fairness evaluators.
+
+Measures whether the synthetic data preserves the fairness properties of
+the real training data. Fairness is assessed via a TSTR-style binary
+classifier whose predictions are stratified by a protected (sensitive)
+attribute. Reports demographic parity, equal opportunity, and equalized
+odds differences across groups.
+"""
+
 from __future__ import annotations
 
 import math
@@ -12,15 +22,15 @@ from fedbench.util.parsing import to_snake_case
 
 
 def _per_group_confusion(
-        y_true: np.ndarray,
-        y_pred: np.ndarray,
-        sensitive: np.ndarray,
-        min_group_size: int = 30,
+    y_true: np.ndarray,
+    y_pred: np.ndarray,
+    sensitive: np.ndarray,
+    min_group_size: int = 30,
 ) -> dict[str, dict[str, int]]:
     """Return per-group TP/FP/TN/FN counts, skipping small groups."""
     out: dict[str, dict[str, int]] = {}
     for g in pd.unique(pd.Series(sensitive)):
-        mask = (sensitive == g)
+        mask = sensitive == g
         if int(mask.sum()) < min_group_size:
             continue
         yt = y_true[mask]
@@ -36,15 +46,28 @@ def _per_group_confusion(
 
 
 def _fairness_metrics_from_counts(
-        group_counts: dict[str, dict[str, int]],
+    group_counts: dict[str, dict[str, int]],
 ) -> tuple[float, float, float]:
-    """
-    Compute the three fairness metrics from per-group confusion counts.
+    """Compute the three fairness metrics from per-group confusion counts.
 
-    Definitions (max – min across groups, NaN groups ignored):
-      demographic_parity_diff  = max(pos_rate) – min(pos_rate)
-      equal_opportunity_diff   = max(TPR)      – min(TPR)
-      equalized_odds_diff      = max(max(ΔTPR, ΔFPR))
+    Parameters
+    ----------
+    group_counts : dict
+        Mapping from group label (``str``) to a dict with keys
+        ``'tp'``, ``'fp'``, ``'tn'``, ``'fn'``, and ``'n'``.
+
+    Returns
+    -------
+    tuple of float
+        ``(demographic_parity_diff, equalized_odds_diff, equal_opportunity_diff)``.
+
+    Notes
+    -----
+    Metrics are defined as max – min across groups (NaN groups ignored):
+
+    * ``demographic_parity_diff`` = max(pos_rate) – min(pos_rate)
+    * ``equal_opportunity_diff``  = max(TPR) – min(TPR)
+    * ``equalized_odds_diff``     = max(max(Δ TPR, Δ FPR))
     """
     pos_rates, tprs, fprs = [], [], []
 
@@ -87,12 +110,12 @@ def _fairness_metrics_from_counts(
 
 
 def _evaluate_for_sensitive_column(
-        train_df: pd.DataFrame,
-        syn_df: pd.DataFrame,
-        target_column: str,
-        sensitive_column: str,
-        seed: int,
-        min_group_size: int = 30,
+    train_df: pd.DataFrame,
+    syn_df: pd.DataFrame,
+    target_column: str,
+    sensitive_column: str,
+    seed: int,
+    min_group_size: int = 30,
 ) -> tuple[float, float, float]:
 
     nan_result = (math.nan, math.nan, math.nan)
@@ -104,7 +127,8 @@ def _evaluate_for_sensitive_column(
                 return nan_result
 
     feature_columns = [
-        col for col in syn_df.columns
+        col
+        for col in syn_df.columns
         if col not in (sensitive_column, target_column) and col in train_df.columns
     ]
     if not feature_columns:
@@ -159,29 +183,25 @@ def _evaluate_for_sensitive_column(
 
 class FairnessEvaluator(Evaluator):
     """
-    Evaluates whether synthetic data preserves the fairness properties of real data.
+    Evaluate whether synthetic data preserves the fairness properties of real data.
 
-    Strategy
-    --------
-    1. Train a LogisticRegression classifier on the *synthetic* training data
-       (TSTR-style) to predict the task's target column.
-    2. Run inference on the *real* training data.
-    3. Segment predictions by the sensitive attribute and compute per-group
-       TP/FP/TN/FN counts.
-    4. Derive the three benchmark-aligned fairness metrics from those counts.
+    A TSTR-style :class:`~sklearn.linear_model.LogisticRegression` classifier is
+    trained on *synthetic* data, then evaluated on *real* training data.
+    Predictions are segmented by the sensitive attribute to derive per-group
+    confusion matrices and fairness metrics.
 
-    Prerequisites
-    -------------
-    - ``ctx.schema`` must expose ``sensitive_column`` and ``target_column``.
-    - The task must be binary classification (target encoded as 0/1 or bool).
-    - Groups with fewer than ``min_group_size`` samples are excluded from the
-      metric computation to avoid unreliable estimates on tiny strata.
+    Notes
+    -----
+    Requires ``ctx.schema`` to expose ``sensitive_column`` and ``target_column``.
+    The task must be binary classification (target encoded as 0/1 or bool).
+    Groups with fewer than ``min_group_size`` samples are excluded from metric
+    computation to avoid unreliable estimates on tiny strata.
 
-    Output keys
-    -----------
-    - ``fairness.demographic_parity_diff``
-    - ``fairness.equalized_odds_diff``
-    - ``fairness.equal_opportunity_diff``
+    Reports the following output metrics per sensitive column:
+
+    * ``fairness.demographic_parity_diff.<column>``
+    * ``fairness.equalized_odds_diff.<column>``
+    * ``fairness.equal_opportunity_diff.<column>``
     """
 
     def evaluate(self, ctx: EvalContext) -> dict[str, float]:
@@ -197,7 +217,6 @@ class FairnessEvaluator(Evaluator):
         metrics: dict[str, float] = {}
 
         for sensitive_column in ctx.sensitive_columns or []:
-
             dp, eo, eopp = _evaluate_for_sensitive_column(
                 ctx.train_df,
                 ctx.synthetic_df,

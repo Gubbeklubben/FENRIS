@@ -16,9 +16,10 @@ class Partitioner(ABC):
 
     @abstractmethod
     def load_partition(
-            self,
-            partition_id: int,
-            split: Literal["train", "test"],
-            seed: int,
-            test_size: float) -> DataFrame:
+        self,
+        partition_id: int,
+        split: Literal["train", "test"],
+        seed: int,
+        test_size: float,
+    ) -> DataFrame:
         pass

@@ -1,10 +1,18 @@
+"""
+Utility evaluators.
+
+Measures the downstream predictive usefulness of the synthetic data
+using a Train-on-Synthetic / Test-on-Real (TSTR) approach with
+logistic regression (classification) or ridge regression (regression).
+"""
+
 import math
 
 import numpy as np
 from sklearn.linear_model import LogisticRegression, Ridge
-from sklearn.metrics import roc_auc_score, accuracy_score, mean_squared_error
+from sklearn.metrics import accuracy_score, mean_squared_error, roc_auc_score
 
-from fedbench.core.eval import Evaluator, EvalContext
+from fedbench.core.eval import EvalContext, Evaluator
 from fedbench.util.metrics import fit_tabular_model
 
 
@@ -28,11 +36,17 @@ class TSTREvaluator(Evaluator):
         X_test = D_test.drop(columns=[y_col])
         y_test = D_test[y_col]
 
+        if X_syn.empty:
+            return metrics
+
         if ctx.schema.kind_of(y_col) in ["binary", "categorical"]:
+            if y_syn.nunique() < 2:
+                return metrics
+
             model = LogisticRegression(
                 max_iter=1000,
                 solver="lbfgs",
-                random_state=ctx.seed
+                random_state=ctx.seed,
             )
             pipe = fit_tabular_model(X_syn, y_syn, model)
 

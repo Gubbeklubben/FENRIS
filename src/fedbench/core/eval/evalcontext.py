@@ -1,4 +1,5 @@
 from dataclasses import dataclass
+
 import pandas as pd
 
 from fedbench.core.data.schemas import TableSchema

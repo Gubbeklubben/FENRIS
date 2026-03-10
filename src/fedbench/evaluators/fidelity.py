@@ -1,7 +1,15 @@
+"""
+Fidelity evaluators.
+
+Measures how well the statistical properties of the synthetic data match
+those of the training data. Includes moment comparison, distribution
+similarity tests, categorical total-variation distance, and correlation
+matrix comparison.
+"""
+
 from __future__ import annotations
 
 import math
-from abc import ABC
 from typing import Mapping
 
 import numpy as np
@@ -9,73 +17,85 @@ import pandas as pd
 from scipy import stats
 
 from fedbench.core.eval import EvalContext, Evaluator
-from fedbench.util.metrics import get_schema_columns
+from fedbench.util.metrics import get_schema_columns, safe_nanmean, sanitize_numeric_df
 
 
-class MomentReductionMetricsEvaluator(Evaluator, ABC):
+class MomentReductionMetricsEvaluator(Evaluator):
     def evaluate(self, ctx: EvalContext) -> Mapping[str, float]:
+        nan_result = {
+            "mean_abs_diff": math.nan,
+            "std_abs_diff": math.nan,
+        }
+
         numeric_columns, _ = get_schema_columns(ctx)
         if not numeric_columns:
-            return {
-                "mean_abs_diff": math.nan,
-                "std_abs_diff": math.nan,
-            }
+            return nan_result
+
+        r_df = sanitize_numeric_df(ctx.train_df, numeric_columns)
+        s_df = sanitize_numeric_df(ctx.synthetic_df, numeric_columns)
+
+        if r_df.empty or s_df.empty:
+            return nan_result
 
         mean_abs_diff = []
         std_abs_diff = []
 
         for col in numeric_columns:
-            r = pd.to_numeric(ctx.train_df[col], errors="coerce")
-            s = pd.to_numeric(ctx.synthetic_df[col], errors="coerce")
+            r = r_df[col]
+            s = s_df[col]
 
             mean_abs_diff.append(abs(r.mean() - s.mean()))
             std_abs_diff.append(abs(r.std() - s.std()))
 
         return {
-            "mean_abs_diff": float(np.nanmean(mean_abs_diff)),
-            "std_abs_diff": float(np.nanmean(std_abs_diff)),
+            "mean_abs_diff": safe_nanmean(mean_abs_diff),
+            "std_abs_diff": safe_nanmean(std_abs_diff),
         }
 
 
-class DistributionSimilarityMetricsEvaluator(Evaluator, ABC):
+class DistributionSimilarityMetricsEvaluator(Evaluator):
     def evaluate(self, ctx: EvalContext) -> dict[str, float]:
-        metrics = {
+        nan_result = {
             "ks_mean": math.nan,
             "wasserstein_mean": math.nan,
             "t_stat_mean_abs": math.nan,
         }
+
         numeric_columns, _ = get_schema_columns(ctx)
         if not numeric_columns:
-            return metrics
+            return nan_result
+
+        r_df = sanitize_numeric_df(ctx.train_df, numeric_columns)
+        s_df = sanitize_numeric_df(ctx.synthetic_df, numeric_columns)
+
+        if r_df.empty or s_df.empty:
+            return nan_result
 
         ks = []
         wasserstein = []
         t_stats = []
 
         for col in numeric_columns:
-            r = ctx.train_df[col].astype(float).dropna()
-            s = ctx.synthetic_df[col].astype(float).dropna()
+            r = r_df[col]
+            s = s_df[col]
 
             if len(r) == 0 or len(s) == 0:
                 continue
 
             ks_stat, _ = stats.ks_2samp(r, s)
-            ks.append(ks_stat)
+            ks.append(float(ks_stat))
 
             wasserstein_distance = stats.wasserstein_distance(r, s)
-            wasserstein.append(wasserstein_distance)
+            wasserstein.append(float(wasserstein_distance))
 
-            t_stat, _ = stats.ttest_ind(r, s, equal_var=False)
-            t_stats.append(abs(t_stat))
+            ttest_res = stats.ttest_ind(r, s, equal_var=False)
+            t_stats.append(abs(ttest_res.statistic))
 
-        if ks:
-            metrics["ks_mean"] = float(np.nanmean(ks))
-        if wasserstein:
-            metrics["wasserstein_mean"] = float(np.nanmean(wasserstein))
-        if t_stats:
-            metrics["t_stat_mean_abs"] = float(np.nanmean(t_stats))
-
-        return metrics
+        return {
+            "ks_mean": safe_nanmean(ks),
+            "wasserstein_mean": safe_nanmean(wasserstein),
+            "t_stat_mean_abs": safe_nanmean(t_stats),
+        }
 
 
 class CategoricalTvMeanEvaluator(Evaluator):
@@ -83,7 +103,7 @@ class CategoricalTvMeanEvaluator(Evaluator):
         _, categorical_columns = get_schema_columns(ctx)
         if not categorical_columns:
             return {
-                "categorical_tv_mean": math.nan
+                "categorical_tv_mean": math.nan,
             }
 
         tvs = []
@@ -96,7 +116,7 @@ class CategoricalTvMeanEvaluator(Evaluator):
             tvs.append(tv)
 
         return {
-            "categorical_tv_mean": float(np.mean(tvs))
+            "categorical_tv_mean": float(np.mean(tvs)),
         }
 
 
@@ -105,7 +125,7 @@ class CorrFroDiffEvaluator(Evaluator):
         numeric_columns, _ = get_schema_columns(ctx)
         if len(numeric_columns) < 2:
             return {
-                "corr_fro_diff": math.nan
+                "corr_fro_diff": math.nan,
             }
 
         def safe_corr(df: pd.DataFrame) -> pd.DataFrame:
@@ -122,5 +142,5 @@ class CorrFroDiffEvaluator(Evaluator):
         diff = r_corr.loc[common, common].values - s_corr.loc[common, common].values
 
         return {
-            "corr_fro_diff": float(np.linalg.norm(diff, ord="fro"))
+            "corr_fro_diff": float(np.linalg.norm(diff, ord="fro")),
         }

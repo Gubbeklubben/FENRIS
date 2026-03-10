@@ -4,15 +4,14 @@ from collections.abc import Iterable
 from fedbench.config import Config
 from fedbench.core.eventbus import EventBus
 from fedbench.core.events import (
+    CommandCompleted,
+    CommandStarted,
     Event,
-    RunStarted,
     RunCompleted,
     RunFailed,
-    CommandStarted,
-    CommandCompleted,
+    RunStarted,
 )
-from fedbench.core.logger import log_debug
-from fedbench.core.logger import log_error
+from fedbench.core.logger import log_debug, log_error
 from fedbench.core.pipeline import Command
 from fedbench.core.runcontext import RunContext
 
@@ -27,10 +26,11 @@ def run(config: Config, commands: Iterable[Command]) -> None:
 
 
 def _run(
-        run_id: str,
-        config: Config,
-        commands: Iterable[Command],
-        eventbus: EventBus) -> None:
+    run_id: str,
+    config: Config,
+    commands: Iterable[Command],
+    eventbus: EventBus,
+) -> None:
 
     eventbus.emit(RunStarted(run_id))
     ctx = RunContext(run_id, config, eventbus)
@@ -41,11 +41,11 @@ def _run(
         try:
             command(ctx)
         except Exception as exc:
-            eventbus.emit(
-                RunFailed(run_id, name, str(type(exc)), str(exc)))
+            eventbus.emit(RunFailed(run_id, name, str(type(exc)), str(exc)))
             log_error(
-                __name__, f"Error executing command {name}",
-                exc_info=True
+                __name__,
+                f"Error executing command {name}",
+                exc_info=True,
             )
             return
         else:

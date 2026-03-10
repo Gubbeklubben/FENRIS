@@ -7,8 +7,9 @@ from fedbench.core.factory_registry import FactoryRegistry
 
 
 def _get_by_categories(
-        registries: Mapping[str, FactoryRegistry[Evaluator]],
-        categories: Iterable[str]) -> Iterable[tuple[str, Evaluator]]:
+    registries: Mapping[str, FactoryRegistry[Evaluator]],
+    categories: Iterable[str],
+) -> Iterable[tuple[str, Evaluator]]:
 
     for category in categories:
         registry = registries[category]
@@ -17,15 +18,17 @@ def _get_by_categories(
 
 
 def _get_by_names(
-        registries: Mapping[str, FactoryRegistry[Evaluator]],
-        names: Iterable[str]) -> Iterable[tuple[str, Evaluator]]:
+    registries: Mapping[str, FactoryRegistry[Evaluator]],
+    names: Iterable[str],
+) -> Iterable[tuple[str, Evaluator]]:
 
     names = set(names)
     for category in Category:
         registry = registries[category]
 
         for name in registry:
-            if name not in names: continue
+            if name not in names:
+                continue
             yield category, registry.call(name)
 
 
@@ -42,22 +45,22 @@ class EvaluationSuite:
 
     @classmethod
     def default(cls, registries: Mapping[str, FactoryRegistry[Evaluator]]) -> Self:
-        return cls.with_evaluator_categories(
-            registries, tuple(Category)
-        )
+        return cls.with_evaluator_categories(registries, tuple(Category))
 
     @classmethod
     def with_evaluator_categories(
-            cls,
-            registries: Mapping[str, FactoryRegistry[Evaluator]],
-            categories: Iterable[str]) -> Self:
+        cls,
+        registries: Mapping[str, FactoryRegistry[Evaluator]],
+        categories: Iterable[str],
+    ) -> Self:
 
         return cls(_get_by_categories(registries, categories))
 
     @classmethod
     def with_evaluator_names(
-            cls,
-            registries: Mapping[str, FactoryRegistry[Evaluator]],
-            names: Iterable[str]) -> Self:
+        cls,
+        registries: Mapping[str, FactoryRegistry[Evaluator]],
+        names: Iterable[str],
+    ) -> Self:
 
         return cls(_get_by_names(registries, names))

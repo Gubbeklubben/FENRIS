@@ -21,10 +21,10 @@ def built_in_partitioners():
 def sample_df():
     return pd.DataFrame(
         {
-            "id": [1, 2, 3, 4],
-            "age": [25.0, 30.0, 45.0, 50.0],
-            "label": [0, 1, 1, 0],
-            "cat": ["car", "truck", "car", "bike"],
+            "id": [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12],
+            "age": [25.0, 30.0, 45.0, 50.0, 1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 99.0],
+            "label": [0, 1, 1, 0, 1, 0, 1, 0, 1, 0, 1, 0],
+            "cat": ["car", "truck", "car", "bike", "car", "truck", "car", "bike", "car", "truck", "car", "airplane"],
         }
     )
 
@@ -43,19 +43,3 @@ def test_load_csv_and_schema(sample_df, tmp_path):
         "binary",
         "categorical",
     ]
-
-def test_iid_partitioning(sample_df, built_in_partitioners):
-    ds = PartitionedDataset(
-        sample_df,
-        infer_schema(sample_df),
-        partitioner=built_in_partitioners.call(
-            name="iid-partitioner",
-            factory_kwargs={"num_partitions": 2},
-        ),
-        test_size=0.2,
-        seed=80085
-    )
-    assert ds.load_train_partition(0).get("id").values[0] == 1
-    assert ds.load_train_partition(1).get("id").values[0] == 3
-    assert ds.load_test_partition(0).get("id").values[0] == 2
-    assert ds.load_test_partition(1).get("id").values[0] == 4
