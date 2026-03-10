@@ -6,7 +6,7 @@ import numpy as np
 import torch
 
 from fedbench.core.algorithm import Aggregator, Synthesizer, Algorithm
-from fedbench.core.data import load_csv
+from fedbench.core.data import load_csv, TableSchema
 from fedbench.core.update import Update
 from fedbench.core.logger import debug_calls
 
@@ -62,13 +62,22 @@ class FedTGAN(Algorithm):
 
 
 class FedTGANAggregator(Aggregator):
-    @debug_calls(__name__)
+
+    def __init__(self, cfg: dict[str, Any]) -> None:
+        self._cfg: dict[str, Any] = cfg
+
+    def configure_init(
+            self,
+            seed: int,
+            schema: TableSchema,
+            client_ids: Iterable[int]) -> Iterable[tuple[int, Update]]:
+        return ((client_id, Update()) for client_id in client_ids)
+
     def aggregate_init(self, replies: Iterable[Update]) -> Update:
         update = Update()
         update.objects["my-state"] = _some_state
         return update
 
-    @debug_calls(__name__)
     def aggregate_train(
             self,
             replies: Iterable[Update]) -> Update:
@@ -78,7 +87,12 @@ class FedTGANAggregator(Aggregator):
 
 
 class FedTGANSynthesizer(Synthesizer):
-    @debug_calls(__name__)
+
+    def __init__(self, cfg: dict[str, Any]) -> None:
+        self._cfg = cfg
+        self._max_batches = cfg["max-batches"]
+        self._device = cfg["device"]
+
     def train(
             self,
             request: Update,
@@ -88,7 +102,6 @@ class FedTGANSynthesizer(Synthesizer):
         update.objects["my-state"] = _some_state
         return update
 
-    @debug_calls(__name__)
     def sample(
             self,
             request: Update,
