@@ -5,7 +5,7 @@ import pandas as pd
 import numpy as np
 import torch
 
-from fedbench.core.algorithm import Aggregator, Synthesizer, Algorithm
+from fedbench.core.algorithm import Coordinator, SingleStepCoordinator, Synthesizer, Algorithm
 from fedbench.core.data import load_csv, TableSchema
 from fedbench.core.update import Update
 from fedbench.core.logger import debug_calls
@@ -72,26 +72,26 @@ class FedTGAN(Algorithm):
             ),
         }
 
-    def create_aggregator(self) -> Aggregator:
-        return FedTGANAggregator(self._cfg)
+    def create_coordinator(self) -> Coordinator:
+        return FedTGANCoordinator(self._cfg)
 
     def create_synthesizer(self) -> Synthesizer:
         return FedTGANSynthesizer(self._cfg)
 
 
-class FedTGANAggregator(Aggregator):
+class FedTGANCoordinator(SingleStepCoordinator):
 
     def __init__(self, cfg: dict[str, Any]) -> None:
         self._cfg: dict[str, Any] = cfg
 
-    def configure_init(
+    def configure_fed_init(
             self,
             seed: int,
             schema: TableSchema,
             client_ids: Iterable[int]) -> Iterable[tuple[int, Update]]:
         return ((client_id, Update()) for client_id in client_ids)
 
-    def aggregate_init(self, replies: Iterable[Update]) -> Update:
+    def aggregate_fed_init(self, replies: Iterable[Update]) -> Update:
         update = Update()
         update.objects["my-state"] = _some_state
         return update
