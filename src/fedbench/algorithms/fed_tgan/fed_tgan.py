@@ -44,7 +44,18 @@ class FedTGAN(Algorithm):
             latent_dim: int = 64,
         ):
 
-        # TODO basic validation, in the same vein as below:
+        if batch_size < 1:
+            raise ValueError("Expecting batch_size >= 1.")
+        if max_batches < 1:
+            raise ValueError("Expecting max_batches >= 1.")
+        if fraction_evaluate < 0 or fraction_evaluate > 1:
+            raise ValueError("Expecting 0 <= fraction_evaluate <= 1.")
+        if num_server_rounds < 1:
+            raise ValueError("Expecting num_server_rounds >= 1.")
+        if local_epochs < 1:
+            raise ValueError("Expecting local_epochs >= 1.")
+        if latent_dim < 1:
+            raise ValueError("Expecting latent_dim >= 1.")
         if learning_rate <= 0 or learning_rate > 0.1:
             raise ValueError("Expecting 0 < learning_rate <= 0.1")
 
