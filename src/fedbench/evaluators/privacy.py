@@ -21,8 +21,8 @@ from fedbench.core.eval import EvalContext, Evaluator
 from fedbench.util.metrics import (
     canonical_row_hash,
     fit_tabular_model,
+    get_numeric_columns,
     get_quasi_identifiers,
-    get_schema_columns,
     sanitize_numeric_df,
 )
 from fedbench.util.parsing import to_snake_case
@@ -105,7 +105,7 @@ class MIANearestNeighborAttackEvaluator(Evaluator):
         if K == 0 or len(ctx.synthetic_df) == 0:
             return nan_result
 
-        numeric_cols, _ = get_schema_columns(ctx)
+        numeric_cols = get_numeric_columns(ctx.train_df, ctx.schema)
         if not numeric_cols:
             return nan_result
 
