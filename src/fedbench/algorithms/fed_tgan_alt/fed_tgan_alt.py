@@ -1,4 +1,4 @@
-"""Fed-TGAN: Federated Learning Framework for Synthesizing Tabular Data.
+"""Fed-TGAN-alt: Alternative implementation of the Federated Learning Framework for Synthesizing Tabular Data.
 
 Based on: Zhao et al., "Fed-TGAN: Federated Learning Framework for
 Synthesizing Tabular Data" (2021). arXiv:2108.07927
@@ -171,7 +171,7 @@ def _cond_loss(
 # ── Algorithm factory ──────────────────────────────────────────────────── #
 
 
-class FedTGAN(Algorithm):
+class FedTGANAlt(Algorithm):
     def __init__(
         self,
         embedding_dim: int = 128,
@@ -222,16 +222,16 @@ class FedTGAN(Algorithm):
         }
 
     def create_coordinator(self) -> SingleStepCoordinator:
-        return FedTGANCoordinator(self._cfg)
+        return FedTGANAltCoordinator(self._cfg)
 
     def create_synthesizer(self) -> Synthesizer:
-        return FedTGANSynthesizer(self._cfg)
+        return FedTGANAltSynthesizer(self._cfg)
 
 
 # ── Coordinator (server-side) ──────────────────────────────────────────── #
 
 
-class FedTGANCoordinator(SingleStepCoordinator):
+class FedTGANAltCoordinator(SingleStepCoordinator):
     def __init__(self, cfg: dict[str, Any]) -> None:
         self._cfg = cfg
         self._cat_attrs: list[str] = []
@@ -429,7 +429,7 @@ class FedTGANCoordinator(SingleStepCoordinator):
 # ── Synthesizer (client-side) ──────────────────────────────────────────── #
 
 
-class FedTGANSynthesizer(Synthesizer):
+class FedTGANAltSynthesizer(Synthesizer):
     def __init__(self, cfg: dict[str, Any]) -> None:
         self._cfg = cfg
         self._device = cfg["device"]

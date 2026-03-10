@@ -10,7 +10,7 @@ from __future__ import annotations
 import numpy as np
 from numpy.typing import NDArray
 
-from fedbench.algorithms.fed_tgan.data_transformer import SpanInfo
+from fedbench.algorithms.fed_tgan_alt.data_transformer import SpanInfo
 
 
 class DataSampler:

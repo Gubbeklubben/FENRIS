@@ -12,8 +12,8 @@ def register_builtin_algorithms(registry: FactoryRegistry[Algorithm]) -> None:
         f"{__package__}.fedtabdiff:FedTabDiff",
     )
     registry.add_builtin(
-        "fed_tgan",
-        f"{__package__}.fed_tgan:FedTGAN",
+        "fed_tgan_alt",
+        f"{__package__}.fed_tgan_alt:FedTGANAlt",
     )
     registry.add_builtin(
         "fed_random",
