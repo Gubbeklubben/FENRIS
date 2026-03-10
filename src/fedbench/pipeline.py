@@ -2,40 +2,55 @@ import json
 from collections.abc import Iterable
 from pathlib import Path
 
+from fedbench.core.data import PartitionedDataset
 from fedbench.core.data.schemas import infer_schema as _infer_schema
 from fedbench.core.pipeline import Command
 from fedbench.core.runcontext import RunContext
 from fedbench.registries import (
     build_algorithm_registry,
+    build_evaluator_registries,
     build_partitioner_registry,
-    build_evaluator_registries
 )
-from fedbench.resolver import resolve_components as _resolve_components
+from fedbench.resolver import (
+    resolve_algorithm,
+    resolve_df_loader,
+    resolve_evaluators,
+    resolve_partitioner,
+)
 
 
 def resolve_components(ctx: RunContext) -> None:
-    components = _resolve_components(
+    ctx.df_loader = resolve_df_loader(ctx.config)
+
+    ctx.algorithm = resolve_algorithm(
         ctx.config,
         build_algorithm_registry(),
-        build_partitioner_registry(),
-        build_evaluator_registries()
     )
-    ctx.components = components
+    ctx.partitioner = resolve_partitioner(
+        ctx.config,
+        build_partitioner_registry(),
+    )
+    ctx.eval_suite = resolve_evaluators(
+        ctx.config,
+        build_evaluator_registries(),
+    )
 
 
-def load_df(ctx: RunContext) -> None:
-    ctx.df = ctx.components.df_loader()
-
-
-def infer_schema(ctx: RunContext) -> None:
-    if ctx.df is None:
-        raise RuntimeError("No dataset loaded, can not infer schema.")
-    ctx.schema = _infer_schema(ctx.df)
-    ctx.df = None  # Not needed atm. so forget it and free some memory.
+def load_dataset(ctx: RunContext) -> None:
+    df = ctx.df_loader()
+    schema = _infer_schema(df)
+    ctx.dataset = PartitionedDataset(
+        df,
+        schema,
+        ctx.partitioner,
+        ctx.config.test_size,
+        ctx.config.seed,
+    )
 
 
 def federated_train_eval_loop(ctx: RunContext) -> None:
     from flwr.simulation import run_simulation
+
     from fedbench.flwr import client_app, make_server_app
 
     run_simulation(
@@ -46,18 +61,16 @@ def federated_train_eval_loop(ctx: RunContext) -> None:
 
 
 def global_sample(ctx: RunContext) -> None:
-    synthesizer = ctx.components.algorithm.create_synthesizer()
+    synthesizer = ctx.algorithm.create_synthesizer()
     ctx.synthetic_df = synthesizer.sample(
         ctx.aggregated_state,
         ctx.config.num_synthetic_rows or 1,
-        ctx.config.seed
+        ctx.config.seed,
     )
 
 
 def global_evaluate(ctx: RunContext) -> None:
-    # I imagine some of the metrics may be relevant here, but not all?
-    # We can create a test set by concatenating all test sets from
-    # partitioner.
+    # Server's evaluation data can be retrieved using ctx.dataset.load_global_holdout()
     pass
 
 
@@ -73,8 +86,7 @@ def write_artifacts(ctx: RunContext) -> None:
 
 def pipeline() -> Iterable[Command]:
     yield resolve_components
-    yield load_df
-    yield infer_schema
+    yield load_dataset
     yield federated_train_eval_loop
     yield global_sample
     yield global_evaluate

@@ -22,7 +22,10 @@ def load_uci_heart_disease_dataset():
         version=1,
         as_frame=True,
     )
-    return openml_to_huggingface_dataset(dataset.data, dataset.target)
+    return (
+        openml_to_huggingface_dataset(dataset.data, dataset.target)
+        .remove_columns(["label"])
+    )
 
 def load_breast_cancer_wisconsin_dataset():
     dataset = load_breast_cancer(

@@ -1,40 +1,84 @@
+from __future__ import annotations
+
 from collections.abc import Callable
-from dataclasses import dataclass
-from types import MappingProxyType
-from typing import Mapping
+from typing import Mapping, cast, overload
 
 from pandas import DataFrame
 
 from fedbench.config import Config
 from fedbench.core.algorithm import Algorithm
-from fedbench.core.data import TableSchema, Partitioner
+from fedbench.core.data import PartitionedDataset, Partitioner
 from fedbench.core.eval import EvaluationSuite
 from fedbench.core.eventbus import EventBus
 from fedbench.core.update import Update
 
 
-@dataclass(frozen=True)
-class Components:
-    df_loader: Callable[[], DataFrame]
-    algorithm: Algorithm
-    partitioner: Partitioner
-    eval_suite: EvaluationSuite
+class _RunCtxField[T]:
+    """Descriptor encapsulating get/set logic for RunContext fields.
+
+    Must always be declared as a class attribute in the class body,
+    never be attached to a class dynamically.
+
+    Semantics:
+    ---------
+    - Get before set -> AttributeError.
+    - Set more than once -> RuntimeError.
+
+    Deliberately assumes runtime checking of types is someone else's
+    responsibility and does no such thing.
+    """
+
+    @property
+    def name(self) -> str:
+        return self._name.lstrip("_")
+
+    def __set_name__(self, owner: type[object], name: str) -> None:
+        self._name = f"_{name}"
+
+    @overload
+    def __get__(self, instance: None, owner: type[object]) -> _RunCtxField[T]: ...
+
+    @overload
+    def __get__(self, instance: object, owner: type[object]) -> T: ...
+
+    def __get__(
+        self, instance: object | None, owner: type[object]
+    ) -> T | _RunCtxField[T]:
+
+        if instance is None:
+            return self
+
+        if not hasattr(instance, self._name):
+            raise AttributeError(f"{instance}: '{self.name}' accessed before set.")
+        # noinspection PyUnnecessaryCast
+        return cast(T, getattr(instance, self._name))
+
+    def __set__(self, instance: object, value: T) -> None:
+        if hasattr(instance, self._name):
+            raise RuntimeError(f"{instance}: '{self.name}' already set.")
+
+        setattr(instance, self._name, value)
 
 
-# The repetitive getter/setter's in RunContext is at least explicit,
-# but could probably be implemented with python's descriptor protocol.
 class RunContext:
+    # fmt: off
+    algorithm          = _RunCtxField[Algorithm]()
+    df_loader          = _RunCtxField[Callable[[], DataFrame]]()
+    partitioner        = _RunCtxField[Partitioner]()
+    eval_suite         = _RunCtxField[EvaluationSuite]()
+    dataset            = _RunCtxField[PartitionedDataset]()
+    aggregated_state   = _RunCtxField[Update]()
+    aggregated_metrics = _RunCtxField[Mapping[str, float]]()
+    synthetic_df       = _RunCtxField[DataFrame]()
+    # fmt: on
+
     def __init__(self, run_id: str, config: Config, eventbus: EventBus) -> None:
         self._run_id = run_id
         self._config = config
         self._eventbus = eventbus
-        self._components: Components | None = None
-        self.df: DataFrame | None = None  # Less strict policy for now
-        self._schema: TableSchema | None = None
-        self._aggregated_state: Update | None = None
-        self._aggregated_metrics: dict[str, float] | None = None
-        # per client metrics?
-        self._synthetic_df: DataFrame | None = None
+
+    def __repr__(self) -> str:
+        return f"<{self.__class__.__name__}>"
 
     @property
     def run_id(self) -> str:
@@ -47,71 +91,3 @@ class RunContext:
     @property
     def eventbus(self) -> EventBus:
         return self._eventbus
-
-    @property
-    def components(self) -> Components:
-        if self._components is None:
-            raise RuntimeError("Property 'components' accessed before set.")
-        return self._components
-
-    @components.setter
-    def components(self, components: Components) -> None:
-        if self._components is not None:
-            raise RuntimeError("Can only set components once.")
-        self._components = components
-
-    @property
-    def schema(self) -> TableSchema:
-        if self._schema is None:
-            raise RuntimeError("Property 'schema' accessed before set.")
-        return self._schema
-
-    @schema.setter
-    def schema(self, schema: TableSchema) -> None:
-        if self._schema is not None:
-            raise RuntimeError("Can only set 'schema' once.")
-        self._schema = schema
-
-    @property
-    def aggregated_state(self) -> Update:
-        if self._aggregated_state is None:
-            raise RuntimeError(
-                "Property 'aggregated_state' accessed before set."
-            )
-        return self._aggregated_state
-
-    @aggregated_state.setter
-    def aggregated_state(self, state: Update) -> None:
-        if self._aggregated_state is not None:
-            raise RuntimeError("Can only set 'aggregated_state' once.")
-        self._aggregated_state = state
-
-    @property
-    def aggregated_metrics(self) -> Mapping[str, float]:
-        if self._aggregated_metrics is None:
-            raise RuntimeError(
-                "Property 'aggregated_metrics' accessed before set."
-            )
-        return MappingProxyType(self._aggregated_metrics)
-
-    @aggregated_metrics.setter
-    def aggregated_metrics(self, metrics: dict[str,float]) -> None:
-        if self._aggregated_metrics is not None:
-            raise RuntimeError("Can only set 'aggregated_metrics' once.")
-        self._aggregated_metrics = metrics
-
-    @property
-    def synthetic_df(self) -> DataFrame:
-        if self._synthetic_df is None:
-            raise RuntimeError("Property 'synthetic_df' accessed before set.")
-        return self._synthetic_df
-
-    @synthetic_df.setter
-    def synthetic_df(self, df: DataFrame) -> None:
-        if self._synthetic_df is not None:
-            raise RuntimeError("Can only set 'synthetic_df' once.")
-
-        if not isinstance(df, DataFrame):
-            raise ValueError(f"Expected a DataFrame, got {type(df)}.")
-
-        self._synthetic_df = df

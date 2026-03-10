@@ -2,43 +2,45 @@ import pickle
 from typing import Protocol, cast
 
 from flwr.common import (
-    Message,
     Array,
     ArrayRecord,
-    MetricRecord,
     ConfigRecord,
-    RecordDict
+    Message,
+    MetricRecord,
+    RecordDict,
 )
 
 from fedbench.core.update import Objects, Update
-
 
 _METADATA_KEY = f"{__package__}.metadata"
 
 
 class FlwrSerializer(Protocol):
     def __call__(
-            self,
-            update: Update,
-            message_type: str | None = None,
-            dst_node_id: int | None = None,
-            reply_to: Message | None = None) -> Message:
+        self,
+        update: Update,
+        message_type: str | None = None,
+        dst_node_id: int | None = None,
+        reply_to: Message | None = None,
+    ) -> Message:
         pass
 
 
 class FlwrDeserializer(Protocol):
     def __call__(
-            self,
-            message: Message,
-            arrays_to_ml_framework_map: dict[str, str] | None = None) -> Update:
+        self,
+        message: Message,
+        arrays_to_ml_framework_map: dict[str, str] | None = None,
+    ) -> Update:
         pass
 
 
 def to_flwr_pickle(
-        update: Update,
-        message_type: str | None = None,
-        dst_node_id: int | None = None,
-        reply_to: Message | None = None) -> Message:
+    update: Update,
+    message_type: str | None = None,
+    dst_node_id: int | None = None,
+    reply_to: Message | None = None,
+) -> Message:
 
     if reply_to is None:
         if dst_node_id is None:
@@ -73,13 +75,14 @@ def to_flwr_pickle(
     return Message(
         content=rdict,
         message_type=cast(str, message_type),
-        dst_node_id=cast(int, dst_node_id)
+        dst_node_id=cast(int, dst_node_id),
     )
 
 
 def from_flwr_pickle(
-        message: Message,
-        arrays_to_ml_framework_map: dict[str, str] | None = None) -> Update:
+    message: Message,
+    arrays_to_ml_framework_map: dict[str, str] | None = None,
+) -> Update:
 
     arrays_to_ml_framework_map = arrays_to_ml_framework_map or {}
     rdict = message.content
@@ -112,12 +115,13 @@ def to_flwr_disable_pickle(
     update: Update,
     message_type: str | None = None,
     dst_node_id: int | None = None,
-    reply_to: Message | None = None) -> Message:
+    reply_to: Message | None = None,
+) -> Message:
 
     if update.objects:
         raise RuntimeError(
-        "Pickle is disabled, but update has non-empty objects field."
-    )
+            "Pickle is disabled, but update has non-empty objects field."
+        )
     return to_flwr_pickle(update, message_type, dst_node_id, reply_to)
 
 
@@ -130,7 +134,8 @@ def _pickle_objects(objects: Objects) -> dict[str, Array]:
             dtype="uint8",
             shape=(len(data),),
             stype="pickle",  # Will, and should make f.ex. arr.numpy() raise err
-            data=data)
+            data=data,
+        )
         arrays[key] = arr
     return arrays
 

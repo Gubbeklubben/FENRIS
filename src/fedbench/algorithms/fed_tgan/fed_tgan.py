@@ -16,17 +16,17 @@ import numpy as np
 import pandas as pd
 import torch
 from pandas import DataFrame
-from torch import nn, optim, Tensor
+from torch import Tensor, nn, optim
 
-from fedbench.core.algorithm import Algorithm, Synthesizer, SingleStepCoordinator
+from fedbench.core.algorithm import Algorithm, SingleStepCoordinator, Synthesizer
 from fedbench.core.data import TableSchema
 from fedbench.core.logger import (
     ELBOW,
     TEE,
-    log_info,
     log_debug,
+    log_info,
 )
-from fedbench.core.update import Update, Objects
+from fedbench.core.update import Objects, Update
 
 from .data_sampler import DataSampler
 from .data_transformer import (

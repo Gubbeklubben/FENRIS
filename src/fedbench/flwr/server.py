@@ -1,7 +1,7 @@
 import time
 from collections.abc import Generator, Iterable
 
-from flwr.common import Context, Message, ConfigRecord, RecordDict
+from flwr.common import ConfigRecord, Context, Message, RecordDict
 from flwr.server import Grid
 from flwr.serverapp import ServerApp
 
@@ -10,26 +10,35 @@ from fedbench.core.algorithm import Coordinator
 from fedbench.core.data import TableSchema
 from fedbench.core.eventbus import EventBus
 from fedbench.core.events import (
-    ClientsConfigured, ServerRequest, ClientReply,
-    FedInitStarted, FedInitCompleted, TrainingStarted, TrainingCompleted
+    ClientReply,
+    ClientsConfigured,
+    FedInitCompleted,
+    FedInitStarted,
+    ServerRequest,
+    TrainingCompleted,
+    TrainingStarted,
 )
 from fedbench.core.runcontext import RunContext
-from fedbench.core.update import Update, Metrics
+from fedbench.core.update import Metrics, Update
 from fedbench.flwr.serde import (
-    to_flwr_pickle, from_flwr_pickle,
-    to_flwr_disable_pickle, FlwrSerializer, FlwrDeserializer
+    FlwrDeserializer,
+    FlwrSerializer,
+    from_flwr_pickle,
+    to_flwr_disable_pickle,
+    to_flwr_pickle,
 )
 
 
 class FedbenchServer:
     def __init__(
-            self,
-            coordinator: Coordinator,
-            seed: int,
-            schema: TableSchema,
-            to_flwr: FlwrSerializer,
-            from_flwr: FlwrDeserializer,
-            eventbus: EventBus) -> None:
+        self,
+        coordinator: Coordinator,
+        seed: int,
+        schema: TableSchema,
+        to_flwr: FlwrSerializer,
+        from_flwr: FlwrDeserializer,
+        eventbus: EventBus,
+    ) -> None:
 
         self._coordinator = coordinator
         self._seed = seed
@@ -43,7 +52,7 @@ class FedbenchServer:
         generator = self._coordinator.fed_init(
             self._seed,
             self._schema,
-            grid.get_node_ids()
+            grid.get_node_ids(),
         )
         self._send_and_receive(grid, generator, msg_type="query.init")
 
@@ -60,7 +69,7 @@ class FedbenchServer:
             request = self._to_flwr(
                 global_state,
                 message_type=msg_type,
-                dst_node_id=dst_id
+                dst_node_id=dst_id,
             )
             requests.append(request)
             self._eventbus.emit(ServerRequest(dst_id, msg_type=msg_type))
@@ -72,9 +81,10 @@ class FedbenchServer:
             self._per_client_metrics[src_id] = dict(metrics)
 
     def run(
-            self,
-            grid: Grid,
-            num_rounds: int) -> tuple[Update, dict[str, float]]:
+        self,
+        grid: Grid,
+        num_rounds: int,
+    ) -> tuple[Update, dict[str, float]]:
 
         self._eventbus.emit(FedInitStarted())
         self.fed_init(grid)
@@ -89,14 +99,17 @@ class FedbenchServer:
         return self._get_and_check_global_state(), {}
 
     def _send_and_receive(
-            self,
-            grid: Grid,
-            generator: Generator[Iterable[tuple[int, Update]],
-                                 Iterable[tuple[int, Update]],
-                                 None],
-            msg_type: str) -> None:
+        self,
+        grid: Grid,
+        generator: Generator[
+            Iterable[tuple[int, Update]],
+            Iterable[tuple[int, Update]],
+            None,
+        ],
+        msg_type: str,
+    ) -> None:
 
-        event_type = msg_type.split(".")[-1]
+        internal_msg_type = msg_type.split(".")[-1]
         arrays_map = self._coordinator.arrays_to_ml_framework_map
         replies: Iterable[tuple[int, Update]] | None = None
 
@@ -114,21 +127,21 @@ class FedbenchServer:
                 request = self._to_flwr(
                     update,
                     message_type=msg_type,
-                    dst_node_id=dst_id
+                    dst_node_id=dst_id,
                 )
                 requests.append(request)
-                self._eventbus.emit(ServerRequest(dst_id, msg_type=event_type))
+                self._eventbus.emit(ServerRequest(dst_id, msg_type=internal_msg_type))
 
             replies = []
             for reply in grid.send_and_receive(requests):
                 src_id = reply.metadata.src_node_id
                 replies.append((src_id, self._from_flwr(reply, arrays_map)))
-                self._eventbus.emit(ClientReply(src_id, msg_type=event_type))
+                self._eventbus.emit(ClientReply(src_id, msg_type=internal_msg_type))
 
     def _get_and_check_global_state(self) -> Update:
         global_state = self._coordinator.global_state
         if not isinstance(global_state, Update):
-            raise RuntimeError(
+            raise TypeError(
                 f"{self._coordinator}.global_state returned"
                 f"{type(global_state)}, expected {Update}"
             )
@@ -149,17 +162,18 @@ def configure_clients(grid: Grid, config: Config) -> Iterable[Message]:
         Message(
             content=RecordDict({"config": cfg_jsons}),
             message_type="query.configure",
-            dst_node_id=cid
-        ) for cid in client_ids
+            dst_node_id=cid,
+        )
+        for cid in client_ids
     )
     return grid.send_and_receive(messages)
 
 
-def make_server_app(runcontext: RunContext) -> ServerApp:
+def make_server_app(ctx: RunContext) -> ServerApp:
     app = ServerApp()
-    config = runcontext.config
-    eventbus = runcontext.eventbus
-    algorithm = runcontext.components.algorithm
+    config = ctx.config
+    eventbus = ctx.eventbus
+    algorithm = ctx.algorithm
 
     @app.main()
     def main(grid: Grid, _: Context) -> None:
@@ -175,13 +189,13 @@ def make_server_app(runcontext: RunContext) -> ServerApp:
         server = FedbenchServer(
             algorithm.create_coordinator(),
             config.seed,
-            runcontext.schema,
+            ctx.dataset.schema,
             to_flwr=to_flwr_disable_pickle if config.disable_pickle else to_flwr_pickle,
             from_flwr=from_flwr_pickle,
             eventbus=eventbus,
         )
         state, metrics = server.run(grid, config.num_rounds)
-        runcontext.aggregated_state = state
-        runcontext.aggregated_metrics = metrics
+        ctx.aggregated_state = state
+        ctx.aggregated_metrics = metrics
 
     return app

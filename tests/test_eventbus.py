@@ -81,7 +81,7 @@ def test_transitions(event_bus):
     event_bus.open()
     assert event_bus.state is BusState.OPEN
 
-    event_bus.emit(Event())
+    event_bus.emit(SomeEvent())
     t = threading.Thread(target=event_bus.close)
     t.start()
     assert wait_for(lambda: event_bus.state is BusState.CLOSING, timeout=2.0)
@@ -158,7 +158,7 @@ def test_closing_state(event_bus, default_observer):
     event_bus.register(slow, (SomeEvent,))
     event_bus.open()
 
-    event_bus.emit(Event())
+    event_bus.emit(SomeEvent())
     t = threading.Thread(target=event_bus.close)
     t.start()
     assert wait_for(lambda: event_bus.state is BusState.CLOSING, timeout=2.0)

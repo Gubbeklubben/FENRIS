@@ -3,6 +3,7 @@ FedTabDiff Diffuser.
 
 From https://github.com/sattarov/FedTabDiff/blob/main/BaseDiffuser.py.
 """
+
 from typing import Any
 
 import torch
@@ -11,13 +12,13 @@ from torch import Tensor
 
 class Diffuser:
     def __init__(
-            self,
-            total_steps: int,
-            beta_start: float,
-            beta_end: float,
-            device: str,
-            scheduler: str
-        ):
+        self,
+        total_steps: int,
+        beta_start: float,
+        beta_end: float,
+        device: str,
+        scheduler: str,
+    ):
 
         self._total_steps = total_steps
         self._beta_start = beta_start
@@ -34,13 +35,20 @@ class Diffuser:
 
         match scheduler:
             case "linear":
-                betas = torch.linspace(beta_start, beta_end, self._total_steps)
-            case "quad":
                 betas = torch.linspace(
-                    self._beta_start ** 0.5,
-                    self._beta_end ** 0.5,
-                    self._total_steps
-                ) ** 2
+                    beta_start,
+                    beta_end,
+                    self._total_steps,
+                )
+            case "quad":
+                betas = (
+                    torch.linspace(
+                        self._beta_start**0.5,
+                        self._beta_end**0.5,
+                        self._total_steps,
+                    )
+                    ** 2
+                )
             case _:
                 raise ValueError(f"Unknown scheduler {scheduler}")
 
@@ -59,8 +67,10 @@ class Diffuser:
         t = torch.randint(low=1, high=self._total_steps, size=(n,), device=self.device)
         return t
 
-    def add_gauss_noise(self, x_num: Tensor, timesteps: Tensor) -> tuple[Tensor, Tensor]:
-        """ Add gaussian noise to the input data given a specific timestep
+    def add_gauss_noise(
+        self, x_num: Tensor, timesteps: Tensor
+    ) -> tuple[Tensor, Tensor]:
+        """Add gaussian noise to the input data given a specific timestep
         value.
 
         Args:
@@ -78,10 +88,8 @@ class Diffuser:
         return x_noise_num, noise_num
 
     def p_sample_gauss(
-            self,
-            model_out: Any,
-            z_norm: Tensor,
-            timesteps: Tensor) -> Tensor:
+        self, model_out: Any, z_norm: Tensor, timesteps: Tensor
+    ) -> Tensor:
         """
         Sampling or denoising step.
 
@@ -101,7 +109,9 @@ class Diffuser:
         random_noise = torch.randn_like(z_norm)
         random_noise[timesteps == 0] = 0.0
 
-        model_mean = ((1 / sqrt_alpha_t) * (z_norm - (betas_t * model_out / sqrt_one_minus_alpha_hat_t)))
+        model_mean = (1 / sqrt_alpha_t) * (
+            z_norm - (betas_t * model_out / sqrt_one_minus_alpha_hat_t)
+        )
         z_norm = model_mean + (epsilon_t * random_noise)
 
         return z_norm
