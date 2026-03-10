@@ -1,4 +1,4 @@
-"""Fed-TGAN Data Transformer.
+"""Fed-TGAN-Alt Data Transformer.
 
 Federated-aware data encoding using VGM (Variational Gaussian Mixture)
 for continuous columns and one-hot encoding for discrete columns.
@@ -28,7 +28,7 @@ class SpanInfo:
     dim
         Number of output dimensions for this column.
     activation_fn
-        Activation function type: ``"tanh"`` for continuous, ``"softmax"``.for discrete.
+        Activation function type: ``"tanh"`` for continuous, ``"softmax"`` for discrete.
     """
 
     dim: int
@@ -264,7 +264,19 @@ class GlobalDataTransformer:
         global_vgms: dict[str, dict[str, Any]],
         global_categories: dict[str, list[str]],
     ) -> None:
-        """Build the global transformer from merged parameters."""
+        """Build the global transformer from merged federated parameters.
+
+        Parameters
+        ----------
+        column_order
+            Names of all columns in the desired output order.
+        column_types
+            Mapping ``{column_name: "continuous" | "discrete"}``.
+        global_vgms
+            Merged VGM parameters per continuous column, keyed by name.
+        global_categories
+            Sorted category lists per discrete column, keyed by name.
+        """
         self._column_order = column_order
         self._column_transform_info_list = []
         self.output_info_list = []
@@ -316,7 +328,18 @@ class GlobalDataTransformer:
             self.output_dimensions += output_dim
 
     def transform(self, df: pd.DataFrame) -> NDArray[Any]:
-        """Encode a DataFrame into a numeric matrix."""
+        """Encode a DataFrame into a numeric matrix.
+
+        Parameters
+        ----------
+        df
+            Input data with the same columns used during ``fit_global``.
+
+        Returns
+        -------
+        ndarray
+            Float32 matrix of shape ``(n_rows, output_dimensions)``.
+        """
         column_data_list: list[NDArray[Any]] = []
 
         for info in self._column_transform_info_list:
@@ -331,7 +354,19 @@ class GlobalDataTransformer:
         return np.concatenate(column_data_list, axis=1).astype(np.float32)
 
     def inverse_transform(self, data: NDArray[Any]) -> pd.DataFrame:
-        """Decode a numeric matrix back into a DataFrame."""
+        """Decode a numeric matrix back into a DataFrame.
+
+        Parameters
+        ----------
+        data
+            Encoded matrix of shape ``(n_rows, output_dimensions)`` as
+            produced by ``transform``.
+
+        Returns
+        -------
+        DataFrame
+            Reconstructed table with the original column order.
+        """
         recovered: dict[str, NDArray[Any]] = {}
         st = 0
 
@@ -451,7 +486,25 @@ class GlobalDataTransformer:
         column_name: str,
         value: str,
     ) -> dict[str, int]:
-        """Get the IDs of the given column_name/value for conditional generation."""
+        """Get the IDs of a column/value pair for conditional generation.
+
+        Parameters
+        ----------
+        column_name
+            Name of a discrete column in the fitted transformer.
+        value
+            Category value to look up.
+
+        Returns
+        -------
+        dict
+            Keys ``"discrete_column_id"``, ``"column_id"``, ``"value_id"``.
+
+        Raises
+        ------
+        ValueError
+            If *column_name* is not found or *value* is unknown.
+        """
         discrete_counter = 0
         column_id = 0
         for info in self._column_transform_info_list:

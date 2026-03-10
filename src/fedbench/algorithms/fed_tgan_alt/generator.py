@@ -1,4 +1,4 @@
-"""Fed-TGAN Generator network.
+"""Fed-TGAN-Alt Generator network.
 
 Uses residual blocks following CTGAN's architecture.
 Each Residual block concatenates its output with the input,
@@ -29,7 +29,7 @@ class Residual(nn.Module):  # type: ignore[misc]
 
 
 class Generator(nn.Module):  # type: ignore[misc]
-    """Generator for Fed-TGAN / CTGAN.
+    """Generator for Fed-TGAN-Alt / CTGAN.
 
     Generates synthetic data by stacking residual blocks, where each block
     concatenates its output with the input, linearly growing the hidden

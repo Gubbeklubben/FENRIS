@@ -1,4 +1,4 @@
-"""Fed-TGAN Discriminator network.
+"""Fed-TGAN-Alt Discriminator network.
 
 PacGAN-style discriminator following CTGAN's architecture.
 Uses WGAN-GP loss (no sigmoid in the output).
@@ -12,7 +12,7 @@ from torch import Tensor
 
 
 class Discriminator(nn.Module):  # type: ignore[misc]
-    """Discriminator for Fed-TGAN / CTGAN with PacGAN.
+    """Discriminator for Fed-TGAN-Alt / CTGAN with PacGAN.
 
     Parameters
     ----------

@@ -1,4 +1,4 @@
-"""Fed-TGAN-alt: Alternative implementation of the Federated Learning Framework for Synthesizing Tabular Data.
+"""Fed-TGAN-Alt: Alternative Fed-TGAN implementation.
 
 Based on: Zhao et al., "Fed-TGAN: Federated Learning Framework for
 Synthesizing Tabular Data" (2021). arXiv:2108.07927
@@ -18,7 +18,12 @@ import torch
 from pandas import DataFrame
 from torch import Tensor, nn, optim
 
-from fedbench.core.algorithm import Algorithm, SingleStepCoordinator, Synthesizer
+from fedbench.core.algorithm import (
+    Algorithm,
+    Coordinator,
+    SingleStepCoordinator,
+    Synthesizer,
+)
 from fedbench.core.data import TableSchema
 from fedbench.core.logger import (
     ELBOW,
@@ -71,7 +76,29 @@ def _gumbel_softmax(
     hard: bool = False,
     eps: float = 1e-10,
 ) -> Tensor:
-    """Gumbel-Softmax with logit clamping for numerical stability."""
+    """Gumbel-Softmax with logit clamping for numerical stability.
+
+    Parameters
+    ----------
+    logits
+        Unnormalized log-probabilities ``(batch_size, num_categories)``.
+    tau
+        Temperature parameter. Lower values produce harder samples.
+    hard
+        If ``True``, use the straight-through estimator.
+    eps
+        Small constant passed to ``torch.nn.functional.gumbel_softmax``.
+
+    Returns
+    -------
+    Tensor
+        Soft (or hard) one-hot samples with the same shape as *logits*.
+
+    Raises
+    ------
+    ValueError
+        If ``gumbel_softmax`` keeps returning NaN after 10 retries.
+    """
     logits = logits.clamp(-20.0, 20.0)
     for _ in range(10):
         transformed = torch.nn.functional.gumbel_softmax(
@@ -172,6 +199,41 @@ def _cond_loss(
 
 
 class FedTGANAlt(Algorithm):
+    """Alternative Fed-TGAN implementation (Zhao et al., 2021).
+
+    Horizontal federated GAN using CTGAN-style VGM encoding,
+    conditional sampling, and table-similarity-aware client weighting.
+
+    Parameters
+    ----------
+    embedding_dim
+        Size of the noise vector concatenated with the conditional vector.
+    generator_dim
+        Hidden layer sizes for each Residual block in the generator.
+        Defaults to ``[256, 256]``.
+    discriminator_dim
+        Hidden layer sizes in the discriminator.
+        Defaults to ``[256, 256]``.
+    generator_lr
+        Adam learning rate for the generator.
+    discriminator_lr
+        Adam learning rate for the discriminator.
+    batch_size
+        Training batch size (must be even and divisible by *pac*).
+    max_batches
+        Maximum number of gradient steps per communication round.
+    discriminator_steps
+        Number of discriminator updates per generator update.
+    pac
+        Number of samples packed together for PacGAN.
+    max_clusters
+        Upper bound on VGM mixture components per continuous column.
+    weight_threshold
+        VGM components with weight below this value are pruned.
+    log_frequency
+        If ``True``, use log-frequency weighting for discrete columns.
+    """
+
     def __init__(
         self,
         embedding_dim: int = 128,
@@ -204,6 +266,12 @@ class FedTGANAlt(Algorithm):
             raise ValueError("Expecting pac >= 1.")
         if batch_size % pac != 0:
             raise ValueError("Expecting batch_size divisible by pac.")
+        if discriminator_steps < 1:
+            raise ValueError("Expecting discriminator_steps >= 1.")
+        if max_batches < 1:
+            raise ValueError("Expecting max_batches >= 1.")
+        if max_clusters < 1:
+            raise ValueError("Expecting max_clusters >= 1.")
 
         self._cfg: dict[str, Any] = {
             "embedding-dim": embedding_dim,
@@ -221,7 +289,7 @@ class FedTGANAlt(Algorithm):
             "device": torch.device("cuda" if torch.cuda.is_available() else "cpu"),
         }
 
-    def create_coordinator(self) -> SingleStepCoordinator:
+    def create_coordinator(self) -> Coordinator:
         return FedTGANAltCoordinator(self._cfg)
 
     def create_synthesizer(self) -> Synthesizer:
@@ -232,6 +300,18 @@ class FedTGANAlt(Algorithm):
 
 
 class FedTGANAltCoordinator(SingleStepCoordinator):
+    """Server-side coordinator for Fed-TGAN-Alt.
+
+    Merges local VGM statistics into a global data transformer,
+    computes similarity-aware client weights, and performs
+    weighted FedAvg on generator and discriminator state dicts.
+
+    Parameters
+    ----------
+    cfg
+        Algorithm hyperparameter dictionary produced by ``FedTGANAlt``.
+    """
+
     def __init__(self, cfg: dict[str, Any]) -> None:
         self._cfg = cfg
         self._cat_attrs: list[str] = []
@@ -259,6 +339,26 @@ class FedTGANAltCoordinator(SingleStepCoordinator):
         schema: TableSchema,
         client_ids: Iterable[int],
     ) -> Iterable[tuple[int, Update]]:
+        """Broadcast hyperparameters and seed to all clients.
+
+        Seeds the global RNG and yields one configuration ``Update`` per
+        client containing ``max-clusters`` and ``weight-threshold`` so
+        that each client can fit local VGM models consistently.
+
+        Parameters
+        ----------
+        seed
+            Global random seed broadcast to all clients.
+        schema
+            Table schema used to split columns into categorical/continuous.
+        client_ids
+            IDs of all participating clients.
+
+        Yields
+        ------
+        tuple of (int, Update)
+            ``(client_id, config_update)`` pairs.
+        """
         np.random.seed(seed)
         torch.manual_seed(seed)
         if torch.cuda.is_available():
@@ -278,6 +378,20 @@ class FedTGANAltCoordinator(SingleStepCoordinator):
             yield cid, update
 
     def aggregate_fed_init(self, replies: Iterable[tuple[int, Update]]) -> None:
+        """Aggregate client init replies to build the global model.
+
+        Merges per-client VGM parameters and category frequencies into a
+        global ``GlobalDataTransformer``, computes table-similarity-aware
+        client weights, and initialises empty Generator/Discriminator
+        state dicts ready for the first training round.
+
+        Parameters
+        ----------
+        replies
+            ``(client_id, init_reply)`` pairs.  Each reply must have
+            ``"cat-freqs"`` and ``"cont-vgms"`` in ``.objects`` and
+            ``"init-extras"`` (containing ``"num-samples"``) in ``.extras``.
+        """
         # Collect local statistics from all clients
         all_cat_freqs: list[dict[str, dict[str, int]]] = []
         all_cont_vgms: list[dict[str, dict[str, Any]]] = []
@@ -381,6 +495,23 @@ class FedTGANAltCoordinator(SingleStepCoordinator):
         log_info(str(self), f"Initialized G ({data_dim}d) + D, cond_dim={cond_dim}")
 
     def aggregate_train(self, replies: Iterable[tuple[int, Update]]) -> None:
+        """Aggregate client train replies via weighted FedAvg.
+
+        Performs a weighted average of generator and discriminator state
+        dicts using the similarity-aware client weights computed during
+        ``aggregate_fed_init``.
+
+        Parameters
+        ----------
+        replies
+            ``(client_id, train_reply)`` pairs.  Each reply must have
+            ``"generator"`` and ``"discriminator"`` in ``.arrays``.
+
+        Raises
+        ------
+        ValueError
+            If *replies* is empty.
+        """
         replies_list = list(replies)
         if not replies_list:
             raise ValueError("No replies, cannot aggregate.")
@@ -430,6 +561,18 @@ class FedTGANAltCoordinator(SingleStepCoordinator):
 
 
 class FedTGANAltSynthesizer(Synthesizer):
+    """Client-side synthesizer for Fed-TGAN-Alt.
+
+    Fits local VGM / discrete statistics during init, runs WGAN-GP
+    training with CTGAN-style conditional sampling during train,
+    and generates synthetic rows during sample.
+
+    Parameters
+    ----------
+    cfg
+        Algorithm hyperparameter dictionary produced by ``FedTGANAlt``.
+    """
+
     def __init__(self, cfg: dict[str, Any]) -> None:
         self._cfg = cfg
         self._device = cfg["device"]
@@ -445,6 +588,31 @@ class FedTGANAltSynthesizer(Synthesizer):
         schema: TableSchema,
         data: DataFrame,
     ) -> Update:
+        """Fit local statistics and return them to the coordinator.
+
+        Computes per-column VGM parameters for continuous columns and
+        category frequency distributions for discrete columns from the
+        client's local data.
+
+        Parameters
+        ----------
+        request
+            Configuration update from ``configure_fed_init`` containing
+            ``"max-clusters"`` and ``"weight-threshold"`` in
+            ``.extras["config"]``.
+        seed
+            Client-local random seed (reserved for future use).
+        schema
+            Table schema identifying categorical/continuous column kinds.
+        data
+            Client's local training data.
+
+        Returns
+        -------
+        Update
+            Reply with ``"cat-freqs"`` and ``"cont-vgms"`` in ``.objects``
+            and ``"init-extras"`` (``{"num-samples": int}``) in ``.extras``.
+        """
         cat_attrs, num_attrs = _split_cat_num(schema)
         extras_cfg = request.extras["config"]
         max_clusters = cast(int, extras_cfg["max-clusters"])
@@ -481,6 +649,27 @@ class FedTGANAltSynthesizer(Synthesizer):
         return reply
 
     def train(self, request: Update, data: DataFrame) -> Update:
+        """Run one local WGAN-GP training round.
+
+        Loads the global Generator and Discriminator state dicts, trains
+        them on the client's local data using CTGAN-style conditional
+        sampling, and returns the updated state dicts.
+
+        Parameters
+        ----------
+        request
+            Global state from ``FedTGANAltCoordinator.global_state``
+            containing the transformer, model state dicts, and training
+            hyperparameters.
+        data
+            Client's local training data.
+
+        Returns
+        -------
+        Update
+            Reply with ``"generator"`` and ``"discriminator"`` state dicts
+            in ``.arrays`` and training metrics in ``.metrics["metrics"]``.
+        """
         log_info(str(self), "Start training...")
 
         # Extract global state
@@ -646,6 +835,23 @@ class FedTGANAltSynthesizer(Synthesizer):
         num_rows: int,
         seed: int,
     ) -> DataFrame:
+        """Generate synthetic tabular data from the trained generator.
+
+        Parameters
+        ----------
+        request
+            Global state from ``FedTGANAltCoordinator.global_state``
+            containing the transformer and generator state dict.
+        num_rows
+            Number of synthetic rows to generate.
+        seed
+            Random seed for reproducible sampling.
+
+        Returns
+        -------
+        DataFrame
+            Synthetic data with the same columns as the training data.
+        """
         log_info(str(self), "Start sampling...")
 
         transformer: GlobalDataTransformer = request.objects["transformer"][

@@ -1,4 +1,4 @@
-"""Fed-TGAN Table-Similarity-Aware Client Weighting.
+"""Fed-TGAN-Alt Table-Similarity-Aware Client Weighting.
 
 Implements Section 4.2 of the Fed-TGAN paper:
   - JSD for categorical columns
@@ -19,6 +19,18 @@ def compute_jsd(p: NDArray[np.floating], q: NDArray[np.floating]) -> float:
 
     ``scipy.spatial.distance.jensenshannon`` returns the *square root* of
     JSD, so the result is squared here.
+
+    Parameters
+    ----------
+    p
+        First probability distribution (must sum to 1).
+    q
+        Second probability distribution (must sum to 1).
+
+    Returns
+    -------
+    float
+        Jensen--Shannon divergence in [0, 1].
     """
     return float(jensenshannon(p, q) ** 2)
 
@@ -161,18 +173,19 @@ def compute_client_weights(
     for j_offset, col in enumerate(cont_columns):
         j = len(cat_columns) + j_offset
 
-        # Generate global distribution samples
-        global_vgm_params: list[dict] = []
-        for client_vgm in cont_vgms:
-            if col in client_vgm:
-                global_vgm_params.append(client_vgm[col])
+        # Generate global distribution samples (only for clients that have this column)
+        global_vgm_pairs: list[tuple[dict, int]] = [
+            (client_vgm[col], n_s)
+            for client_vgm, n_s in zip(cont_vgms, client_sample_counts, strict=True)
+            if col in client_vgm
+        ]
 
-        if not global_vgm_params:
+        if not global_vgm_pairs:
             continue
 
         # Merge VGM samples for global reference
         global_samples: list[NDArray[np.floating]] = []
-        for vgm_p, n_s in zip(global_vgm_params, client_sample_counts, strict=True):
+        for vgm_p, n_s in global_vgm_pairs:
             global_samples.append(_generate_vgm_samples(vgm_p, n_s, rng))
         global_combined = np.concatenate(global_samples)
 

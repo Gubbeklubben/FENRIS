@@ -1,4 +1,4 @@
-"""Fed-TGAN Data Sampler.
+"""Fed-TGAN-Alt Data Sampler.
 
 Implements CTGAN's "training-by-sampling" for conditional generation.
 Ensures categorical levels are sampled proportionally during GAN training
@@ -10,7 +10,7 @@ from __future__ import annotations
 import numpy as np
 from numpy.typing import NDArray
 
-from fedbench.algorithms.fed_tgan_alt.data_transformer import SpanInfo
+from .data_transformer import SpanInfo
 
 
 class DataSampler:
@@ -145,6 +145,17 @@ class DataSampler:
 
         Unlike ``sample_condvec``, this samples across *all* categories
         proportionally, suitable for unconditional generation.
+
+        Parameters
+        ----------
+        batch
+            Number of conditional vectors to produce.
+
+        Returns
+        -------
+        ndarray or None
+            Float32 array of shape ``(batch, n_categories)``, or ``None``
+            if there are no discrete columns.
         """
         if self._n_discrete_columns == 0:
             return None
