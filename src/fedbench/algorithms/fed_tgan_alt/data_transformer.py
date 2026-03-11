@@ -257,6 +257,16 @@ class GlobalDataTransformer:
         self.output_info_list: list[list[SpanInfo]] = []
         self.output_dimensions: int = 0
 
+    @property
+    def cond_dim(self) -> int:
+        """Total conditional-vector dimensionality (all discrete spans)."""
+        return sum(
+            span.dim
+            for col_info in self.output_info_list
+            for span in col_info
+            if len(col_info) == 1 and col_info[0].activation_fn == "softmax"
+        )
+
     def fit_global(
         self,
         column_order: list[str],

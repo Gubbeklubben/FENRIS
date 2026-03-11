@@ -1143,3 +1143,70 @@ def test_e2e_multi_round_training(sample_df, sample_schema, tiny_cfg):
 
     result = synthesizer.sample(coordinator.global_state, num_rows=10, seed=9)
     assert len(result) == 10
+
+
+# ---------------------------------------------------------------------------
+# DataSampler: non-IID guard (empty candidates fallback)
+# ---------------------------------------------------------------------------
+
+
+def test_data_sampler_sample_data_empty_candidates():
+    """When a category has zero local rows, sample_data must fall back
+    to a random row instead of crashing (non-IID guard)."""
+    # 1 discrete column with 3 categories, but only cat-0 has rows
+    n = 20
+    data = np.zeros((n, 3), dtype=np.float32)
+    data[:, 0] = 1.0  # all rows are category 0
+    output_info: list[list[SpanInfo]] = [[SpanInfo(3, "softmax")]]
+    sampler = DataSampler(data, output_info)
+
+    # Request category 2, which has no local rows
+    col = np.array([0, 0], dtype=np.intp)  # column index
+    opt = np.array([2, 2], dtype=np.intp)  # category index with 0 rows
+    rows = sampler.sample_data(data, n=0, col=col, opt=opt)
+    assert rows.shape == (2, 3)
+
+
+# ---------------------------------------------------------------------------
+# GlobalDataTransformer.cond_dim property
+# ---------------------------------------------------------------------------
+
+
+def test_transformer_cond_dim_mixed(fitted_transformer):
+    """cond_dim must equal the total number of discrete one-hot positions."""
+    # label has 2 categories, color has 3 → cond_dim = 5
+    assert fitted_transformer.cond_dim == 5
+
+
+def test_transformer_cond_dim_continuous_only(continuous_only_transformer):
+    """All-continuous transformer must have cond_dim == 0."""
+    assert continuous_only_transformer.cond_dim == 0
+
+
+def test_transformer_cond_dim_discrete_only(discrete_only_transformer):
+    """All-discrete transformer: cond_dim == output_dimensions."""
+    assert discrete_only_transformer.cond_dim == 3
+
+
+# ---------------------------------------------------------------------------
+# _sample_condvec_from_info: explicit rng parameter
+# ---------------------------------------------------------------------------
+
+
+def test_sample_condvec_from_info_with_rng():
+    """Passing an explicit rng must produce valid one-hot vectors."""
+    output_info = [[SpanInfo(4, "softmax")]]
+    rng = np.random.default_rng(42)
+    out = _sample_condvec_from_info(output_info, batch_size=16, rng=rng)
+    assert out.shape == (16, 4)
+    assert np.allclose(out.sum(axis=1), 1.0)
+
+
+# ---------------------------------------------------------------------------
+# max_total_samples constructor validation
+# ---------------------------------------------------------------------------
+
+
+def test_constructor_rejects_zero_max_total_samples():
+    with pytest.raises(ValueError, match="max_total_samples"):
+        FedTGANAlt(batch_size=10, pac=2, embedding_dim=8, max_total_samples=0)

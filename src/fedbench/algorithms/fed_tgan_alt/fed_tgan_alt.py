@@ -30,6 +30,7 @@ from fedbench.core.logger import (
     TEE,
     log_debug,
     log_info,
+    log_warning,
 )
 from fedbench.core.update import Objects, Update
 
@@ -482,12 +483,7 @@ class FedTGANAltCoordinator(SingleStepCoordinator):
         )
 
         data_dim = self._transformer.output_dimensions
-        cond_dim = sum(
-            span.dim
-            for col_info in self._transformer.output_info_list
-            for span in col_info
-            if len(col_info) == 1 and col_info[0].activation_fn == "softmax"
-        )
+        cond_dim = self._transformer.cond_dim
 
         # Initialize Generator and Discriminator
         embedding_dim = self._cfg["embedding-dim"]
@@ -539,7 +535,12 @@ class FedTGANAltCoordinator(SingleStepCoordinator):
         # Use precomputed similarity weights
         weights = self._client_weights
         if len(weights) != len(g_state_dicts):
-            # Fallback to uniform if mismatch
+            log_warning(
+                str(self),
+                f"Client weight count ({len(weights)}) does not match "
+                f"reply count ({len(g_state_dicts)}); falling back to "
+                f"uniform weights.",
+            )
             weights = [1.0 / len(g_state_dicts)] * len(g_state_dicts)
 
         self._g_state = _weighted_average_state_dicts(g_state_dicts, weights)
@@ -590,6 +591,7 @@ class FedTGANAltSynthesizer(Synthesizer):
     def __init__(self, cfg: dict[str, Any]) -> None:
         self._cfg = cfg
         self._device = cfg["device"]
+        self._rng: np.random.Generator = np.random.default_rng(0)
 
     @property
     def arrays_to_ml_framework_map(self) -> dict[str, str] | None:
@@ -760,7 +762,7 @@ class FedTGANAltSynthesizer(Synthesizer):
                     c1 = torch.from_numpy(c1).to(self._device)
                     fakez = torch.cat([fakez, c1], dim=1)
                     perm = np.arange(batch_size)
-                    np.random.shuffle(perm)
+                    self._rng.shuffle(perm)
                     real = sampler.sample_data(
                         train_data, batch_size, col[perm], opt[perm]
                     )
@@ -880,12 +882,7 @@ class FedTGANAltSynthesizer(Synthesizer):
         batch_size = cast(int, model_info["batch-size"])
 
         # We need cond_dim to reconstruct generator input size
-        cond_dim = sum(
-            span.dim
-            for col_info in output_info
-            for span in col_info
-            if len(col_info) == 1 and col_info[0].activation_fn == "softmax"
-        )
+        cond_dim = transformer.cond_dim
 
         generator = Generator(
             embedding_dim + cond_dim,
@@ -895,7 +892,7 @@ class FedTGANAltSynthesizer(Synthesizer):
         generator.load_state_dict(g_state)
         generator.eval()
 
-        np.random.seed(seed)
+        rng = np.random.default_rng(seed)
         torch.manual_seed(seed)
 
         # Recover category probabilities for data-aware sampling
@@ -912,7 +909,7 @@ class FedTGANAltSynthesizer(Synthesizer):
 
             if cond_dim > 0:
                 condvec = _sample_condvec_from_info(
-                    output_info, batch_size, category_probs
+                    output_info, batch_size, category_probs, rng=rng
                 )
                 c1 = torch.from_numpy(condvec).to(self._device)
                 fakez = torch.cat([fakez, c1], dim=1)
@@ -994,6 +991,8 @@ def _sample_condvec_from_info(
     output_info: list[list[SpanInfo]],
     batch_size: int,
     category_probs: np.ndarray | None = None,
+    *,
+    rng: np.random.Generator | None = None,
 ) -> np.ndarray:
     """Sample a one-hot conditional vector for generation.
 
@@ -1027,11 +1026,14 @@ def _sample_condvec_from_info(
 
     cond = np.zeros((batch_size, n_categories), dtype=np.float32)
 
+    if rng is None:
+        rng = np.random.default_rng()
+
     if category_probs is not None and len(category_probs) == n_categories:
         # Data-aware sampling: pick category indices proportional to frequency
         probs = category_probs.copy()
         probs = probs / probs.sum()  # re-normalise for safety
-        chosen = np.random.choice(n_categories, size=batch_size, p=probs)
+        chosen = rng.choice(n_categories, size=batch_size, p=probs)
         cond[np.arange(batch_size), chosen] = 1.0
     else:
         # Fallback: uniform over discrete columns × categories
@@ -1042,9 +1044,9 @@ def _sample_condvec_from_info(
                 discrete_spans.append((cond_st, col_info[0].dim))
                 cond_st += col_info[0].dim
         for i in range(batch_size):
-            col_idx = np.random.randint(len(discrete_spans))
+            col_idx = rng.integers(len(discrete_spans))
             st, dim = discrete_spans[col_idx]
-            cat_idx = np.random.randint(dim)
+            cat_idx = rng.integers(dim)
             cond[i, st + cat_idx] = 1.0
 
     return cond
