@@ -23,7 +23,7 @@ from fedbench.evaluators.privacy import (
     MIANearestNeighborAttackEvaluator,
 )
 
-from .conftest import NUMERIC_DF, make_ctx, make_schema
+from .conftest import NUMERIC_DF, make_ctx, make_centralized_ctx, make_local_ctx, make_schema
 
 
 # ===================================================================
@@ -31,7 +31,13 @@ from .conftest import NUMERIC_DF, make_ctx, make_schema
 # ===================================================================
 
 class TestDirectOverlap:
-    """Tests for exact-match and partial-match memorisation diagnostics."""
+    """Tests for exact-match and partial-match memorization diagnostics.
+
+    ``global_evaluate`` intentionally returns NaN for this evaluator —
+    overlap against a server holdout is a structural false negative (§16.5).
+    All meaningful tests use ``local_evaluate`` + ``aggregate``, which is the
+    only correct mode for overlap detection.
+    """
 
     evaluator = DirectOverlapDiagnosticEvaluator()
 
@@ -44,10 +50,18 @@ class TestDirectOverlap:
         "partial_match_any",
     }
 
-    def test_full_memorization(self):
-        """syn == train  → 100 % exact match."""
+    def test_global_evaluate_returns_nan(self):
+        """global_evaluate is unsupported by design — must return all-NaN result."""
         ctx = make_ctx(NUMERIC_DF, NUMERIC_DF.copy())
-        result = self.evaluator.evaluate(ctx)
+        result = self.evaluator.global_evaluate(ctx)
+
+        assert set(result.keys()) == self.EXPECTED_KEYS
+        assert all(math.isnan(v) for v in result.values())
+
+    def test_full_memorization(self):
+        """syn == train → 100 % exact match via local_evaluate + aggregate."""
+        ctx = make_local_ctx(NUMERIC_DF, NUMERIC_DF.copy())
+        result = self.evaluator.aggregate([self.evaluator.local_evaluate(ctx)])
 
         assert result["exact_row_match_rate_train"] == pytest.approx(1.0)
         assert result["exact_row_match_any"] == 1.0
@@ -60,8 +74,8 @@ class TestDirectOverlap:
             "income": rng.normal(999_999, 1, len(NUMERIC_DF)),
             "score":  rng.uniform(100, 200, len(NUMERIC_DF)),
         })
-        ctx = make_ctx(NUMERIC_DF, syn)
-        result = self.evaluator.evaluate(ctx)
+        ctx = make_local_ctx(NUMERIC_DF, syn)
+        result = self.evaluator.aggregate([self.evaluator.local_evaluate(ctx)])
 
         assert result["exact_row_match_rate_train"] == pytest.approx(0.0)
         assert result["exact_row_match_any"] == 0.0
@@ -79,25 +93,25 @@ class TestDirectOverlap:
             [NUMERIC_DF.iloc[:half].reset_index(drop=True), random_half],
             ignore_index=True,
         )
-        ctx = make_ctx(NUMERIC_DF, syn)
-        result = self.evaluator.evaluate(ctx)
+        ctx = make_local_ctx(NUMERIC_DF, syn)
+        result = self.evaluator.aggregate([self.evaluator.local_evaluate(ctx)])
 
         assert 0.4 < result["exact_row_match_rate_train"] < 0.6
 
     def test_disjoint_columns_emits_nan_keys(self):
-        """No shared columns → all 6 keys present as nan (NaN contract §7.1.2)."""
+        """No shared columns → local_evaluate returns None → aggregate emits all-NaN."""
         real = pd.DataFrame({"a": [1, 2]})
         syn = pd.DataFrame({"b": [3, 4]})
-        ctx = make_ctx(real, syn)
-        result = self.evaluator.evaluate(ctx)
+        ctx = make_local_ctx(real, syn)
+        result = self.evaluator.aggregate([self.evaluator.local_evaluate(ctx)])
 
         assert set(result.keys()) == self.EXPECTED_KEYS
         assert all(math.isnan(v) for v in result.values())
 
     def test_returns_all_keys(self):
         """Key-completeness check: all six expected metric keys must be present."""
-        ctx = make_ctx(NUMERIC_DF, NUMERIC_DF.copy())
-        result = self.evaluator.evaluate(ctx)
+        ctx = make_local_ctx(NUMERIC_DF, NUMERIC_DF.copy())
+        result = self.evaluator.aggregate([self.evaluator.local_evaluate(ctx)])
 
         assert set(result.keys()) == self.EXPECTED_KEYS
 
@@ -107,11 +121,14 @@ class TestDirectOverlap:
 # ===================================================================
 
 class TestMIA:
-    """Tests for Membership Inference Attack using nearest-neighbour distance.
+    """Tests for Membership Inference Attack using nearest-neighbor distance.
 
     MIA checks whether an attacker can distinguish training members from
     non-members by their distance to the synthetic data.  If syn ≈ train,
     members are closer → AUC > 0.5; if syn is random, AUC ≈ 0.5.
+
+    ``global_evaluate`` requires a ``CentralizedEvalContext``: members are
+    sampled from ``client_train_df`` and non-members from ``holdout_df``.
     """
 
     evaluator = MIANearestNeighborAttackEvaluator()
@@ -136,8 +153,8 @@ class TestMIA:
         train, test = self._make_disjoint_datasets(rng, n=200)
         syn = train.copy()
 
-        ctx = make_ctx(train, syn, test_df=test)
-        result = self.evaluator.evaluate(ctx)
+        ctx = make_centralized_ctx(train, syn, test_df=test, client_train_df=train)
+        result = self.evaluator.global_evaluate(ctx)
 
         assert result["mia_auc"] > 0.7
 
@@ -150,8 +167,8 @@ class TestMIA:
         # Synthetic from a completely different region
         syn = pd.DataFrame({"x": rng.normal(50, 1, n), "y": rng.normal(50, 1, n)})
 
-        ctx = make_ctx(train, syn, test_df=test)
-        result = self.evaluator.evaluate(ctx)
+        ctx = make_centralized_ctx(train, syn, test_df=test, client_train_df=train)
+        result = self.evaluator.global_evaluate(ctx)
 
         # Both members and non-members are far from syn → no signal
         assert 0.35 < result["mia_auc"] < 0.65
@@ -160,8 +177,8 @@ class TestMIA:
         """Empty training set → all three MIA keys present as nan (NaN contract §7.1.2)."""
         empty = pd.DataFrame({"x": pd.Series(dtype=float)})
         syn = pd.DataFrame({"x": [1.0, 2.0]})
-        ctx = make_ctx(empty, syn, test_df=empty)
-        result = self.evaluator.evaluate(ctx)
+        ctx = make_centralized_ctx(empty, syn, test_df=empty, client_train_df=empty)
+        result = self.evaluator.global_evaluate(ctx)
 
         assert math.isnan(result["mia_auc"])
         assert math.isnan(result["mia_accuracy"])
@@ -175,8 +192,8 @@ class TestMIA:
         test = pd.DataFrame({"x": rng.normal(5, 1, n)})
         syn = train.copy()
 
-        ctx = make_ctx(train, syn, test_df=test)
-        result = self.evaluator.evaluate(ctx)
+        ctx = make_centralized_ctx(train, syn, test_df=test, client_train_df=train)
+        result = self.evaluator.global_evaluate(ctx)
 
         assert set(result.keys()) == self.EXPECTED_KEYS
 
@@ -200,13 +217,13 @@ class TestAIA:
         """No sensitive_columns → generic nan result emitted (NaN contract §7.1.2)."""
         df = pd.DataFrame({"x": [1.0, 2.0, 3.0], "y": [0, 1, 0]})
         ctx = make_ctx(df, df.copy(), sensitive_columns=None)
-        result = self.evaluator.evaluate(ctx)
+        result = self.evaluator.global_evaluate(ctx)
 
         assert set(result.keys()) == self.GENERIC_NAN_KEYS
         assert all(math.isnan(v) for v in result.values())
 
         ctx2 = make_ctx(df, df.copy(), sensitive_columns=())
-        result2 = self.evaluator.evaluate(ctx2)
+        result2 = self.evaluator.global_evaluate(ctx2)
         assert set(result2.keys()) == self.GENERIC_NAN_KEYS
         assert all(math.isnan(v) for v in result2.values())
 
@@ -221,11 +238,10 @@ class TestAIA:
 
         ctx = make_ctx(
             df, df.copy(),
-            test_df=df.copy(),
             sensitive_columns=("sensitive",),
             schema=schema,
         )
-        result = self.evaluator.evaluate(ctx)
+        result = self.evaluator.global_evaluate(ctx)
 
         assert "aia_accuracy.sensitive" in result
         assert result["aia_accuracy.sensitive"] > 0.8
@@ -241,11 +257,10 @@ class TestAIA:
 
         ctx = make_ctx(
             df, df.copy(),
-            test_df=df.copy(),
             sensitive_columns=("sens_val",),
             schema=schema,
         )
-        result = self.evaluator.evaluate(ctx)
+        result = self.evaluator.global_evaluate(ctx)
 
         assert "aia_rmse.sens_val" in result
 
@@ -260,7 +275,7 @@ class TestAIA:
             sensitive_columns=("sensitive",),
             schema=schema,
         )
-        result = self.evaluator.evaluate(ctx)
+        result = self.evaluator.global_evaluate(ctx)
 
         assert math.isnan(result["aia_accuracy.sensitive"])
         assert math.isnan(result["aia_auc.sensitive"])

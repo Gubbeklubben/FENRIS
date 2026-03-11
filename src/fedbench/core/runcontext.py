@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from collections.abc import Callable
-from typing import Mapping, cast, overload
+from typing import Any, Mapping, cast, overload
 
 from pandas import DataFrame
 
@@ -62,14 +62,16 @@ class _RunCtxField[T]:
 
 class RunContext:
     # fmt: off
-    algorithm          = _RunCtxField[Algorithm]()
-    df_loader          = _RunCtxField[Callable[[], DataFrame]]()
-    partitioner        = _RunCtxField[Partitioner]()
-    eval_suite         = _RunCtxField[EvaluationSuite]()
-    dataset            = _RunCtxField[PartitionedDataset]()
-    aggregated_state   = _RunCtxField[Update]()
-    aggregated_metrics = _RunCtxField[Mapping[str, float]]()
-    synthetic_df       = _RunCtxField[DataFrame]()
+    algorithm           = _RunCtxField[Algorithm]()
+    df_loader           = _RunCtxField[Callable[[], DataFrame]]()
+    partitioner         = _RunCtxField[Partitioner]()
+    eval_suite          = _RunCtxField[EvaluationSuite]()
+    dataset             = _RunCtxField[PartitionedDataset]()
+    aggregated_state    = _RunCtxField[Update]()
+    per_client_metrics  = _RunCtxField[Mapping[int, Mapping[str, Any]]]()
+    aggregated_metrics  = _RunCtxField[Mapping[str, float]]()
+    centralized_metrics = _RunCtxField[Mapping[str, float]]()
+    synthetic_df        = _RunCtxField[DataFrame]()
     # fmt: on
 
     def __init__(self, run_id: str, config: Config, eventbus: EventBus) -> None:

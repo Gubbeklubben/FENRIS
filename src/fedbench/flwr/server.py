@@ -1,5 +1,7 @@
+import json
 import time
 from collections.abc import Generator, Iterable
+from typing import Any, cast
 
 from flwr.common import ConfigRecord, Context, Message, RecordDict
 from flwr.server import Grid
@@ -8,6 +10,7 @@ from flwr.serverapp import ServerApp
 from fedbench.config import Config
 from fedbench.core.algorithm import Coordinator
 from fedbench.core.data import TableSchema
+from fedbench.core.encoder import FedbenchEncoder
 from fedbench.core.eventbus import EventBus
 from fedbench.core.events import (
     ClientReply,
@@ -77,14 +80,21 @@ class FedbenchServer:
         for reply in grid.send_and_receive(requests):
             src_id = reply.metadata.src_node_id
             self._eventbus.emit(ClientReply(src_id, msg_type=msg_type))
-            metrics = reply.content.metric_records["metrics"]
-            self._per_client_metrics[src_id] = dict(metrics)
+            metrics = reply.content.config_records["metrics"]
+            # noinspection PyUnnecessaryCast
+            self._per_client_metrics[src_id] = {
+                key: json.loads(
+                    cast(str, value),
+                    object_hook=FedbenchEncoder.decode,
+                )
+                for key, value in metrics.items()
+            }
 
     def run(
         self,
         grid: Grid,
         num_rounds: int,
-    ) -> tuple[Update, dict[str, float]]:
+    ) -> tuple[Update, dict[int, Any]]:
 
         self._eventbus.emit(FedInitStarted())
         self.fed_init(grid)
@@ -96,7 +106,7 @@ class FedbenchServer:
             self._eventbus.emit(TrainingCompleted(curr_round, num_rounds))
             self.evaluate(grid)
 
-        return self._get_and_check_global_state(), {}
+        return self._get_and_check_global_state(), self._per_client_metrics
 
     def _send_and_receive(
         self,
@@ -196,6 +206,6 @@ def make_server_app(ctx: RunContext) -> ServerApp:
         )
         state, metrics = server.run(grid, config.num_rounds)
         ctx.aggregated_state = state
-        ctx.aggregated_metrics = metrics
+        ctx.per_client_metrics = metrics
 
     return app

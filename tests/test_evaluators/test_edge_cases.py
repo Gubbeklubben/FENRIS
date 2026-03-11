@@ -9,6 +9,14 @@ Note on the NaN contract (Code Structure Guide §7.1.2)
 Evaluators emit ``float("nan")`` when a metric is not applicable, rather
 than omitting the key.  Tests in this module accept both ``nan`` and finite
 values; only ``±inf`` is forbidden.
+
+Note on MIANearestNeighborAttackEvaluator
+-----------------------------------------
+``global_evaluate`` requires a ``CentralizedEvalContext``.  The edge-case
+suite calls ``global_evaluate`` via a ``CentralizedEvalContext`` built by
+``make_centralized_ctx`` so the evaluator does not raise a ``TypeError``
+before the robustness logic is reached.  All other evaluators receive a
+plain ``GlobalEvalContext`` from ``make_ctx``.
 """
 
 import numpy as np
@@ -27,7 +35,14 @@ from fedbench.evaluators.privacy import (
 from fedbench.evaluators.fairness import FairnessEvaluator
 from fedbench.evaluators.utility import TSTREvaluator
 
-from .conftest import NUMERIC_DF, _DistSimilarity, _MomentReduction, make_ctx, assert_dicts_nan_safe
+from .conftest import (
+    NUMERIC_DF,
+    _DistSimilarity,
+    _MomentReduction,
+    make_ctx,
+    make_centralized_ctx,
+    assert_dicts_nan_safe,
+)
 
 
 # ---------------------------------------------------------------------------
@@ -38,7 +53,6 @@ from .conftest import NUMERIC_DF, _DistSimilarity, _MomentReduction, make_ctx, a
 # can be instantiated).  All nine evaluators are tested in one sweep.
 # ---------------------------------------------------------------------------
 
-# All evaluators we want to cross-test
 ALL_EVALUATORS = [
     _MomentReduction(),
     _DistSimilarity(),
@@ -56,6 +70,13 @@ ALL_EVALUATOR_IDS = [
 ]
 
 
+def _make_eval_ctx(evaluator, real, syn, **kwargs):
+    """Return the appropriate context type for the given evaluator."""
+    if isinstance(evaluator, MIANearestNeighborAttackEvaluator):
+        return make_centralized_ctx(real, syn, client_train_df=real, **kwargs)
+    return make_ctx(real, syn, **kwargs)
+
+
 @pytest.mark.parametrize("evaluator", ALL_EVALUATORS, ids=ALL_EVALUATOR_IDS)
 class TestEdgeCases:
 
@@ -63,21 +84,21 @@ class TestEdgeCases:
         """Evaluator must not raise on a single-row DataFrame."""
         real = pd.DataFrame({"x": [1.0], "cat": ["a"]})
         syn = pd.DataFrame({"x": [2.0], "cat": ["b"]})
-        ctx = make_ctx(real, syn, target_column="cat")
+        ctx = _make_eval_ctx(evaluator, real, syn, target_column="cat")
 
         # Must not raise — result can be anything (empty dict is fine)
-        result = evaluator.evaluate(ctx)
+        result = evaluator.global_evaluate(ctx)
         assert isinstance(result, dict)
 
     def test_deterministic_with_seed(self, evaluator):
         """Same EvalContext → same result on repeated calls.
 
         Uses ``assert_dicts_nan_safe`` instead of ``dict.__eq__`` to avoid
-        relying on CPython’s identity-based short-circuit for ``math.nan``.
+        relying on CPython's identity-based short-circuit for ``math.nan``.
         """
-        ctx = make_ctx(NUMERIC_DF, NUMERIC_DF.copy())
-        r1 = evaluator.evaluate(ctx)
-        r2 = evaluator.evaluate(ctx)
+        ctx = _make_eval_ctx(evaluator, NUMERIC_DF, NUMERIC_DF.copy())
+        r1 = evaluator.global_evaluate(ctx)
+        r2 = evaluator.global_evaluate(ctx)
 
         assert_dicts_nan_safe(r1, r2)
 
@@ -88,8 +109,8 @@ class TestEdgeCases:
         ``float("nan")`` rather than a missing key.  Both ``nan`` and finite
         values are therefore accepted; only ``±inf`` is forbidden.
         """
-        ctx = make_ctx(NUMERIC_DF, NUMERIC_DF * 1.01)
-        result = evaluator.evaluate(ctx)
+        ctx = _make_eval_ctx(evaluator, NUMERIC_DF, NUMERIC_DF * 1.01)
+        result = evaluator.global_evaluate(ctx)
 
         for key, value in result.items():
             assert isinstance(value, float), f"{key} is not float: {type(value)}"
@@ -107,8 +128,8 @@ class TestEdgeCases:
             "bad":  [float("nan")] * 3,
         })
         syn = real.copy()
-        ctx = make_ctx(real, syn)
-        result = evaluator.evaluate(ctx)
+        ctx = _make_eval_ctx(evaluator, real, syn)
+        result = evaluator.global_evaluate(ctx)
 
         assert isinstance(result, dict)
         for key, value in result.items():
@@ -123,8 +144,8 @@ class TestEdgeCases:
         real = NUMERIC_DF.copy()
         syn = NUMERIC_DF.copy()
         syn["extra_col"] = 999.0
-        ctx = make_ctx(real, syn)
-        result = evaluator.evaluate(ctx)
+        ctx = _make_eval_ctx(evaluator, real, syn)
+        result = evaluator.global_evaluate(ctx)
 
         assert isinstance(result, dict)
         for value in result.values():
@@ -144,20 +165,22 @@ class TestEdgeCases:
         nan_mask = rng.random(syn.shape) < 0.5
         syn[nan_mask] = float("nan")
 
-        ctx = make_ctx(real, syn)
-        result = evaluator.evaluate(ctx)
+        ctx = _make_eval_ctx(evaluator, real, syn)
+        result = evaluator.global_evaluate(ctx)
 
         assert isinstance(result, dict)
         for key, value in result.items():
             assert isinstance(value, float), f"{key} is not float: {type(value)}"
             assert not np.isinf(value), f"{key} = {value} is ±inf (forbidden)"
 
+    @pytest.mark.filterwarnings("ignore::RuntimeWarning")
     def test_inf_in_synthetic_no_crash(self, evaluator):
         """±inf values in synthetic_df must not cause a crash or ±inf output.
 
         If a generator diverges it can emit ±inf instead of NaN.  The
         evaluator must still return a valid float dict without re-emitting
-        the infinity upward.
+        the infinity upward.  NumPy may emit a RuntimeWarning when reducing
+        over arrays containing ±inf — this is expected and suppressed here.
         """
         real = NUMERIC_DF.copy()
         syn = NUMERIC_DF.copy()
@@ -165,8 +188,8 @@ class TestEdgeCases:
         syn.iloc[::3, :] = np.inf
         syn.iloc[1::3, :] = -np.inf
 
-        ctx = make_ctx(real, syn)
-        result = evaluator.evaluate(ctx)
+        ctx = _make_eval_ctx(evaluator, real, syn)
+        result = evaluator.global_evaluate(ctx)
 
         assert isinstance(result, dict)
         for key, value in result.items():

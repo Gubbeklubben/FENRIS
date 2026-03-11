@@ -1,6 +1,6 @@
 import hashlib
 import math
-from typing import Any, Literal
+from typing import Any, Iterable, Literal
 
 import numpy as np
 import pandas as pd
@@ -87,7 +87,7 @@ def get_nominal_columns(df: pd.DataFrame, schema: TableSchema) -> list[str]:
 
 def sanitize_numeric_df(
     df: pd.DataFrame,
-    numeric_cols: list[str],
+    numeric_cols: Iterable[str],
 ) -> pd.DataFrame:
     """
     Return a numeric-only dataframe safe for statistics.
@@ -114,7 +114,12 @@ def sanitize_numeric_df(
     return clean
 
 
-def safe_nanmean(values: list[float]) -> float:
+def to_numeric_series(series: pd.Series) -> pd.Series:
+    """Coerce to numeric and drop NaNs, returning a clean pd.Series."""
+    return pd.Series(pd.to_numeric(series, errors="coerce")).dropna()
+
+
+def safe_nanmean(values: Iterable[float]) -> float:
     """Like ``np.nanmean`` but returns ``nan`` silently for all-NaN inputs.
 
     ``np.nanmean`` emits a ``RuntimeWarning: Mean of empty slice`` when every
@@ -124,6 +129,23 @@ def safe_nanmean(values: list[float]) -> float:
     arr = np.asarray(values, dtype=float)
     finite = arr[~np.isnan(arr)]
     return float(np.mean(finite)) if finite.size else math.nan
+
+
+def weighted_mean(pairs: Iterable[tuple[float, int]]) -> float:
+    """Weighted mean of (value, weight) pairs, NaN-safe."""
+    num, den = 0.0, 0
+    for v, w in pairs:
+        if v == v and w > 0:  # v==v is NaN-safe
+            num += float(v) * int(w)
+            den += int(w)
+    return math.nan if den == 0 else num / den
+
+
+def nanptp(sequence: np.ndarray) -> float:
+    """Like np.ptp but ignores NaNs and returns NaN if all values are NaN."""
+    if np.all(np.isnan(sequence)):
+        return math.nan
+    return float(np.nanmax(sequence)) - float(np.nanmin(sequence))
 
 
 def get_quasi_identifiers(
