@@ -10,7 +10,7 @@ from sklearn.impute import SimpleImputer
 from sklearn.pipeline import Pipeline
 from sklearn.preprocessing import OneHotEncoder, StandardScaler
 
-from fedbench.core.eval import EvalContext
+from fedbench.core.data import TableSchema
 
 type TaskType = Literal[
     "binary_classification", "multiclass_classification", "regression"
@@ -61,23 +61,28 @@ def fit_tabular_model(X: pd.DataFrame, y: pd.Series, model: BaseEstimator) -> Pi
     return pipe
 
 
-def get_schema_columns(ctx: EvalContext) -> tuple[list[str], list[str]]:
-    """Return (numeric_columns, categorical_columns) present in train."""
-    train_cols = set(ctx.train_df.columns)
-
-    numeric = [
+def get_numeric_columns(df: pd.DataFrame, schema: TableSchema) -> list[str]:
+    """Return schema columns with kind 'continuous' or 'integer' present in df."""
+    df_cols = set(df.columns)
+    return [
         c.name
-        for c in ctx.schema.columns
-        if c.kind in ("continuous", "integer") and c.name in train_cols
+        for c in schema.columns
+        if c.kind in ("continuous", "integer") and c.name in df_cols
     ]
 
-    categorical = [
-        c.name
-        for c in ctx.schema.columns
-        if c.kind in ("categorical", "binary") and c.name in train_cols
-    ]
 
-    return numeric, categorical
+def get_nominal_columns(df: pd.DataFrame, schema: TableSchema) -> list[str]:
+    """Return schema columns with kind 'categorical' or 'binary' present in df.
+
+    These are unordered discrete columns for which arithmetic operations
+    are not meaningful.
+    """
+    df_cols = set(df.columns)
+    return [
+        c.name
+        for c in schema.columns
+        if c.kind in ("categorical", "binary") and c.name in df_cols
+    ]
 
 
 def sanitize_numeric_df(
