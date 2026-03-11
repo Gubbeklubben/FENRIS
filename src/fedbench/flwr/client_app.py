@@ -8,6 +8,17 @@ from flwr.common import (
     RecordDict,
 )
 
+from fedbench.component_factory import (
+    create_algorithm,
+    create_df_loader,
+    create_evaluation_suite,
+    create_partitioner,
+)
+from fedbench.registries import (
+    build_algorithm_registry,
+    build_evaluator_registries,
+    build_partitioner_registry,
+)
 from fedbench.config import Config
 from fedbench.core.data import PartitionedDataset
 from fedbench.core.data.schemas import infer_schema
@@ -17,17 +28,10 @@ from fedbench.flwr.serde import (
     to_flwr_no_pickle,
     to_flwr_pickle,
 )
-from fedbench.registries import (
-    build_algorithm_registry,
-    build_evaluator_registries,
-    build_partitioner_registry,
-)
-from fedbench.resolver import (
-    resolve_algorithm,
-    resolve_df_loader,
-    resolve_evaluators,
-    resolve_partitioner,
-)
+
+import uuid
+
+INST = str(uuid.uuid4())
 
 config: Config | None = None
 flwr_client: FlwrClient | None = None
@@ -42,6 +46,7 @@ def require_context() -> tuple[Config, FlwrClient]:
 
 @app.query("config")
 def recv_config(flwr_message: Message, _: Context) -> Message:
+    print(INST, "config")
     cfg_record: ConfigRecord = flwr_message.content.config_records["config"]
     global config
     # noinspection PyUnnecessaryCast
@@ -51,13 +56,14 @@ def recv_config(flwr_message: Message, _: Context) -> Message:
 
 @app.query("artifacts")
 def recv_artifacts(flwr_message: Message, _: Context) -> Message:
+    print(INST, "artifacts")
     if config is None:
         raise RuntimeError("Missing config.")
 
-    df_loader = resolve_df_loader(config)
-    algorithm = resolve_algorithm(config, build_algorithm_registry())
-    partitioner = resolve_partitioner(config, build_partitioner_registry())
-    eval_suite = resolve_evaluators(config, build_evaluator_registries())
+    df_loader = create_df_loader(config)
+    algorithm = create_algorithm(config, build_algorithm_registry())
+    partitioner = create_partitioner(config, build_partitioner_registry())
+    eval_suite = create_evaluation_suite(config, build_evaluator_registries())
 
     synthesizer_spec = algorithm.synthesizer_spec
     if flwr_message.has_content():
@@ -92,6 +98,7 @@ def recv_artifacts(flwr_message: Message, _: Context) -> Message:
 
 @app.query("fed_init")
 def fed_init(flwr_message: Message, flwr_context: Context) -> Message:
+    print(INST, "fed_init")
     cfg, client = require_context()
     return client.fed_init(cfg.seed, flwr_message, flwr_context)
 

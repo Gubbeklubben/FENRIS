@@ -2,9 +2,9 @@ from flwr.common import Context
 from flwr.server import Grid
 from flwr.serverapp import ServerApp
 
-from fedbench.core.algorithm import create_coordinator
-from fedbench.core.events import ClientsConfigured
+from fedbench.component_factory import create_coordinator
 from fedbench.core.runcontext import RunContext
+from fedbench.core.events import ClientsConfigured
 from fedbench.flwr.serde import (
     from_flwr_pickle,
     to_flwr_no_pickle,
@@ -16,6 +16,9 @@ from fedbench.flwr.server import send_config, send_artifacts, Strategy
 def make_server_app(ctx: RunContext) -> ServerApp:
     app = ServerApp()
 
+    to_flwr = to_flwr_no_pickle if ctx.config.disable_pickle else to_flwr_pickle
+    from_flwr = from_flwr_pickle
+
     @app.main()
     def main(grid: Grid, _: Context) -> None:
         for reply in send_config(grid, ctx.config):
@@ -24,8 +27,15 @@ def make_server_app(ctx: RunContext) -> ServerApp:
                     f"Failed to send config: {reply.error.reason}"
                 )
 
-        for reply in send_artifacts(grid, ctx.algorithm_artifacts.synthesizer):
-            pass
+        for reply in send_artifacts(
+                grid,
+                to_flwr,
+                ctx.algorithm_artifacts.synthesizer
+        ):
+            if reply.has_error():
+                raise RuntimeError(
+                    f"Failed to send artifacts: {reply.error.reason}"
+                )
 
         ctx.eventbus.emit(ClientsConfigured())
 
@@ -38,9 +48,8 @@ def make_server_app(ctx: RunContext) -> ServerApp:
         strategy = Strategy(
             seed=ctx.config.seed,
             schema=ctx.dataset.schema,
-            to_flwr=to_flwr_no_pickle if ctx.config.disable_pickle
-                    else to_flwr_pickle,
-            from_flwr=from_flwr_pickle,
+            to_flwr=to_flwr,
+            from_flwr=from_flwr,
             eventbus=ctx.eventbus,
             coordinator=coordinator,
             arrays_to_ml_framework_map=arrays_map

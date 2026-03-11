@@ -6,29 +6,18 @@ import pandas as pd
 from numpy.typing import NDArray
 
 from fedbench.core.algorithm import (
-    Algorithm,
+    Algorithm, ComponentSpec, coordinator_spec, synthesizer_spec,
     Coordinator, SingleStepCoordinator,
-    Synthesizer, ComponentSpec, coordinator_spec, synthesizer_spec, )
+    Synthesizer,
+)
 from fedbench.core.data import TableSchema
 from fedbench.core.logger import log_info
-from fedbench.core.types import Extras
 from fedbench.core.update import Update
 
 
 class FedHelloCoordinator(SingleStepCoordinator):
-    def __init__(
-        self,
-        config: Extras | None,
-        artifacts: Update | None,
-    ) -> None:
-
-        super().__init__(None, artifacts)
-        if config is not None:
-            # noinspection PyUnnecessaryCast
-            self._name: str = cast(str, config["name"])
-        else:
-            raise ValueError(f"{self}: Bad framework forgot my config!")
-
+    def __init__(self, name: str) -> None:
+        self._name = name
         self._state: list[NDArray[np.int_]] | None = None
         self._df: pd.DataFrame | None = None
 
@@ -71,19 +60,8 @@ class FedHelloCoordinator(SingleStepCoordinator):
 
 
 class FedHelloSynthesizer(Synthesizer):
-    def __init__(
-        self,
-        config: Extras | None,
-        artifacts: Update | None,
-        client_cache: Update | None = None
-    ) -> None:
-
-        super().__init__(None, artifacts, client_cache)
-        if config is not None:
-            # noinspection PyUnnecessaryCast
-            self._name: str = cast(str, config["name"])
-        else:
-            raise ValueError(f"{self}: Bad framework forgot my config!")
+    def __init__(self, name: str) -> None:
+        self._name = name
 
     def train(
         self,
@@ -113,13 +91,14 @@ class FedHello(Algorithm):
     """Say a federated hello."""
 
     def __init__(self, name: str = "Stranger") -> None:
-        self._name = name
+        self._coord_factory = lambda: FedHelloCoordinator(name)
+        self._synth_factory = lambda: FedHelloSynthesizer(name)
 
     @property
     def coordinator_spec(self) -> ComponentSpec[Coordinator]:
-        return coordinator_spec(FedHelloCoordinator, {"name": self._name})
+        return coordinator_spec(self._coord_factory)
 
     @property
     def synthesizer_spec(self) -> ComponentSpec[Synthesizer]:
-        return synthesizer_spec(FedHelloSynthesizer, {"name":  self._name})
+        return synthesizer_spec(self._synth_factory)
 

@@ -2,6 +2,7 @@ import uuid
 from collections.abc import Iterable
 
 from fedbench.config import Config
+from fedbench.core.command import Command
 from fedbench.core.eventbus import EventBus
 from fedbench.core.events import (
     CommandCompleted,
@@ -12,7 +13,6 @@ from fedbench.core.events import (
     RunStarted,
 )
 from fedbench.core.logger import log_debug, log_error
-from fedbench.core.pipeline import Command
 from fedbench.core.runcontext import RunContext
 
 
