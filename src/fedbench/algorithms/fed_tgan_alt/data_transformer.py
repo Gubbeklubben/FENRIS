@@ -327,6 +327,67 @@ class GlobalDataTransformer:
             self.output_info_list.append(info.output_info)
             self.output_dimensions += output_dim
 
+    def to_dict(self) -> dict[str, Any]:
+        """Serialise the transformer to a plain-Python dict.
+
+        The returned dict is JSON-safe (only ``str``, ``int``, ``float``
+        and ``list`` values) and can be transmitted through
+        ``Update.extras`` or any other serialisation layer.
+
+        Returns
+        -------
+        dict
+            Keys ``"column_order"``, ``"column_types"``,
+            ``"global_vgms"``, ``"global_categories"``.
+        """
+        column_types: dict[str, str] = {}
+        global_categories: dict[str, list[str]] = {}
+        for info in self._column_transform_info_list:
+            column_types[info.column_name] = info.column_type
+            if info.column_type == "discrete":
+                ohe = self._discrete_info[info.column_name]
+                global_categories[info.column_name] = list(ohe.categories_[0])
+
+        return {
+            "column_order": list(self._column_order),
+            "column_types": column_types,
+            "global_vgms": {
+                col: dict(vgm) for col, vgm in self._continuous_info.items()
+            },
+            "global_categories": global_categories,
+        }
+
+    @classmethod
+    def from_dict(cls, data: dict[str, Any]) -> "GlobalDataTransformer":
+        """Reconstruct a transformer from a dict produced by ``to_dict()``.
+
+        Parameters
+        ----------
+        data
+            Dict with keys ``"column_order"``, ``"column_types"``,
+            ``"global_vgms"``, ``"global_categories"``.
+
+        Returns
+        -------
+        GlobalDataTransformer
+            Fully initialised transformer ready for ``transform`` /
+            ``inverse_transform`` calls.
+        """
+        transformer = cls()
+        col_types_raw: dict[str, str] = data["column_types"]
+        col_types: dict[str, Literal["continuous", "discrete"]] = {}
+        for k, v in col_types_raw.items():
+            if v not in ("continuous", "discrete"):
+                raise ValueError(f"Unknown column type '{v}' for column '{k}'.")
+            col_types[k] = v  # type: ignore[assignment]
+        transformer.fit_global(
+            column_order=data["column_order"],
+            column_types=col_types,
+            global_vgms=data.get("global_vgms", {}),
+            global_categories=data.get("global_categories", {}),
+        )
+        return transformer
+
     def transform(self, df: pd.DataFrame) -> NDArray[Any]:
         """Encode a DataFrame into a numeric matrix.
 
@@ -450,7 +511,7 @@ class GlobalDataTransformer:
 
         selected_means = means[component_idx]
         selected_stds = stds[component_idx]
-        values = normalized * 4.0 * selected_stds + selected_means
+        values: NDArray[Any] = normalized * 4.0 * selected_stds + selected_means
 
         return values
 
@@ -466,7 +527,8 @@ class GlobalDataTransformer:
         # Categories were stored as strings (fit_local_discrete uses str(k)),
         # so cast incoming values to str to match and avoid np.isnan on objects.
         str_values = np.array([str(v) for v in values]).reshape(-1, 1)
-        return ohe.transform(str_values).astype(np.float32)
+        result: NDArray[Any] = ohe.transform(str_values).astype(np.float32)
+        return result
 
     def _inverse_discrete(
         self,
@@ -477,7 +539,8 @@ class GlobalDataTransformer:
         ohe = self._discrete_info[col]
         indices = np.argmax(col_data, axis=1)
         categories = ohe.categories_[0]
-        return categories[indices]
+        result: NDArray[Any] = categories[indices]
+        return result
 
     # ── Helper for conditional vector / column ID mapping ──────────────── #
 

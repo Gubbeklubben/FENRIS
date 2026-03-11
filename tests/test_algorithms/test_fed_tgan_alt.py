@@ -102,6 +102,7 @@ def tiny_cfg() -> dict:
         "pac": 2,
         "max-clusters": 3,
         "weight-threshold": 0.005,
+        "max-total-samples": 1000,
         "log-frequency": True,
         "device": torch.device("cpu"),
     }

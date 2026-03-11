@@ -201,8 +201,16 @@ class DataSampler:
             idx = np.random.randint(len(data), size=n)
             return data[idx]
 
-        idx = []
+        assert opt is not None  # opt is always provided when col is
+        row_indices: list[int] = []
         for c, o in zip(col, opt, strict=True):
-            idx.append(np.random.choice(self._rid_by_cat_cols[c][o]))
+            candidates = self._rid_by_cat_cols[c][o]
+            if len(candidates) == 0:
+                # Guard: category exists in global encoding but has no
+                # local rows (extreme non-IID).  Fall back to a random row.
+                row_indices.append(int(np.random.randint(len(data))))
+            else:
+                row_indices.append(int(np.random.choice(candidates)))
 
-        return data[np.array(idx)]
+        result: NDArray[np.floating] = data[np.array(row_indices)]
+        return result

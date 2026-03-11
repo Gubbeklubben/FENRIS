@@ -8,6 +8,8 @@ Implements Section 4.2 of the Fed-TGAN paper:
 
 from __future__ import annotations
 
+from typing import Any
+
 import numpy as np
 from numpy.typing import NDArray
 from scipy.spatial.distance import jensenshannon
@@ -56,7 +58,7 @@ def compute_wd(
 
 
 def _generate_vgm_samples(
-    vgm_params: dict,
+    vgm_params: dict[str, Any],
     n_samples: int,
     rng: np.random.Generator,
 ) -> NDArray[np.floating]:
@@ -97,7 +99,7 @@ def _generate_vgm_samples(
 
 def compute_client_weights(
     cat_freqs: list[dict[str, dict[str, int]]],
-    cont_vgms: list[dict[str, dict]],
+    cont_vgms: list[dict[str, dict[str, Any]]],
     client_sample_counts: list[int],
     cat_columns: list[str],
     cont_columns: list[str],
@@ -174,7 +176,7 @@ def compute_client_weights(
         j = len(cat_columns) + j_offset
 
         # Generate global distribution samples (only for clients that have this column)
-        global_vgm_pairs: list[tuple[dict, int]] = [
+        global_vgm_pairs: list[tuple[dict[str, Any], int]] = [
             (client_vgm[col], n_s)
             for client_vgm, n_s in zip(cont_vgms, client_sample_counts, strict=True)
             if col in client_vgm
@@ -219,4 +221,6 @@ def compute_client_weights(
     exp_sd = np.exp(SD - SD.max())  # Stable softmax
     weights = exp_sd / exp_sd.sum()
 
-    return weights.tolist()
+    result: list[float] = weights.tolist()
+
+    return result

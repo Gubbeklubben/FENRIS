@@ -10,7 +10,7 @@ separate modules under this package.
 """
 
 from collections.abc import Iterable
-from typing import Any, cast
+from typing import Any, Literal, cast
 
 import numpy as np
 import pandas as pd
@@ -230,6 +230,11 @@ class FedTGANAlt(Algorithm):
         Upper bound on VGM mixture components per continuous column.
     weight_threshold
         VGM components with weight below this value are pruned.
+    max_total_samples
+        Hard cap on total synthetic samples generated when merging
+        local VGM models on the server.  Client proportions are
+        preserved but scaled down when the raw total exceeds this
+        limit.  Defaults to ``100_000``.
     log_frequency
         If ``True``, use log-frequency weighting for discrete columns.
     """
@@ -247,6 +252,7 @@ class FedTGANAlt(Algorithm):
         pac: int = 10,
         max_clusters: int = 10,
         weight_threshold: float = 0.005,
+        max_total_samples: int = 100_000,
         log_frequency: bool = True,
     ) -> None:
         if generator_dim is None:
@@ -272,6 +278,8 @@ class FedTGANAlt(Algorithm):
             raise ValueError("Expecting max_batches >= 1.")
         if max_clusters < 1:
             raise ValueError("Expecting max_clusters >= 1.")
+        if max_total_samples < 1:
+            raise ValueError("Expecting max_total_samples >= 1.")
 
         self._cfg: dict[str, Any] = {
             "embedding-dim": embedding_dim,
@@ -285,6 +293,7 @@ class FedTGANAlt(Algorithm):
             "pac": pac,
             "max-clusters": max_clusters,
             "weight-threshold": weight_threshold,
+            "max-total-samples": max_total_samples,
             "log-frequency": log_frequency,
             "device": torch.device("cuda" if torch.cuda.is_available() else "cpu"),
         }
@@ -321,6 +330,7 @@ class FedTGANAltCoordinator(SingleStepCoordinator):
         self._schema_column_order: list[str] = []
         self._transformer: GlobalDataTransformer | None = None
         self._client_weights: list[float] = []
+        self._rng: np.random.Generator = np.random.default_rng(0)
         self._category_probs: np.ndarray = np.array([])
         self._g_state: dict[str, Tensor] | None = None
         self._d_state: dict[str, Tensor] | None = None
@@ -359,7 +369,7 @@ class FedTGANAltCoordinator(SingleStepCoordinator):
         tuple of (int, Update)
             ``(client_id, config_update)`` pairs.
         """
-        np.random.seed(seed)
+        self._rng = np.random.default_rng(seed)
         torch.manual_seed(seed)
         if torch.cuda.is_available():
             torch.cuda.manual_seed(seed)
@@ -441,6 +451,7 @@ class FedTGANAltCoordinator(SingleStepCoordinator):
                 client_sample_counts,
                 max_clusters=self._cfg["max-clusters"],
                 weight_threshold=self._cfg["weight-threshold"],
+                max_total_samples=self._cfg["max-total-samples"],
             )
 
         # Compute table-similarity-aware client weights
@@ -457,7 +468,9 @@ class FedTGANAltCoordinator(SingleStepCoordinator):
 
         # Build global transformer
         column_order = self._cat_attrs + self._num_attrs
-        column_types = {c: "discrete" for c in self._cat_attrs}
+        column_types: dict[str, Literal["continuous", "discrete"]] = {
+            c: "discrete" for c in self._cat_attrs
+        }
         column_types.update({c: "continuous" for c in self._num_attrs})
 
         self._transformer = GlobalDataTransformer()
@@ -533,14 +546,15 @@ class FedTGANAltCoordinator(SingleStepCoordinator):
         self._d_state = _weighted_average_state_dicts(d_state_dicts, weights)
 
     def _create_update(self) -> Update:
+        assert self._transformer is not None
         return Update(
             arrays={
                 "generator": cast(dict[str, Tensor], self._g_state),
                 "discriminator": cast(dict[str, Tensor], self._d_state),
             },
             objects={
-                "transformer": cast(Objects, {"transformer": self._transformer}),
-                "weights": cast(Objects, {"weights": self._client_weights}),
+                "transformer": self._transformer.to_dict(),
+                "weights": {"weights": self._client_weights},
             },
             extras={
                 "model-info": {
@@ -673,9 +687,9 @@ class FedTGANAltSynthesizer(Synthesizer):
         log_info(str(self), "Start training...")
 
         # Extract global state
-        transformer: GlobalDataTransformer = request.objects["transformer"][
-            "transformer"
-        ]
+        transformer = GlobalDataTransformer.from_dict(
+            request.objects["transformer"]
+        )
         output_info = transformer.output_info_list
         data_dim = transformer.output_dimensions
 
@@ -854,9 +868,9 @@ class FedTGANAltSynthesizer(Synthesizer):
         """
         log_info(str(self), "Start sampling...")
 
-        transformer: GlobalDataTransformer = request.objects["transformer"][
-            "transformer"
-        ]
+        transformer = GlobalDataTransformer.from_dict(
+            request.objects["transformer"]
+        )
         output_info = transformer.output_info_list
         data_dim = transformer.output_dimensions
 
@@ -913,13 +927,13 @@ class FedTGANAltSynthesizer(Synthesizer):
         result = transformer.inverse_transform(data_concat)
 
         # Round integer columns back to int
-        int_cols = model_info.get("integer-columns", [])
+        int_cols = cast(list[str], model_info.get("integer-columns", []))
         for col in int_cols:
             if col in result.columns:
                 result[col] = result[col].round().astype(int)
 
         # Restore binary columns to int (inverse_transform returns strings)
-        binary_cols = model_info.get("binary-columns", [])
+        binary_cols = cast(list[str], model_info.get("binary-columns", []))
         for col in binary_cols:
             if col in result.columns:
                 result[col] = (
@@ -927,7 +941,9 @@ class FedTGANAltSynthesizer(Synthesizer):
                 )
 
         # Restore original schema column order
-        schema_order = model_info.get("schema-column-order")
+        schema_order = cast(
+            list[str] | None, model_info.get("schema-column-order")
+        )
         if schema_order:
             result = result[[c for c in schema_order if c in result.columns]]
 
@@ -968,7 +984,8 @@ def _weighted_average_state_dicts(
                     acc = tensor * w
                 else:
                     acc = acc + tensor * w
-            result[key] = acc  # type: ignore[assignment]
+            assert acc is not None  # guaranteed by non-empty state_dicts
+            result[key] = acc
 
     return result
 
