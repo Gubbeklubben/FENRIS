@@ -14,6 +14,7 @@ from fedbench.config import Config
 from fedbench.core.algorithm import Algorithm
 from fedbench.core.data import PartitionedDataset
 from fedbench.core.data.schemas import infer_schema
+from fedbench.core.encoder import FedbenchEncoder
 from fedbench.core.eval import EvaluationSuite, LocalEvalContext
 from fedbench.core.logger import log_warning
 from fedbench.core.update import Extras, Update
@@ -124,7 +125,7 @@ class FedbenchClient:
         )
         metrics: Extras = {}
         for key, value in self._eval_suite.local_evaluate(eval_ctx).items():
-            metrics[key] = json.dumps(value)
+            metrics[key] = json.dumps(value, cls=FedbenchEncoder)
 
         update = Update(extras={"metrics": metrics})
 

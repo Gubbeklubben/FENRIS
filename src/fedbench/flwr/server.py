@@ -10,6 +10,7 @@ from flwr.serverapp import ServerApp
 from fedbench.config import Config
 from fedbench.core.algorithm import Coordinator
 from fedbench.core.data import TableSchema
+from fedbench.core.encoder import FedbenchEncoder
 from fedbench.core.eventbus import EventBus
 from fedbench.core.events import (
     ClientReply,
@@ -82,7 +83,10 @@ class FedbenchServer:
             metrics = reply.content.config_records["metrics"]
             # noinspection PyUnnecessaryCast
             self._per_client_metrics[src_id] = {
-                key: json.loads(cast(str, value))  # nofmt
+                key: json.loads(
+                    cast(str, value),
+                    object_hook=FedbenchEncoder.decode,
+                )
                 for key, value in metrics.items()
             }
 
