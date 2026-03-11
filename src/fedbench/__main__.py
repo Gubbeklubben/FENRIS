@@ -1,3 +1,4 @@
+from enum import StrEnum
 from typing import Annotated, Literal
 
 import typer
@@ -8,11 +9,13 @@ from fedbench.pipeline import pipeline
 from fedbench.registries import (
     build_algorithm_registry,
     build_partitioner_registry,
+    build_evaluator_registries,
 )
 from fedbench.util.parsing import split_outside_brackets
 
 algorithms = build_algorithm_registry()
 partitioners = build_partitioner_registry()
+evaluators = build_evaluator_registries()
 
 app = typer.Typer()
 
@@ -40,49 +43,148 @@ def new(name: str) -> None:
     pass
 
 
+class Component(StrEnum):
+    ALGORITHMS = "algorithms"
+    PARTITIONERS = "partitioners"
+    EVALUATORS = "evaluators"
+
+
 @app.command()
-def list_algorithms(
-    include_locator: Annotated[
+def show(
+    components: Annotated[
+        list[Component] | None,
+        typer.Argument(
+            help="Components to show. If omitted, all are shown.",
+        ),
+    ] = None,
+    include_locators: Annotated[
         bool,
         typer.Option(
             "--include-locators",
-            help="Show locators for the factories used to create algorithm instances.",
+            help="Include factory locators (import paths) in the output.",
         ),
     ] = False,
 ) -> None:
+    """
+    Show available algorithms, partitioners, and/or evaluators.
 
-    for metadata in algorithms.metadata():
-        print(metadata.name, end="")
-        print(f": {metadata.locator}" if include_locator else "")
+    Examples:\n
+      fedbench show\n
+      fedbench show algorithms\n
+      fedbench show algorithms partitioners --include-locators
+    """
+
+    selected = components if components else list(Component)
+
+    if Component.ALGORITHMS in selected:
+        items = list(algorithms.metadata())
+        width = max(len(m.name) for m in items)
+        print("\n--- ALGORITHMS ---")
+        for metadata in items:
+            print(f"  {metadata.name:<{width}}", end="")
+            print(f"  {metadata.locator}" if include_locators else "")
+
+    if Component.PARTITIONERS in selected:
+        items = list(partitioners.metadata())
+        width = max(len(m.name) for m in items)
+        print("\n--- PARTITIONERS ---")
+        for metadata in items:
+            print(f"  {metadata.name:<{width}}", end="")
+            print(f"  {metadata.locator}" if include_locators else "")
+
+    if Component.EVALUATORS in selected:
+        for category, registry in evaluators.items():
+            print(f"\n--- EVALUATORS: {category.upper()} ---")
+            registered_items = list(registry.metadata())
+            if not registered_items:
+                print("  (No evaluators registered)")
+                continue
+            width = max(len(m.name) for m in registered_items)
+            for metadata in registered_items:
+                print(f"  {metadata.name:<{width}}", end="")
+                print(f"  {metadata.locator}" if include_locators else "")
+
+    print()
 
 
 @app.command()
 def run(
-    algorithm: Annotated[str, typer.Argument()],
-    partitioner: Annotated[str, typer.Argument()],
-    dataset: Annotated[str, typer.Argument()],
-    algorithm_kwargs: Annotated[str | None, typer.Option(callback=parse_kwargs)] = None,
-    partitioner_kwargs: Annotated[
-        str | None, typer.Option(callback=parse_kwargs)
+    algorithm: Annotated[str, typer.Argument(help="Algorithm/Generator key.")],
+    partitioner: Annotated[str, typer.Argument(help="Partitioner key.")],
+    dataset: Annotated[str, typer.Argument(help="Path to the dataset CSV.")],
+    algorithm_kwargs: Annotated[
+        str | None,
+        typer.Option(
+            callback=parse_kwargs, help="Kwargs for the algorithm (key=value)."
+        ),
     ] = None,
-    target_col: Annotated[str | None, typer.Option()] = None,
-    sensitive_cols: Annotated[str | None, typer.Option(callback=parse_args)] = None,
-    run_categories: Annotated[str | None, typer.Option(callback=parse_args)] = None,
-    early_stop: Annotated[bool | None, typer.Option()] = None,
-    stop_metric: Annotated[str | None, typer.Option()] = None,
-    stop_mode: Annotated[Literal["min", "max"] | None, typer.Option()] = None,
-    stop_epsilon: Annotated[float | None, typer.Option()] = None,
-    stop_patience: Annotated[int | None, typer.Option()] = None,
-    stop_min_rounds: Annotated[int | None, typer.Option()] = None,
-    stop_eval_every: Annotated[int | None, typer.Option()] = None,
-    stop_synthetic_rows: Annotated[int | None, typer.Option()] = None,
-    num_clients: Annotated[int | None, typer.Option()] = None,
-    num_rounds: Annotated[int | None, typer.Option()] = None,
-    test_size: Annotated[float | None, typer.Option()] = None,
-    seed: Annotated[int | None, typer.Option()] = None,
-    outputdir: Annotated[str | None, typer.Option()] = None,
-    num_synthetic_rows: Annotated[int | None, typer.Option()] = None,
-    disable_pickle: Annotated[bool | None, typer.Option()] = None,
+    partitioner_kwargs: Annotated[
+        str | None,
+        typer.Option(
+            callback=parse_kwargs, help="Kwargs for the partitioner (key=value)."
+        ),
+    ] = None,
+    target_col: Annotated[
+        str | None, typer.Option(help="Target column for utility/fairness metrics.")
+    ] = None,
+    sensitive_cols: Annotated[
+        str | None,
+        typer.Option(
+            callback=parse_args,
+            help="Comma-separated sensitive columns for fairness/AIA.",
+        ),
+    ] = None,
+    run_categories: Annotated[
+        str | None,
+        typer.Option(
+            callback=parse_args, help="Override specific metric categories to run."
+        ),
+    ] = None,
+    early_stop: Annotated[
+        bool | None, typer.Option(help="Enable threshold-based convergence.")
+    ] = None,
+    stop_metric: Annotated[
+        str | None,
+        typer.Option(help="Metric key to monitor (e.g., fidelity.corr_fro_diff)."),
+    ] = None,
+    stop_mode: Annotated[
+        Literal["min", "max"] | None, typer.Option(help="min or max.")
+    ] = None,
+    stop_epsilon: Annotated[
+        float | None, typer.Option(help="Minimum improvement required.")
+    ] = None,
+    stop_patience: Annotated[
+        int | None,
+        typer.Option(help="Evaluations without improvement before stopping."),
+    ] = None,
+    stop_min_rounds: Annotated[
+        int | None, typer.Option(help="Minimum rounds before stopping.")
+    ] = None,
+    stop_eval_every: Annotated[
+        int | None, typer.Option(help="Evaluate stopping metric every N rounds.")
+    ] = None,
+    stop_synthetic_rows: Annotated[
+        int | None, typer.Option(help="Rows sampled for early stopping evaluation.")
+    ] = None,
+    num_clients: Annotated[
+        int | None, typer.Option(help="Number of simulated clients.")
+    ] = None,
+    num_rounds: Annotated[
+        int | None, typer.Option(help="Maximum number of federated rounds.")
+    ] = None,
+    test_size: Annotated[
+        float | None, typer.Option(help="Fraction of data to hold out for testing.")
+    ] = None,
+    seed: Annotated[int | None, typer.Option(help="Master random seed.")] = None,
+    outputdir: Annotated[
+        str | None, typer.Option(help="Output directory for artifacts.")
+    ] = None,
+    num_synthetic_rows: Annotated[
+        int | None, typer.Option(help="Number of synthetic rows to generate.")
+    ] = None,
+    disable_pickle: Annotated[
+        bool | None, typer.Option(help="Disable pickle for dataset loading.")
+    ] = None,
 ) -> None:
 
     cli_input = {
