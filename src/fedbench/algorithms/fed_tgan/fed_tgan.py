@@ -1,23 +1,32 @@
 from collections.abc import Iterable
-from typing import Any, Literal
+from typing import Any
 
 import pandas as pd
 import numpy as np
 import torch
+from sklearn.preprocessing import LabelEncoder
 
 from fedbench.core.algorithm import Coordinator, SingleStepCoordinator, Synthesizer, Algorithm
-from fedbench.core.data import load_csv, TableSchema
+from fedbench.core.data import TableSchema
 from fedbench.core.update import Update
-from fedbench.core.logger import debug_calls
 
 from fedbench.algorithms.fed_tgan.generator import Generator
 from fedbench.algorithms.fed_tgan.discriminator import Discriminator
 
 
-_some_state = {
-    "s1": {"s11": 1, "s12": 2, "s13": 3, "nested_dict": {1: 1}},
-    "s2": {"s21": 1, "s22": 2, "s23": 3, "nested_dict": {2: 2}},
-}
+def split_cat_num(schema: TableSchema) -> tuple[list[str], list[str]]:
+    """Split schema into categorical and numerical column names."""
+    cat_attrs = [
+        c.name
+        for c in schema.columns
+        if c.kind in ("categorical", "binary")
+    ]
+    num_attrs = [
+        c.name
+        for c in schema.columns
+        if c.kind in ("continuous", "integer")
+    ]
+    return cat_attrs, num_attrs
 
 
 def init_model(cfg: dict[str, Any]) -> tuple[Generator, Discriminator]:
@@ -83,25 +92,100 @@ class FedTGANCoordinator(SingleStepCoordinator):
 
     def __init__(self, cfg: dict[str, Any]) -> None:
         self._cfg: dict[str, Any] = cfg
+        self._cat_attrs: list[str] | None = None
+        self._num_attrs: list[str] | None = None
+        self._preproc_objects: dict[str, Any] | None = None
+        self._preproc_extras: dict[str, Any] | None = None
+        self._state: dict[str, Any] | None = None
+
+    @property
+    def arrays_to_ml_framework_map(self) -> dict[str, str] | None:
+        return {"arrays": "torch"}
+
+    @property
+    def global_state(self) -> Update | None:
+        if self._state is None:
+            return None
+        return self._create_update()
 
     def configure_fed_init(
             self,
             seed: int,
             schema: TableSchema,
             client_ids: Iterable[int]) -> Iterable[tuple[int, Update]]:
+
+        np.random.seed(seed)
+        torch.manual_seed(seed)
+        if torch.cuda.is_available():
+            torch.cuda.manual_seed(seed)
+
+        # Split schema into categorical and numerical columns
+        self._cat_attrs, self._num_attrs = split_cat_num(schema)
+
+        # Send empty requests to all clients to collect vocabularies
         return ((client_id, Update()) for client_id in client_ids)
 
-    def aggregate_fed_init(self, replies: Iterable[Update]) -> Update:
-        update = Update()
-        update.objects["my-state"] = _some_state
-        return update
+    def aggregate_fed_init(self, replies: Iterable[tuple[int, Update]]) -> None:
+        # Collect vocabularies from all clients
+        global_vocab: dict[str, set[str]] = {col: set() for col in self._cat_attrs}
+
+        for _, reply in replies:
+            if "vocab" in reply.extras:
+                client_vocab = reply.extras["vocab"]
+                for col, values in client_vocab.items():
+                    global_vocab[col].update(values)
+
+        # Create label encoders for each categorical column
+        label_encoders: dict[str, LabelEncoder] = {}
+        for col, values in global_vocab.items():
+            if values:  # Only create encoder if there are values
+                sorted_values = sorted(values)
+                label_encoders[col] = LabelEncoder().fit(sorted_values)
+
+        # Calculate dimensions for model initialization
+        n_cat_features = len(self._cat_attrs)
+        n_num_features = len(self._num_attrs)
+        input_dim = output_dim = n_cat_features + n_num_features
+
+        # Store preprocessing artifacts
+        self._preproc_objects = {
+            "label-encoders": label_encoders,
+            "num-scaler": None,  # Will be set during first training round if needed
+        }
+        self._preproc_extras = {
+            "cat-attrs": self._cat_attrs,
+            "num-attrs": self._num_attrs,
+            "input-dim": input_dim,
+            "output-dim": output_dim,
+        }
+
+        # Initialize models with correct dimensions
+        cfg_with_dims = self._cfg | {
+            "input_dim": input_dim,
+            "output_dim": output_dim,
+            "latent_dim": self._cfg["latent-dim"],
+        }
+        generator, discriminator = init_model(cfg_with_dims)
+
+        self._state = {
+            "generator": generator.state_dict(),
+            "discriminator": discriminator.state_dict(),
+        }
 
     def aggregate_train(
             self,
-            replies: Iterable[Update]) -> Update:
+            replies: Iterable[tuple[int, Update]]) -> None:
         update = Update()
-        update.objects["my-state"] = _some_state
+        update.objects["my-state"] = self._state
         return update
+
+    def _create_update(self) -> Update:
+        """Create Update with the current global state and preprocessing artifacts."""
+        return Update(
+            arrays={"arrays": self._state},
+            objects={"preproc-objects": self._preproc_objects},
+            extras={"preproc-extras": self._preproc_extras},
+        )
 
 
 class FedTGANSynthesizer(Synthesizer):
@@ -111,13 +195,38 @@ class FedTGANSynthesizer(Synthesizer):
         self._max_batches = cfg["max-batches"]
         self._device = cfg["device"]
 
+    @property
+    def arrays_to_ml_framework_map(self) -> dict[str, str] | None:
+        return {"arrays": "torch"}
+
+    def fed_init(
+            self,
+            request: Update,
+            seed: int,
+            schema: TableSchema,
+            data: pd.DataFrame) -> Update:
+        """Extract unique categorical values from local data and return to coordinator."""
+
+        cat_attrs, num_attrs = split_cat_num(schema)
+
+        # Collect unique categorical values from this client's data
+        vocab: dict[str, list[str]] = {}
+        for col in cat_attrs:
+            # Convert to string and get unique values
+            unique_vals = data[col].astype(str).unique().tolist()
+            vocab[col] = unique_vals
+
+        # Return vocabulary to coordinator
+        update = Update()
+        update.extras["vocab"] = vocab
+        return update
+
     def train(
             self,
             request: Update,
             data: pd.DataFrame) -> Update:
 
         update = Update()
-        update.objects["my-state"] = _some_state
         return update
 
     def sample(
@@ -125,15 +234,5 @@ class FedTGANSynthesizer(Synthesizer):
             request: Update,
             num_rows: int,
             seed: int) -> pd.DataFrame:
-        # TODO: Extremely hacky, fix later
-        df, schema = load_csv("datasets/breast_cancer.csv")
-        return df
-
-        # num_records = 10
-        # data = {
-        #    "ints": np.random.randint(0, 100, size=num_records),
-        #    "floats": np.random.randn(num_records),
-        #    "dates": pd.date_range('2023-01-01', periods=num_records),
-        #    "categories": np.random.choice(["a", "b", "c"], size=num_records)
-        # }
-        # return pd.DataFrame(data)
+        # TODO: Implement sampling
+        raise NotImplementedError("Sampling not yet implemented")
