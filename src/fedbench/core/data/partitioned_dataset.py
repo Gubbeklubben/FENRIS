@@ -1,4 +1,4 @@
-from pandas import DataFrame
+import pandas as pd
 from sklearn.model_selection import train_test_split
 
 from fedbench.core.data.partitioner import Partitioner
@@ -8,7 +8,7 @@ from fedbench.core.data.schemas import TableSchema
 class PartitionedDataset:
     def __init__(
         self,
-        df: DataFrame,
+        df: pd.DataFrame,
         schema: TableSchema,
         partitioner: Partitioner,
         test_size: float,
@@ -25,7 +25,7 @@ class PartitionedDataset:
             shuffle=True,
         )
         self._partitioner.set_dataset(client_pool)
-        self._global_holdout: DataFrame = holdout
+        self._global_holdout: pd.DataFrame = holdout
 
         self._test_size = test_size
         self._seed = seed
@@ -38,10 +38,10 @@ class PartitionedDataset:
     def num_partitions(self) -> int:
         return self._partitioner.num_partitions
 
-    def load_global_holdout(self) -> DataFrame:
+    def load_global_holdout(self) -> pd.DataFrame:
         return self._global_holdout
 
-    def load_train_partition(self, partition_id: int) -> DataFrame:
+    def load_train_partition(self, partition_id: int) -> pd.DataFrame:
         return self._partitioner.load_partition(
             partition_id=partition_id,
             split="train",
@@ -49,10 +49,17 @@ class PartitionedDataset:
             seed=self._seed,
         )
 
-    def load_test_partition(self, partition_id: int) -> DataFrame:
+    def load_test_partition(self, partition_id: int) -> pd.DataFrame:
         return self._partitioner.load_partition(
             partition_id=partition_id,
             split="test",
             test_size=self._test_size,
             seed=self._seed,
         )
+
+    def load_all_train_data(self) -> pd.DataFrame:
+        partitions = [
+            self.load_train_partition(i)  # nofmt
+            for i in range(self.num_partitions)
+        ]
+        return pd.concat(partitions, ignore_index=True)

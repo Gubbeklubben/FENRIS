@@ -12,20 +12,17 @@ if TYPE_CHECKING:
 
 type Arrays = list[NDArray[Any]] | dict[str, torch.Tensor]
 type Objects = dict[str, Any]
-type Metrics = dict[str, int | float | list[int] | list[float]]
+type Metrics = dict[
+    str,
+    int | float | list[int] | list[float],
+]
+# fmt: off
 type Extras = dict[
     str,
-    str
-    | bool
-    | int
-    | float
-    | bytes
-    | list[str]
-    | list[bool]
-    | list[int]
-    | list[float]
-    | list[bytes],
+    str | bool | int | float | bytes |
+    list[str] | list[bool] | list[int] | list[float] | list[bytes]
 ]
+# fmt: on
 
 
 @dataclass(frozen=True)  # Can not replace top level dicts once created
