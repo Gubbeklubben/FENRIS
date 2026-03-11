@@ -17,7 +17,12 @@ import pandas as pd
 from scipy import stats
 
 from fedbench.core.eval import EvalContext, Evaluator
-from fedbench.util.metrics import get_schema_columns, safe_nanmean, sanitize_numeric_df
+from fedbench.util.metrics import (
+    get_nominal_columns,
+    get_numeric_columns,
+    safe_nanmean,
+    sanitize_numeric_df,
+)
 
 
 class MomentReductionMetricsEvaluator(Evaluator):
@@ -27,7 +32,7 @@ class MomentReductionMetricsEvaluator(Evaluator):
             "std_abs_diff": math.nan,
         }
 
-        numeric_columns, _ = get_schema_columns(ctx)
+        numeric_columns = get_numeric_columns(ctx.train_df, ctx.schema)
         if not numeric_columns:
             return nan_result
 
@@ -61,7 +66,7 @@ class DistributionSimilarityMetricsEvaluator(Evaluator):
             "t_stat_mean_abs": math.nan,
         }
 
-        numeric_columns, _ = get_schema_columns(ctx)
+        numeric_columns = get_numeric_columns(ctx.train_df, ctx.schema)
         if not numeric_columns:
             return nan_result
 
@@ -100,14 +105,14 @@ class DistributionSimilarityMetricsEvaluator(Evaluator):
 
 class CategoricalTvMeanEvaluator(Evaluator):
     def evaluate(self, ctx: EvalContext) -> dict[str, float]:
-        _, categorical_columns = get_schema_columns(ctx)
-        if not categorical_columns:
+        nominal_columns = get_nominal_columns(ctx.train_df, ctx.schema)
+        if not nominal_columns:
             return {
                 "categorical_tv_mean": math.nan,
             }
 
         tvs = []
-        for col in categorical_columns:
+        for col in nominal_columns:
             pr = ctx.train_df[col].fillna("__NA__").value_counts(normalize=True)
             ps = ctx.synthetic_df[col].fillna("__NA__").value_counts(normalize=True)
 
@@ -122,7 +127,7 @@ class CategoricalTvMeanEvaluator(Evaluator):
 
 class CorrFroDiffEvaluator(Evaluator):
     def evaluate(self, ctx: EvalContext) -> dict[str, float]:
-        numeric_columns, _ = get_schema_columns(ctx)
+        numeric_columns = get_numeric_columns(ctx.train_df, ctx.schema)
         if len(numeric_columns) < 2:
             return {
                 "corr_fro_diff": math.nan,
