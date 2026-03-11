@@ -12,6 +12,7 @@ from fedbench.core.update import Update
 
 from fedbench.algorithms.fed_tgan.generator import Generator
 from fedbench.algorithms.fed_tgan.discriminator import Discriminator
+from fedbench.algorithms.fed_tgan.training import generator_step, discriminator_step
 
 
 def split_cat_num(schema: TableSchema) -> tuple[list[str], list[str]]:
@@ -177,7 +178,6 @@ class FedTGANCoordinator(SingleStepCoordinator):
             replies: Iterable[tuple[int, Update]]) -> None:
         update = Update()
         update.objects["my-state"] = self._state
-        return update
 
     def _create_update(self) -> Update:
         """Create Update with the current global state and preprocessing artifacts."""
@@ -225,9 +225,118 @@ class FedTGANSynthesizer(Synthesizer):
             self,
             request: Update,
             data: pd.DataFrame) -> Update:
+        """Train Generator and Discriminator on local data using alternating GAN training."""
 
-        update = Update()
-        return update
+        # Extract preprocessing artifacts and model states from request
+        arrays = request.arrays["arrays"]
+        preproc_objects = request.objects["preproc-objects"]
+        preproc_extras = request.extras["preproc-extras"]
+
+        cat_attrs = preproc_extras["cat-attrs"]
+        num_attrs = preproc_extras["num-attrs"]
+        input_dim = preproc_extras["input-dim"]
+        output_dim = preproc_extras["output-dim"]
+        label_encoders = preproc_objects["label-encoders"]
+
+        # Preprocess data: label-encode categoricals, concatenate with numericals
+        processed_data = []
+
+        # Encode categorical columns
+        for col in cat_attrs:
+            if col in label_encoders:
+                encoded = label_encoders[col].transform(data[col].astype(str))
+                processed_data.append(encoded.reshape(-1, 1))
+
+        # Add numerical columns
+        if num_attrs:
+            num_data = data[num_attrs].values
+            processed_data.append(num_data)
+
+        # Concatenate all features
+        if processed_data:
+            X = np.hstack(processed_data).astype(np.float32)
+        else:
+            raise ValueError("No data to train on")
+
+        # Convert to torch tensor and create DataLoader
+        dataset = torch.utils.data.TensorDataset(torch.from_numpy(X))
+        dataloader = torch.utils.data.DataLoader(
+            dataset,
+            batch_size=self._cfg["batch-size"],
+            shuffle=True
+        )
+
+        # Initialize models
+        generator = Generator(
+            latent_dim=self._cfg["latent-dim"],
+            output_dim=output_dim
+        )
+        discriminator = Discriminator(input_dim=input_dim)
+
+        # Load weights from request
+        generator.load_state_dict(arrays["generator"])
+        discriminator.load_state_dict(arrays["discriminator"])
+
+        # Move to device
+        generator.to(self._device)
+        discriminator.to(self._device)
+
+        # Create optimizers
+        lr = self._cfg["learning-rate"]
+        optimizer_generator = torch.optim.SGD(generator.parameters(), lr=lr, momentum=0.9)
+        optimizer_discriminator = torch.optim.SGD(discriminator.parameters(), lr=lr, momentum=0.9)
+
+        train_loss_discriminator = 0.0
+        train_loss_generator = 0.0
+        num_batches = 0
+
+        # Training loop
+        for _ in range(self._cfg["local-epochs"]):
+            for (real_data_batch,) in dataloader:
+                real_data = real_data_batch.to(self._device)
+
+                # Generate synthetic data
+                noise = torch.randn(real_data.size(0), self._cfg["latent-dim"], device=self._device)
+                fake_data = generator(noise)
+
+                # Train discriminator on combined data
+                train_loss_discriminator += discriminator_step(
+                    discriminator,
+                    real_data,
+                    fake_data.detach(),
+                    optimizer_discriminator,
+                    self._device
+                )
+
+                # Train the generator
+                noise_g = torch.randn(real_data.size(0), self._cfg["latent-dim"], device=self._device)
+                train_loss_generator += generator_step(
+                    generator,
+                    discriminator,
+                    noise_g,
+                    optimizer_generator,
+                    self._device
+                )
+
+                num_batches += 1
+
+                # Stop if max_batches reached
+                if num_batches >= self._max_batches:
+                    break
+
+            if num_batches >= self._max_batches:
+                break
+
+        # Return updated Generator state (discriminator stays local)
+        reply = Update()
+        reply.arrays["arrays"] = generator.state_dict()
+        reply.metrics["metrics"] = {
+            "loss-discriminator": train_loss_discriminator / num_batches if num_batches > 0 else 0.0,
+            "loss-generator": train_loss_generator / num_batches if num_batches > 0 else 0.0,
+            "num-samples": len(dataset),
+        }
+
+        return reply
 
     def sample(
             self,
