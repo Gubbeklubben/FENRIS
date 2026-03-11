@@ -8,8 +8,8 @@ from fedbench.config.builder import build_config
 from fedbench.pipeline import pipeline
 from fedbench.registries import (
     build_algorithm_registry,
-    build_partitioner_registry,
     build_evaluator_registries,
+    build_partitioner_registry,
 )
 from fedbench.util.parsing import split_outside_brackets
 
