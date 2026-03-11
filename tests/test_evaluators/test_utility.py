@@ -35,7 +35,7 @@ class TestTSTRGuards:
         """No target_column set → all three keys present as nan (NaN contract §7.1.2)."""
         df = pd.DataFrame({"x": [1.0, 2.0], "y": [0, 1]})
         ctx = make_ctx(df, df.copy(), target_column=None)
-        result = self.evaluator.evaluate(ctx)
+        result = self.evaluator.global_evaluate(ctx)
 
         assert set(result.keys()) == self.EXPECTED_KEYS
         assert all(math.isnan(v) for v in result.values())
@@ -45,7 +45,7 @@ class TestTSTRGuards:
         df = pd.DataFrame({"x": [1.0, 2.0, 3.0], "target": [0, 0, 0]})
         schema = make_schema(("x", "continuous"), ("target", "binary"))
         ctx = make_ctx(df, df.copy(), target_column="target", schema=schema)
-        result = self.evaluator.evaluate(ctx)
+        result = self.evaluator.global_evaluate(ctx)
 
         assert set(result.keys()) == self.EXPECTED_KEYS
         assert all(math.isnan(v) for v in result.values())
@@ -57,7 +57,7 @@ class TestTSTRGuards:
         df = pd.DataFrame({"x": rng.normal(0, 1, n), "target": rng.integers(0, 2, n)})
         schema = make_schema(("x", "continuous"), ("target", "binary"))
         ctx = make_ctx(df, df.copy(), target_column="target", schema=schema)
-        result = self.evaluator.evaluate(ctx)
+        result = self.evaluator.global_evaluate(ctx)
 
         assert set(result.keys()) == self.EXPECTED_KEYS
 
@@ -90,7 +90,7 @@ class TestTSTRBinary:
             target_column="target",
             schema=schema,
         )
-        result = self.evaluator.evaluate(ctx)
+        result = self.evaluator.global_evaluate(ctx)
 
         assert "tstr_auc" in result
         assert result["tstr_auc"] > 0.85
@@ -110,7 +110,7 @@ class TestTSTRBinary:
             target_column="target",
             schema=schema,
         )
-        result = self.evaluator.evaluate(ctx)
+        result = self.evaluator.global_evaluate(ctx)
 
         assert 0.35 < result["tstr_auc"] < 0.65
 
@@ -118,7 +118,7 @@ class TestTSTRBinary:
         """Binary path: tstr_auc computed; tstr_accuracy and tstr_rmse are nan."""
         df, schema = separable_data
         ctx = make_ctx(df, df.copy(), target_column="target", schema=schema)
-        result = self.evaluator.evaluate(ctx)
+        result = self.evaluator.global_evaluate(ctx)
 
         assert "tstr_auc" in result
         assert math.isnan(result["tstr_accuracy"])
@@ -144,7 +144,7 @@ class TestTSTRCategorical:
         schema = make_schema(("x", "continuous"), ("target", "categorical"))
 
         ctx = make_ctx(df, df.copy(), target_column="target", schema=schema)
-        result = self.evaluator.evaluate(ctx)
+        result = self.evaluator.global_evaluate(ctx)
 
         assert "tstr_accuracy" in result
         assert math.isnan(result["tstr_auc"])
@@ -169,7 +169,7 @@ class TestTSTRRegression:
         schema = make_schema(("x", "continuous"), ("target", "continuous"))
 
         ctx = make_ctx(df, df.copy(), target_column="target", schema=schema)
-        result = self.evaluator.evaluate(ctx)
+        result = self.evaluator.global_evaluate(ctx)
 
         assert "tstr_rmse" in result
         assert result["tstr_rmse"] < 0.1
@@ -185,7 +185,7 @@ class TestTSTRRegression:
         schema = make_schema(("x", "continuous"), ("target", "continuous"))
 
         ctx = make_ctx(df, df.copy(), target_column="target", schema=schema)
-        result = self.evaluator.evaluate(ctx)
+        result = self.evaluator.global_evaluate(ctx)
 
         assert "tstr_rmse" in result
         assert math.isnan(result["tstr_auc"])

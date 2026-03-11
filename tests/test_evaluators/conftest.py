@@ -2,8 +2,9 @@
 
 Design rationale
 ----------------
-* ``make_ctx`` provides a single construction entry point so that individual
-  test modules never need to import or construct ``EvalContext`` directly.
+* ``make_ctx`` and ``make_centralized_ctx`` provide the construction entry
+  points for ``GlobalEvalContext`` and ``CentralizedEvalContext`` respectively.
+  Individual test modules never need to import context classes directly.
 * ``NUMERIC_DF``, ``CATEGORICAL_DF``, and ``MIXED_DF`` are seeded once and
   reused across modules — changes here propagate everywhere automatically.
 * ``_MomentReduction`` and ``_DistSimilarity`` live here (not in individual
@@ -21,7 +22,7 @@ import pandas as pd
 import pytest
 
 from fedbench.core.data.schemas import TableSchema, ColumnSchema, infer_schema
-from fedbench.core.eval import EvalContext
+from fedbench.core.eval.evalcontext import GlobalEvalContext, CentralizedEvalContext
 from fedbench.evaluators.fidelity import (
     DistributionSimilarityMetricsEvaluator,
     MomentReductionMetricsEvaluator,
@@ -51,7 +52,7 @@ def assert_dicts_nan_safe(d1: dict[str, float], d2: dict[str, float]) -> None:
 
 
 # ---------------------------------------------------------------------------
-# EvalContext factory
+# EvalContext factories
 # ---------------------------------------------------------------------------
 
 def make_ctx(
@@ -63,13 +64,43 @@ def make_ctx(
     sensitive_columns: tuple[str, ...] | None = None,
     seed: int = 42,
     schema: TableSchema | None = None,
-) -> EvalContext:
-    """Build an EvalContext with sensible defaults."""
-    if test_df is None:
-        test_df = train_df.copy()
+) -> GlobalEvalContext:
+    """Build a GlobalEvalContext with sensible defaults.
+
+    ``train_df`` is used as the holdout (the real data the server has access
+    to).  Pass ``test_df`` explicitly if the caller needs a distinct split;
+    it is otherwise ignored for ``GlobalEvalContext`` (which only has
+    ``holdout_df``).
+    """
     if schema is None:
         schema = infer_schema(train_df)
-    return EvalContext(
+    return GlobalEvalContext(
+        schema=schema,
+        holdout_df=train_df,
+        synthetic_df=synthetic_df,
+        seed=seed,
+        target_column=target_column,
+        sensitive_columns=sensitive_columns,
+    )
+
+
+def make_local_ctx(
+    train_df: pd.DataFrame,
+    synthetic_df: pd.DataFrame,
+    *,
+    test_df: pd.DataFrame | None = None,
+    target_column: str | None = None,
+    sensitive_columns: tuple[str, ...] | None = None,
+    seed: int = 42,
+    schema: TableSchema | None = None,
+) -> "LocalEvalContext":
+    """Build a LocalEvalContext representing a single federated client."""
+    from fedbench.core.eval.evalcontext import LocalEvalContext
+    if schema is None:
+        schema = infer_schema(train_df)
+    if test_df is None:
+        test_df = train_df.copy()
+    return LocalEvalContext(
         schema=schema,
         train_df=train_df,
         test_df=test_df,
@@ -77,6 +108,38 @@ def make_ctx(
         seed=seed,
         target_column=target_column,
         sensitive_columns=sensitive_columns,
+    )
+
+
+def make_centralized_ctx(
+    train_df: pd.DataFrame,
+    synthetic_df: pd.DataFrame,
+    *,
+    test_df: pd.DataFrame | None = None,
+    client_train_df: pd.DataFrame | None = None,
+    target_column: str | None = None,
+    sensitive_columns: tuple[str, ...] | None = None,
+    seed: int = 42,
+    schema: TableSchema | None = None,
+) -> CentralizedEvalContext:
+    """Build a CentralizedEvalContext for evaluators that require client train data.
+
+    Used by ``MIANearestNeighborAttackEvaluator``, which samples members from
+    ``client_train_df`` and non-members from ``holdout_df``.  If
+    ``client_train_df`` is not provided it defaults to ``train_df``.
+    """
+    if schema is None:
+        schema = infer_schema(train_df)
+    if client_train_df is None:
+        client_train_df = train_df
+    return CentralizedEvalContext(
+        schema=schema,
+        holdout_df=test_df if test_df is not None else train_df,
+        synthetic_df=synthetic_df,
+        seed=seed,
+        target_column=target_column,
+        sensitive_columns=sensitive_columns,
+        client_train_df=client_train_df,
     )
 
 

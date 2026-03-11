@@ -13,7 +13,7 @@ Evaluators emit ``float("nan")`` when a metric is not applicable, rather
 than omitting the key.  Guard-path tests assert the full nan key set is
 returned; metric-path tests assert values are either finite or nan (never ±inf).
 
-Fallback behaviour
+Fallback behavior
 ------------------
 If prerequistes fail **before** any sensitive column is processed, the
 evaluator returns the generic three-key nan result:
@@ -88,7 +88,7 @@ class TestFairnessGuards:
         """No target_column on the context → generic nan result."""
         df = pd.DataFrame({"x": [1.0, 2.0, 3.0], "s": [0, 1, 0]})
         ctx = make_ctx(df, df.copy(), sensitive_columns=("s",))
-        result = self.evaluator.evaluate(ctx)
+        result = self.evaluator.global_evaluate(ctx)
 
         assert set(result.keys()) == GENERIC_NAN_KEYS
         assert all(math.isnan(v) for v in result.values())
@@ -97,7 +97,7 @@ class TestFairnessGuards:
         """sensitive_columns not set → loop never runs → generic nan result."""
         df = pd.DataFrame({"feature": [1.0, 2.0, 3.0], "target": [0, 1, 0]})
         ctx = make_ctx(df, df.copy(), target_column="target")
-        result = self.evaluator.evaluate(ctx)
+        result = self.evaluator.global_evaluate(ctx)
 
         assert set(result.keys()) == GENERIC_NAN_KEYS
         assert all(math.isnan(v) for v in result.values())
@@ -106,7 +106,7 @@ class TestFairnessGuards:
         """Passing an empty sequence for sensitive_columns → generic nan result."""
         df = pd.DataFrame({"feature": [1.0, 2.0], "target": [0, 1]})
         ctx = make_ctx(df, df.copy(), target_column="target", sensitive_columns=())
-        result = self.evaluator.evaluate(ctx)
+        result = self.evaluator.global_evaluate(ctx)
 
         assert set(result.keys()) == GENERIC_NAN_KEYS
         assert all(math.isnan(v) for v in result.values())
@@ -138,7 +138,7 @@ class TestFairnessPerColumnNan:
             target_column="target",
             sensitive_columns=("sens",),
         )
-        result = self.evaluator.evaluate(ctx)
+        result = self.evaluator.global_evaluate(ctx)
 
         assert math.isnan(result["demographic_parity_diff.sens"])
         assert math.isnan(result["equalized_odds_diff.sens"])
@@ -158,7 +158,7 @@ class TestFairnessPerColumnNan:
             target_column="target",
             sensitive_columns=("sens",),
         )
-        result = self.evaluator.evaluate(ctx)
+        result = self.evaluator.global_evaluate(ctx)
 
         assert math.isnan(result["demographic_parity_diff.sens"])
         assert math.isnan(result["equalized_odds_diff.sens"])
@@ -172,7 +172,7 @@ class TestFairnessPerColumnNan:
             target_column="target",
             sensitive_columns=("sens",),
         )
-        result = self.evaluator.evaluate(ctx)
+        result = self.evaluator.global_evaluate(ctx)
 
         assert math.isnan(result["demographic_parity_diff.sens"])
         assert math.isnan(result["equalized_odds_diff.sens"])
@@ -201,7 +201,7 @@ class TestFairnessMetrics:
             target_column="target",
             sensitive_columns=("sensitive",),
         )
-        result = self.evaluator.evaluate(ctx)
+        result = self.evaluator.global_evaluate(ctx)
 
         assert "demographic_parity_diff.sensitive" in result
         assert "equalized_odds_diff.sensitive" in result
@@ -215,7 +215,7 @@ class TestFairnessMetrics:
             target_column="target",
             sensitive_columns=("sensitive",),
         )
-        result = self.evaluator.evaluate(ctx)
+        result = self.evaluator.global_evaluate(ctx)
 
         dp = result["demographic_parity_diff.sensitive"]
         assert math.isfinite(dp), f"expected finite dp_diff, got {dp}"
@@ -229,7 +229,7 @@ class TestFairnessMetrics:
             target_column="target",
             sensitive_columns=("sensitive",),
         )
-        result = self.evaluator.evaluate(ctx)
+        result = self.evaluator.global_evaluate(ctx)
 
         for key, value in result.items():
             assert isinstance(value, float), f"{key} is not float: {type(value)}"
@@ -247,7 +247,7 @@ class TestFairnessMetrics:
             target_column="target",
             sensitive_columns=("group_a", "group_b"),
         )
-        result = self.evaluator.evaluate(ctx)
+        result = self.evaluator.global_evaluate(ctx)
 
         for col in ("group_a", "group_b"):
             assert f"demographic_parity_diff.{col}" in result
@@ -262,7 +262,7 @@ class TestFairnessMetrics:
             target_column="target",
             sensitive_columns=("sensitive",),
         )
-        r1 = self.evaluator.evaluate(ctx)
-        r2 = self.evaluator.evaluate(ctx)
+        r1 = self.evaluator.global_evaluate(ctx)
+        r2 = self.evaluator.global_evaluate(ctx)
 
         assert_dicts_nan_safe(r1, r2)
