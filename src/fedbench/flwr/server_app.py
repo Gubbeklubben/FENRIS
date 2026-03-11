@@ -10,7 +10,7 @@ from fedbench.flwr.serde import (
     to_flwr_no_pickle,
     to_flwr_pickle,
 )
-from fedbench.flwr.server import send_config, send_artifacts, Strategy
+from fedbench.flwr._server import send_config, send_artifacts, Strategy
 
 
 def make_server_app(ctx: RunContext) -> ServerApp:

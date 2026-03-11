@@ -17,7 +17,7 @@ from fedbench.component_factory import (
 from fedbench.config import Config
 from fedbench.core.data import PartitionedDataset
 from fedbench.core.data.schemas import infer_schema
-from fedbench.flwr.client import FlwrClient
+from fedbench.flwr._client import FlwrClient
 from fedbench.flwr.serde import (
     from_flwr_pickle,
     to_flwr_no_pickle,
