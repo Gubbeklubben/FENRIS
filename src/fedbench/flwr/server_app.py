@@ -3,14 +3,14 @@ from flwr.server import Grid
 from flwr.serverapp import ServerApp
 
 from fedbench.component_factory import create_coordinator
-from fedbench.core.runcontext import RunContext
 from fedbench.core.events import ClientsConfigured
+from fedbench.core.runcontext import RunContext
 from fedbench.flwr.serde import (
     from_flwr_pickle,
     to_flwr_no_pickle,
     to_flwr_pickle,
 )
-from fedbench.flwr._server import send_config, send_artifacts, Strategy
+from fedbench.flwr.server import send_config, send_artifacts, Strategy
 
 
 def make_server_app(ctx: RunContext) -> ServerApp:
@@ -30,7 +30,7 @@ def make_server_app(ctx: RunContext) -> ServerApp:
         for reply in send_artifacts(
                 grid,
                 to_flwr,
-                ctx.algorithm_artifacts.synthesizer
+                ctx.global_init_artifacts.synthesizer
         ):
             if reply.has_error():
                 raise RuntimeError(
@@ -41,7 +41,7 @@ def make_server_app(ctx: RunContext) -> ServerApp:
 
         coordinator = create_coordinator(
             spec=ctx.algorithm.coordinator_spec,
-            artifacts=ctx.algorithm_artifacts.coordinator,
+            artifacts=ctx.global_init_artifacts.coordinator,
         )
         arrays_map = ctx.algorithm.coordinator_spec.arrays_to_ml_framework_map
 
@@ -56,6 +56,6 @@ def make_server_app(ctx: RunContext) -> ServerApp:
         )
         state, metrics = strategy.run(grid, ctx.config.num_rounds)
         ctx.aggregated_state = state
-        ctx.aggregated_metrics = metrics
+        ctx.per_client_metrics = metrics
 
     return app

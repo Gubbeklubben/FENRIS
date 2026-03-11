@@ -3,9 +3,8 @@ import time
 from collections.abc import Generator, Iterable
 from typing import Any, cast
 
-from flwr.common import ConfigRecord, Context, Message, RecordDict
+from flwr.common import ConfigRecord, Message, RecordDict
 from flwr.server import Grid
-from flwr.serverapp import ServerApp
 
 from fedbench.config import Config
 from fedbench.core.algorithm import Coordinator
@@ -14,41 +13,38 @@ from fedbench.core.encoder import FedbenchEncoder
 from fedbench.core.eventbus import EventBus
 from fedbench.core.events import (
     ClientReply,
-    ClientsConfigured,
     FedInitCompleted,
     FedInitStarted,
     ServerRequest,
     TrainingCompleted,
     TrainingStarted,
 )
-from fedbench.core.runcontext import RunContext
 from fedbench.core.update import Metrics, Update
 from fedbench.flwr.serde import (
     FlwrDeserializer,
     FlwrSerializer,
-    from_flwr_pickle,
-    to_flwr_disable_pickle,
-    to_flwr_pickle,
 )
 
 
-class FedbenchServer:
+class Strategy:
     def __init__(
         self,
-        coordinator: Coordinator,
         seed: int,
         schema: TableSchema,
         to_flwr: FlwrSerializer,
         from_flwr: FlwrDeserializer,
         eventbus: EventBus,
+        coordinator: Coordinator,
+        arrays_to_ml_framework_map: dict[str, str] | None,
     ) -> None:
 
-        self._coordinator = coordinator
         self._seed = seed
         self._schema = schema
         self._to_flwr = to_flwr
         self._from_flwr = from_flwr
         self._eventbus = eventbus
+        self._coordinator = coordinator
+        self._arrays_map = arrays_to_ml_framework_map
         self._per_client_metrics: dict[int, Metrics] = {}
 
     def fed_init(self, grid: Grid) -> None:
@@ -57,7 +53,7 @@ class FedbenchServer:
             self._schema,
             grid.get_node_ids(),
         )
-        self._send_and_receive(grid, generator, msg_type="query.init")
+        self._send_and_receive(grid, generator, msg_type="query.fed_init")
 
     def train(self, grid: Grid) -> None:
         generator = self._coordinator.train(grid.get_node_ids())
@@ -120,7 +116,6 @@ class FedbenchServer:
     ) -> None:
 
         internal_msg_type = msg_type.split(".")[-1]
-        arrays_map = self._coordinator.arrays_to_ml_framework_map
         replies: Iterable[tuple[int, Update]] | None = None
 
         while True:
@@ -140,13 +135,19 @@ class FedbenchServer:
                     dst_node_id=dst_id,
                 )
                 requests.append(request)
-                self._eventbus.emit(ServerRequest(dst_id, msg_type=internal_msg_type))
+                self._eventbus.emit(
+                    ServerRequest(dst_id, msg_type=internal_msg_type)
+                )
 
             replies = []
             for reply in grid.send_and_receive(requests):
                 src_id = reply.metadata.src_node_id
-                replies.append((src_id, self._from_flwr(reply, arrays_map)))
-                self._eventbus.emit(ClientReply(src_id, msg_type=internal_msg_type))
+                replies.append(
+                    (src_id, self._from_flwr(reply, self._arrays_map))
+                )
+                self._eventbus.emit(ClientReply(
+                    src_id, msg_type=internal_msg_type)
+                )
 
     def _get_and_check_global_state(self) -> Update:
         global_state = self._coordinator.global_state
@@ -158,20 +159,20 @@ class FedbenchServer:
         return global_state
 
 
-def configure_clients(grid: Grid, config: Config) -> Iterable[Message]:
-    client_ids = list(grid.get_node_ids())
-
+def send_config(grid: Grid, config: Config) -> Iterable[Message]:
     # Wait for clients to connect.
-    # https://github.com/adap/flower/blob/main/examples/federated-kaplan-meier-fitter/examplefkm/server_app.py
+    # ref. flwr.serverapp.strategy.strategy_utils:sample_nodes
+    client_ids = list(grid.get_node_ids())
     while len(client_ids) < config.num_clients:
         time.sleep(1)
         client_ids = list(grid.get_node_ids())
 
-    cfg_jsons = ConfigRecord({"jsons": config.jsons()})
     messages = (
         Message(
-            content=RecordDict({"config": cfg_jsons}),
-            message_type="query.configure",
+            content=RecordDict(
+                {"config": ConfigRecord({"jsons": config.jsons()})}
+            ),
+            message_type="query.config",
             dst_node_id=cid,
         )
         for cid in client_ids
@@ -179,33 +180,20 @@ def configure_clients(grid: Grid, config: Config) -> Iterable[Message]:
     return grid.send_and_receive(messages)
 
 
-def make_server_app(ctx: RunContext) -> ServerApp:
-    app = ServerApp()
-    config = ctx.config
-    eventbus = ctx.eventbus
-    algorithm = ctx.algorithm
+def send_artifacts(
+    grid: Grid,
+    to_flwr: FlwrSerializer,
+    synthesizer_artifacts: Update | None,
+) -> Iterable[Message]:
 
-    @app.main()
-    def main(grid: Grid, _: Context) -> None:
-        reply_count = 0
-        for reply in configure_clients(grid, config):
-            if reply.has_error():
-                raise RuntimeError(
-                    f"Failed to configure all clients: {reply.error.reason}"
-                )
-            reply_count += 1
-        eventbus.emit(ClientsConfigured(reply_count))
+    artifacts = synthesizer_artifacts or Update()
 
-        server = FedbenchServer(
-            algorithm.create_coordinator(),
-            config.seed,
-            ctx.dataset.schema,
-            to_flwr=to_flwr_disable_pickle if config.disable_pickle else to_flwr_pickle,
-            from_flwr=from_flwr_pickle,
-            eventbus=eventbus,
+    messages = (
+        to_flwr(
+            artifacts,
+            message_type="query.artifacts",
+            dst_node_id=cid,
         )
-        state, metrics = server.run(grid, config.num_rounds)
-        ctx.aggregated_state = state
-        ctx.per_client_metrics = metrics
-
-    return app
+        for cid in grid.get_node_ids()
+    )
+    return grid.send_and_receive(messages)

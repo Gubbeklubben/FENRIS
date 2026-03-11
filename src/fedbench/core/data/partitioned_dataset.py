@@ -15,7 +15,6 @@ class PartitionedDataset:
         seed: int,
     ) -> None:
 
-        self._df = df
         self._schema = schema
         self._partitioner = partitioner
 
@@ -30,10 +29,6 @@ class PartitionedDataset:
 
         self._test_size = test_size
         self._seed = seed
-
-    @property
-    def df(self) -> DataFrame:
-        return self._df
 
     @property
     def schema(self) -> TableSchema:
