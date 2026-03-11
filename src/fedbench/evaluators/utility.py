@@ -7,28 +7,29 @@ logistic regression (classification) or ridge regression (regression).
 """
 
 import math
+from typing import Any, Iterable
 
 import numpy as np
 from sklearn.linear_model import LogisticRegression, Ridge
 from sklearn.metrics import accuracy_score, mean_squared_error, roc_auc_score
 
-from fedbench.core.eval import EvalContext, Evaluator
+from fedbench.core.eval import Evaluator, GlobalEvalContext, LocalEvalContext
 from fedbench.util.metrics import fit_tabular_model
 
 
 class TSTREvaluator(Evaluator):
-    def evaluate(self, ctx: EvalContext) -> dict[str, float]:
+    def global_evaluate(self, ctx: GlobalEvalContext) -> dict[str, float]:
         metrics = {
             "tstr_auc": math.nan,
             "tstr_accuracy": math.nan,
             "tstr_rmse": math.nan,
         }
 
-        if ctx.target_column is None or ctx.test_df is None:
+        if ctx.target_column is None or ctx.holdout_df is None:
             return metrics
 
         D_syn = ctx.synthetic_df
-        D_test = ctx.test_df
+        D_test = ctx.holdout_df
         y_col = ctx.target_column
 
         X_syn = D_syn.drop(columns=[y_col])
@@ -64,3 +65,10 @@ class TSTREvaluator(Evaluator):
             metrics["tstr_rmse"] = np.sqrt(mean_squared_error(y_test, y_pred))
 
         return metrics
+
+    def local_evaluate(self, ctx: LocalEvalContext) -> Any:
+        pass
+
+    @staticmethod
+    def aggregate(stats: Iterable[Any]) -> dict[str, float]:
+        pass

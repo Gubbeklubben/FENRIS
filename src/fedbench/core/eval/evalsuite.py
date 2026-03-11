@@ -1,7 +1,7 @@
 from collections.abc import Iterable, Mapping
-from typing import Self
+from typing import Any, Self
 
-from fedbench.core.eval.evalcontext import EvalContext
+from fedbench.core.eval.evalcontext import GlobalEvalContext, LocalEvalContext
 from fedbench.core.eval.evaluator import Category, Evaluator
 from fedbench.core.factory_registry import FactoryRegistry
 
@@ -25,11 +25,17 @@ class EvaluationSuite:
     def __init__(self, evaluators: Iterable[tuple[str, str, Evaluator]]):
         self._evaluators = tuple(evaluators)
 
-    def evaluate(self, ctx: EvalContext) -> dict[str, float]:
+    def global_evaluate(self, ctx: GlobalEvalContext) -> dict[str, float]:
         metrics: dict[str, float] = {}
         for _, category, ev in self._evaluators:
-            for metric, value in ev.evaluate(ctx).items():
+            for metric, value in ev.global_evaluate(ctx).items():
                 metrics[f"{category}.{metric}"] = value
+        return metrics
+
+    def local_evaluate(self, ctx: LocalEvalContext) -> dict[str, Any]:
+        metrics: dict[str, Any] = {}
+        for name, _, ev in self._evaluators:
+            metrics[name] = ev.local_evaluate(ctx)
         return metrics
 
     @classmethod

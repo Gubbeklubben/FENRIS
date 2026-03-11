@@ -1,5 +1,7 @@
+import json
 import time
 from collections.abc import Generator, Iterable
+from typing import cast
 
 from flwr.common import ConfigRecord, Context, Message, RecordDict
 from flwr.server import Grid
@@ -77,8 +79,12 @@ class FedbenchServer:
         for reply in grid.send_and_receive(requests):
             src_id = reply.metadata.src_node_id
             self._eventbus.emit(ClientReply(src_id, msg_type=msg_type))
-            metrics = reply.content.metric_records["metrics"]
-            self._per_client_metrics[src_id] = dict(metrics)
+            metrics = reply.content.config_records["metrics"]
+            # noinspection PyUnnecessaryCast
+            self._per_client_metrics[src_id] = {
+                key: json.loads(cast(str, value))  # nofmt
+                for key, value in metrics.items()
+            }
 
     def run(
         self,

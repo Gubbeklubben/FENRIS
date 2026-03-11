@@ -11,13 +11,14 @@ Includes three complementary privacy diagnostics:
 """
 
 import math
+from typing import Any, Iterable
 
 import numpy as np
 import pandas as pd
 from sklearn.linear_model import LogisticRegression, Ridge
 from sklearn.metrics import accuracy_score, mean_squared_error, roc_auc_score
 
-from fedbench.core.eval import EvalContext, Evaluator
+from fedbench.core.eval import Evaluator, GlobalEvalContext, LocalEvalContext
 from fedbench.util.metrics import (
     canonical_row_hash,
     fit_tabular_model,
@@ -38,8 +39,8 @@ class DirectOverlapDiagnosticEvaluator(Evaluator):
     columns) between the synthetic data and the training set.
     """
 
-    def evaluate(self, ctx: EvalContext) -> dict[str, float]:
-        train, syn = ctx.train_df, ctx.synthetic_df
+    def global_evaluate(self, ctx: GlobalEvalContext) -> dict[str, float]:
+        train, syn = ctx.holdout_df, ctx.synthetic_df
         common = sorted(set(train.columns) & set(syn.columns))
 
         if not common:
@@ -85,6 +86,13 @@ class DirectOverlapDiagnosticEvaluator(Evaluator):
             "partial_match_any": float(any(v > 0 for v in partial_rates.values())),
         }
 
+    def local_evaluate(self, ctx: LocalEvalContext) -> Any:
+        pass
+
+    @staticmethod
+    def aggregate(stats: Iterable[Any]) -> dict[str, float]:
+        pass
+
 
 class MIANearestNeighborAttackEvaluator(Evaluator):
     """Nearest-neighbour membership inference attack.
@@ -94,14 +102,14 @@ class MIANearestNeighborAttackEvaluator(Evaluator):
     nearest synthetic sample. Reports AUC, accuracy, and advantage.
     """
 
-    def evaluate(self, ctx: EvalContext) -> dict[str, float]:
+    def global_evaluate(self, ctx: GlobalEvalContext) -> dict[str, float]:
         nan_result = {
             "mia_auc": math.nan,
             "mia_accuracy": math.nan,
             "mia_advantage": math.nan,
         }
 
-        K = min(DEFAULT_MIA_K, len(ctx.train_df), len(ctx.test_df))
+        K = min(DEFAULT_MIA_K, len(ctx.holdout_df), len(ctx.holdout_df))
         if K == 0 or len(ctx.synthetic_df) == 0:
             return nan_result
 
@@ -109,8 +117,8 @@ class MIANearestNeighborAttackEvaluator(Evaluator):
         if not numeric_cols:
             return nan_result
 
-        rt = sanitize_numeric_df(ctx.train_df, numeric_cols)
-        rh = sanitize_numeric_df(ctx.test_df, numeric_cols)
+        rt = sanitize_numeric_df(ctx.holdout_df, numeric_cols)
+        rh = sanitize_numeric_df(ctx.holdout_df, numeric_cols)
         sx = sanitize_numeric_df(ctx.synthetic_df, numeric_cols)
 
         if rt.empty or rh.empty or sx.empty:
@@ -156,6 +164,13 @@ class MIANearestNeighborAttackEvaluator(Evaluator):
             ),
         }
 
+    def local_evaluate(self, ctx: LocalEvalContext) -> Any:
+        pass
+
+    @staticmethod
+    def aggregate(stats: Iterable[Any]) -> dict[str, float]:
+        pass
+
 
 class AIASupervisedAttackEvaluator(Evaluator):
     """Supervised attribute inference attack.
@@ -165,14 +180,14 @@ class AIASupervisedAttackEvaluator(Evaluator):
     real held-out data. Reports accuracy, AUC, and RMSE per sensitive column.
     """
 
-    def evaluate(self, ctx: EvalContext) -> dict[str, float]:
+    def global_evaluate(self, ctx: GlobalEvalContext) -> dict[str, float]:
         nan_result = {
             "aia_accuracy": math.nan,
             "aia_auc": math.nan,
             "aia_rmse": math.nan,
         }
 
-        train, test, syn = ctx.train_df, ctx.test_df, ctx.synthetic_df
+        train, test, syn = ctx.holdout_df, ctx.holdout_df, ctx.synthetic_df
         all_columns = set(train.columns)
 
         metrics: dict[str, float] = {}
@@ -228,3 +243,10 @@ class AIASupervisedAttackEvaluator(Evaluator):
                 )
 
         return metrics or nan_result
+
+    def local_evaluate(self, ctx: LocalEvalContext) -> Any:
+        pass
+
+    @staticmethod
+    def aggregate(stats: Iterable[Any]) -> dict[str, float]:
+        pass

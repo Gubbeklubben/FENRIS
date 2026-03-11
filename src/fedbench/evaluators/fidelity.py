@@ -10,13 +10,13 @@ matrix comparison.
 from __future__ import annotations
 
 import math
-from typing import Mapping
+from typing import Any, Iterable
 
 import numpy as np
 import pandas as pd
 from scipy import stats
 
-from fedbench.core.eval import EvalContext, Evaluator
+from fedbench.core.eval import Evaluator, GlobalEvalContext, LocalEvalContext
 from fedbench.util.metrics import (
     get_nominal_columns,
     get_numeric_columns,
@@ -26,7 +26,7 @@ from fedbench.util.metrics import (
 
 
 class MomentReductionMetricsEvaluator(Evaluator):
-    def evaluate(self, ctx: EvalContext) -> Mapping[str, float]:
+    def global_evaluate(self, ctx: GlobalEvalContext) -> dict[str, float]:
         nan_result = {
             "mean_abs_diff": math.nan,
             "std_abs_diff": math.nan,
@@ -36,7 +36,7 @@ class MomentReductionMetricsEvaluator(Evaluator):
         if not numeric_columns:
             return nan_result
 
-        r_df = sanitize_numeric_df(ctx.train_df, numeric_columns)
+        r_df = sanitize_numeric_df(ctx.holdout_df, numeric_columns)
         s_df = sanitize_numeric_df(ctx.synthetic_df, numeric_columns)
 
         if r_df.empty or s_df.empty:
@@ -57,9 +57,16 @@ class MomentReductionMetricsEvaluator(Evaluator):
             "std_abs_diff": safe_nanmean(std_abs_diff),
         }
 
+    def local_evaluate(self, ctx: LocalEvalContext) -> Any:
+        pass
+
+    @staticmethod
+    def aggregate(stats: Iterable[Any]) -> dict[str, float]:
+        pass
+
 
 class DistributionSimilarityMetricsEvaluator(Evaluator):
-    def evaluate(self, ctx: EvalContext) -> dict[str, float]:
+    def global_evaluate(self, ctx: GlobalEvalContext) -> dict[str, float]:
         nan_result = {
             "ks_mean": math.nan,
             "wasserstein_mean": math.nan,
@@ -70,7 +77,7 @@ class DistributionSimilarityMetricsEvaluator(Evaluator):
         if not numeric_columns:
             return nan_result
 
-        r_df = sanitize_numeric_df(ctx.train_df, numeric_columns)
+        r_df = sanitize_numeric_df(ctx.holdout_df, numeric_columns)
         s_df = sanitize_numeric_df(ctx.synthetic_df, numeric_columns)
 
         if r_df.empty or s_df.empty:
@@ -102,10 +109,17 @@ class DistributionSimilarityMetricsEvaluator(Evaluator):
             "t_stat_mean_abs": safe_nanmean(t_stats),
         }
 
+    def local_evaluate(self, ctx: LocalEvalContext) -> Any:
+        pass
+
+    @staticmethod
+    def aggregate(stats: Iterable[Any]) -> dict[str, float]:
+        pass
+
 
 class CategoricalTvMeanEvaluator(Evaluator):
-    def evaluate(self, ctx: EvalContext) -> dict[str, float]:
-        nominal_columns = get_nominal_columns(ctx.train_df, ctx.schema)
+    def global_evaluate(self, ctx: GlobalEvalContext) -> dict[str, float]:
+        nominal_columns = get_nominal_columns(ctx.holdout_df, ctx.schema)
         if not nominal_columns:
             return {
                 "categorical_tv_mean": math.nan,
@@ -113,7 +127,7 @@ class CategoricalTvMeanEvaluator(Evaluator):
 
         tvs = []
         for col in nominal_columns:
-            pr = ctx.train_df[col].fillna("__NA__").value_counts(normalize=True)
+            pr = ctx.holdout_df[col].fillna("__NA__").value_counts(normalize=True)
             ps = ctx.synthetic_df[col].fillna("__NA__").value_counts(normalize=True)
 
             vals = set(pr.index).union(ps.index)
@@ -124,9 +138,16 @@ class CategoricalTvMeanEvaluator(Evaluator):
             "categorical_tv_mean": float(np.mean(tvs)),
         }
 
+    def local_evaluate(self, ctx: LocalEvalContext) -> Any:
+        pass
+
+    @staticmethod
+    def aggregate(stats: Iterable[Any]) -> dict[str, float]:
+        pass
+
 
 class CorrFroDiffEvaluator(Evaluator):
-    def evaluate(self, ctx: EvalContext) -> dict[str, float]:
+    def global_evaluate(self, ctx: GlobalEvalContext) -> dict[str, float]:
         numeric_columns = get_numeric_columns(ctx.train_df, ctx.schema)
         if len(numeric_columns) < 2:
             return {
@@ -139,7 +160,7 @@ class CorrFroDiffEvaluator(Evaluator):
             corr = df[non_constant].corr()
             return corr.fillna(0.0)
 
-        r_corr = safe_corr(ctx.train_df[numeric_columns])
+        r_corr = safe_corr(ctx.holdout_df[numeric_columns])
         s_corr = safe_corr(ctx.synthetic_df[numeric_columns])
 
         # Align matrices (important if columns dropped differently)
@@ -149,3 +170,10 @@ class CorrFroDiffEvaluator(Evaluator):
         return {
             "corr_fro_diff": float(np.linalg.norm(diff, ord="fro")),
         }
+
+    def local_evaluate(self, ctx: LocalEvalContext) -> Any:
+        pass
+
+    @staticmethod
+    def aggregate(stats: Iterable[Any]) -> dict[str, float]:
+        pass

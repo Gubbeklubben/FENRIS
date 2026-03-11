@@ -1,3 +1,4 @@
+import json
 from typing import cast
 
 from flwr.clientapp import ClientApp
@@ -13,8 +14,9 @@ from fedbench.config import Config
 from fedbench.core.algorithm import Algorithm
 from fedbench.core.data import PartitionedDataset
 from fedbench.core.data.schemas import infer_schema
-from fedbench.core.eval import EvalContext, EvaluationSuite
+from fedbench.core.eval import EvaluationSuite, LocalEvalContext
 from fedbench.core.logger import log_warning
+from fedbench.core.update import Extras, Update
 from fedbench.flwr.serde import (
     FlwrDeserializer,
     FlwrSerializer,
@@ -111,7 +113,7 @@ class FedbenchClient:
                 content=RecordDict({"metrics": MetricRecord()}),
                 reply_to=flwr_message,
             )
-        eval_ctx = EvalContext(
+        eval_ctx = LocalEvalContext(
             train_df=train_df,
             test_df=test_df,
             synthetic_df=synthetic_df,
@@ -120,12 +122,14 @@ class FedbenchClient:
             sensitive_columns=sensitive_columns,
             schema=self._dataset.schema,
         )
-        metrics = MetricRecord()
-        for key, value in self._eval_suite.evaluate(eval_ctx).items():
-            metrics[key] = value
+        metrics: Extras = {}
+        for key, value in self._eval_suite.local_evaluate(eval_ctx).items():
+            metrics[key] = json.dumps(value)
 
-        return Message(
-            content=RecordDict({"metrics": metrics}),
+        update = Update(extras={"metrics": metrics})
+
+        return self._to_flwr(
+            update=update,
             reply_to=flwr_message,
         )
 

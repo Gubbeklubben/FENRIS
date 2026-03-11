@@ -11,12 +11,13 @@ odds differences across groups.
 from __future__ import annotations
 
 import math
+from typing import Any, Iterable
 
 import numpy as np
 import pandas as pd
 from sklearn.linear_model import LogisticRegression
 
-from fedbench.core.eval import EvalContext, Evaluator
+from fedbench.core.eval import Evaluator, GlobalEvalContext, LocalEvalContext
 from fedbench.util.metrics import fit_tabular_model
 from fedbench.util.parsing import to_snake_case
 
@@ -204,7 +205,7 @@ class FairnessEvaluator(Evaluator):
     * ``fairness.equal_opportunity_diff.<column>``
     """
 
-    def evaluate(self, ctx: EvalContext) -> dict[str, float]:
+    def global_evaluate(self, ctx: GlobalEvalContext) -> dict[str, float]:
         nan_result = {
             "demographic_parity_diff": math.nan,
             "equalized_odds_diff": math.nan,
@@ -218,7 +219,7 @@ class FairnessEvaluator(Evaluator):
 
         for sensitive_column in ctx.sensitive_columns or []:
             dp, eo, eopp = _evaluate_for_sensitive_column(
-                ctx.train_df,
+                ctx.holdout_df,
                 ctx.synthetic_df,
                 target_column=ctx.target_column,
                 sensitive_column=sensitive_column,
@@ -232,3 +233,10 @@ class FairnessEvaluator(Evaluator):
             metrics[f"equal_opportunity_diff.{sensitive_column_normalized}"] = eopp
 
         return metrics or nan_result
+
+    def local_evaluate(self, ctx: LocalEvalContext) -> Any:
+        pass
+
+    @staticmethod
+    def aggregate(stats: Iterable[Any]) -> dict[str, float]:
+        pass
