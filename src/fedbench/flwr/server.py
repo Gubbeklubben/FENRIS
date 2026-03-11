@@ -10,7 +10,6 @@ from fedbench.config import Config
 from fedbench.core.algorithm import Coordinator
 from fedbench.core.data import TableSchema
 from fedbench.core.encoder import FedbenchEncoder
-from fedbench.core.eventbus import EventBus
 from fedbench.core.events import (
     ClientReply,
     FedInitCompleted,
@@ -24,6 +23,7 @@ from fedbench.flwr.serde import (
     FlwrDeserializer,
     FlwrSerializer,
 )
+from fedbench.runtime.eventbus import EventBus
 
 
 class Strategy:

@@ -2,15 +2,15 @@ from flwr.common import Context
 from flwr.server import Grid
 from flwr.serverapp import ServerApp
 
-from fedbench.component_factory import create_coordinator
 from fedbench.core.events import ClientsConfigured
-from fedbench.core.runcontext import RunContext
 from fedbench.flwr.serde import (
     from_flwr_pickle,
     to_flwr_no_pickle,
     to_flwr_pickle,
 )
 from fedbench.flwr.server import send_config, send_artifacts, Strategy
+from fedbench.runtime.component_factory import create_coordinator
+from fedbench.runtime.runcontext import RunContext
 
 
 def make_server_app(ctx: RunContext) -> ServerApp:

@@ -8,7 +8,7 @@ from fedbench.config.builder import build_config, parse_for_function
 from fedbench.core.algorithm import Algorithm
 from fedbench.core.data import Partitioner
 from fedbench.core.eval import Category
-from fedbench.core.factory_registry import FactoryRegistry
+from fedbench.runtime.registry import FactoryRegistry
 from fedbench.partitioners import register_builtin_partitioners
 from fedbench.util.parsing import coerce, is_optional
 

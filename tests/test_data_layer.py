@@ -3,7 +3,7 @@ import pytest
 
 from fedbench.core.data import load_csv, Partitioner
 from fedbench.core.data.schemas import infer_schema
-from fedbench.core.factory_registry import FactoryRegistry
+from fedbench.runtime.registry import FactoryRegistry
 from fedbench.partitioners import register_builtin_partitioners
 
 

@@ -9,7 +9,6 @@ from flwr.common import (
     RecordDict,
 )
 
-from fedbench.component_factory import create_synthesizer
 from fedbench.core.algorithm import ComponentSpec, Synthesizer
 from fedbench.core.data import PartitionedDataset
 from fedbench.core.encoder import FedbenchEncoder
@@ -20,6 +19,7 @@ from fedbench.flwr.serde import (
     FlwrDeserializer,
     FlwrSerializer
 )
+from fedbench.runtime.component_factory import create_synthesizer
 
 
 @dataclass(frozen=True)

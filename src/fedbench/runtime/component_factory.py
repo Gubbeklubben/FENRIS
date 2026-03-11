@@ -9,8 +9,8 @@ from fedbench.core.algorithm import (
 )
 from fedbench.core.data import Partitioner, load_csv
 from fedbench.core.eval import EvaluationSuite, Evaluator
-from fedbench.core.factory_registry import FactoryRegistry
 from fedbench.core.update import Update
+from fedbench.runtime.registry import FactoryRegistry
 
 
 # Wrap up loading in a partial for easy replay in client subprocs.

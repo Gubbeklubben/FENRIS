@@ -3,25 +3,25 @@ import math
 from collections.abc import Iterable
 from pathlib import Path
 
-from fedbench.component_factory import (
+from fedbench.core.algorithm import GlobalInitArtifacts
+from fedbench.core.data import PartitionedDataset
+from fedbench.core.data.schemas import infer_schema as _infer_schema
+from fedbench.core.eval import CentralizedEvalContext
+from fedbench.core.logger import log_info
+from fedbench.runtime.command import Command
+from fedbench.runtime.component_factory import (
     create_df_loader,
     create_algorithm,
     create_partitioner,
     create_evaluation_suite,
     create_synthesizer,
 )
-from fedbench.core.algorithm import GlobalInitArtifacts
-from fedbench.core.command import Command
-from fedbench.core.data import PartitionedDataset
-from fedbench.core.data.schemas import infer_schema as _infer_schema
-from fedbench.core.eval import CentralizedEvalContext
-from fedbench.core.logger import log_info
-from fedbench.core.runcontext import RunContext
-from fedbench.registries import (
+from fedbench.runtime.registry_builder import (
     build_algorithm_registry,
     build_evaluator_registries,
     build_partitioner_registry,
 )
+from fedbench.runtime.runcontext import RunContext
 
 
 def create_components(ctx: RunContext) -> None:
