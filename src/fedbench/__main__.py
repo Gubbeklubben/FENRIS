@@ -1,4 +1,5 @@
-from typing import Annotated, Literal, Optional
+from enum import StrEnum
+from typing import Annotated, Literal
 
 import typer
 
@@ -9,7 +10,6 @@ from fedbench.registries import (
     build_algorithm_registry,
     build_partitioner_registry,
     build_evaluator_registries,
-    Component,
 )
 from fedbench.util.parsing import split_outside_brackets
 
@@ -43,19 +43,25 @@ def new(name: str) -> None:
     pass
 
 
+class Component(StrEnum):
+    ALGORITHMS = "algorithms"
+    PARTITIONERS = "partitioners"
+    EVALUATORS = "evaluators"
+
+
 @app.command()
 def show(
     components: Annotated[
-        Optional[list[Component]],
+        list[Component] | None,
         typer.Argument(
-            help="Components to show. If omitted, all components are shown.",
+            help="Components to show. If omitted, all are shown.",
         ),
     ] = None,
     include_locators: Annotated[
         bool,
         typer.Option(
             "--include-locators",
-            help="Show locators for the factories used to create instances.",
+            help="Include factory locators (import paths) in the output.",
         ),
     ] = False,
 ) -> None:
@@ -67,25 +73,26 @@ def show(
       fedbench show algorithms\n
       fedbench show algorithms partitioners --include-locators
     """
+
     selected = components if components else list(Component)
 
-    if Component.algorithms in selected:
+    if Component.ALGORITHMS in selected:
         items = list(algorithms.metadata())
         width = max(len(m.name) for m in items)
         print("\n--- ALGORITHMS ---")
-        for metadata in algorithms.metadata():
-            print(f"  {metadata.name.ljust(width)}", end="")
+        for metadata in items:
+            print(f"  {metadata.name:<{width}}", end="")
             print(f"  {metadata.locator}" if include_locators else "")
 
-    if Component.partitioners in selected:
+    if Component.PARTITIONERS in selected:
         items = list(partitioners.metadata())
         width = max(len(m.name) for m in items)
         print("\n--- PARTITIONERS ---")
-        for metadata in partitioners.metadata():
-            print(f"  {metadata.name.ljust(width)}", end="")
+        for metadata in items:
+            print(f"  {metadata.name:<{width}}", end="")
             print(f"  {metadata.locator}" if include_locators else "")
 
-    if Component.evaluators in selected:
+    if Component.EVALUATORS in selected:
         for category, registry in evaluators.items():
             print(f"\n--- EVALUATORS: {category.upper()} ---")
             registered_items = list(registry.metadata())
@@ -94,8 +101,10 @@ def show(
                 continue
             width = max(len(m.name) for m in registered_items)
             for metadata in registered_items:
-                print(f"  {metadata.name.ljust(width)}", end="")
+                print(f"  {metadata.name:<{width}}", end="")
                 print(f"  {metadata.locator}" if include_locators else "")
+
+    print()
 
 
 @app.command()

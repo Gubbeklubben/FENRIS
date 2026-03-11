@@ -1,6 +1,5 @@
 from types import MappingProxyType
 from typing import Mapping
-from enum import Enum
 
 from fedbench.algorithms import register_builtin_algorithms
 from fedbench.core.algorithm import Algorithm
@@ -39,9 +38,3 @@ def build_evaluator_registries() -> Mapping[str, FactoryRegistry[Evaluator]]:
     }
     register_builtin_evaluators(registries)
     return MappingProxyType(registries)
-
-
-class Component(str, Enum):
-    algorithms = "algorithms"
-    partitioners = "partitioners"
-    evaluators = "evaluators"
