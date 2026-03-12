@@ -31,7 +31,7 @@ jobs:
           key: venv-${{ runner.os }}-${{ hashFiles('poetry.lock') }}
 
       - name: Install dependencies
-        run: poetry install --no-interaction
+        run: poetry install --no-interaction --without algorithms
 
       - name: Check formatting
         run: poetry run ruff format src --check
@@ -63,7 +63,7 @@ jobs:
           key: venv-${{ runner.os }}-${{ hashFiles('poetry.lock') }}
 
       - name: Install dependencies
-        run: poetry install --no-interaction
+        run: poetry install --no-interaction --without algorithms
 
       - name: Run mypy
         run: poetry run mypy -p fedbench
@@ -92,7 +92,7 @@ jobs:
           key: venv-${{ runner.os }}-${{ hashFiles('poetry.lock') }}
 
       - name: Install dependencies
-        run: poetry install --no-interaction
+        run: poetry install --no-interaction --without algorithms
 
       - name: Run tests
         run: poetry run pytest tests
