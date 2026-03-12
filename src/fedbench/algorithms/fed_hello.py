@@ -6,25 +6,13 @@ import pandas as pd
 from numpy.typing import NDArray
 
 from fedbench.core.algorithm import (
-    Algorithm,
-    Coordinator,
-    SingleStepCoordinator,
+    Algorithm, ComponentSpec, coordinator_spec, synthesizer_spec,
+    Coordinator, SingleStepCoordinator,
     Synthesizer,
 )
 from fedbench.core.data import TableSchema
 from fedbench.core.logger import log_info
 from fedbench.core.update import Update
-
-
-class FedHello(Algorithm):
-    def __init__(self, name: str = "Stranger") -> None:
-        self._name = name
-
-    def create_coordinator(self) -> Coordinator:
-        return FedHelloCoordinator(self._name)
-
-    def create_synthesizer(self) -> Synthesizer:
-        return FedHelloSynthesizer(self._name)
 
 
 class FedHelloCoordinator(SingleStepCoordinator):
@@ -97,3 +85,20 @@ class FedHelloSynthesizer(Synthesizer):
             return cast(pd.DataFrame, request.objects["objects"]["df"])[:num_rows]
         except IndexError:
             return cast(pd.DataFrame, request.objects["objects"]["df"])
+
+
+class FedHello(Algorithm):
+    """Say a federated hello."""
+
+    def __init__(self, name: str = "Stranger") -> None:
+        self._coord_factory = lambda: FedHelloCoordinator(name)
+        self._synth_factory = lambda: FedHelloSynthesizer(name)
+
+    @property
+    def coordinator_spec(self) -> ComponentSpec[Coordinator]:
+        return coordinator_spec(self._coord_factory)
+
+    @property
+    def synthesizer_spec(self) -> ComponentSpec[Synthesizer]:
+        return synthesizer_spec(self._synth_factory)
+

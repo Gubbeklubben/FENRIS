@@ -3,37 +3,39 @@ import math
 from collections.abc import Iterable
 from pathlib import Path
 
+from fedbench.component_factory import (
+    create_df_loader,
+    create_algorithm,
+    create_partitioner,
+    create_evaluation_suite,
+    create_synthesizer,
+)
+from fedbench.core.algorithm import GlobalInitArtifacts
+from fedbench.core.command import Command
 from fedbench.core.data import PartitionedDataset
 from fedbench.core.data.schemas import infer_schema as _infer_schema
 from fedbench.core.eval import CentralizedEvalContext
 from fedbench.core.logger import log_info
-from fedbench.core.pipeline import Command
 from fedbench.core.runcontext import RunContext
 from fedbench.registries import (
     build_algorithm_registry,
     build_evaluator_registries,
     build_partitioner_registry,
 )
-from fedbench.resolver import (
-    resolve_algorithm,
-    resolve_df_loader,
-    resolve_evaluators,
-    resolve_partitioner,
-)
 
 
-def resolve_components(ctx: RunContext) -> None:
-    ctx.df_loader = resolve_df_loader(ctx.config)
+def create_components(ctx: RunContext) -> None:
+    ctx.df_loader = create_df_loader(ctx.config)
 
-    ctx.algorithm = resolve_algorithm(
+    ctx.algorithm = create_algorithm(
         ctx.config,
         build_algorithm_registry(),
     )
-    ctx.partitioner = resolve_partitioner(
+    ctx.partitioner = create_partitioner(
         ctx.config,
         build_partitioner_registry(),
     )
-    ctx.eval_suite = resolve_evaluators(
+    ctx.eval_suite = create_evaluation_suite(
         ctx.config,
         build_evaluator_registries(),
     )
@@ -49,6 +51,18 @@ def load_dataset(ctx: RunContext) -> None:
         ctx.config.test_size,
         ctx.config.seed,
     )
+
+
+def global_init(ctx: RunContext) -> None:
+    artifacts: GlobalInitArtifacts | None = ctx.algorithm.global_init(
+        ctx.config.seed,
+        ctx.dataset.schema,
+        ctx.dataset.load_all_train_data(),
+    )
+    if artifacts is not None:
+        ctx.global_init_artifacts = artifacts
+    else:
+        ctx.global_init_artifacts = GlobalInitArtifacts(None, None)
 
 
 def federated_train_eval_loop(ctx: RunContext) -> None:
@@ -68,7 +82,11 @@ def aggregate_per_client_metrics(ctx: RunContext) -> None:
 
 
 def global_sample(ctx: RunContext) -> None:
-    synthesizer = ctx.algorithm.create_synthesizer()
+    synthesizer = create_synthesizer(
+        spec=ctx.algorithm.synthesizer_spec,
+        artifacts=ctx.global_init_artifacts.synthesizer,
+        client_cache=None
+    )
     ctx.synthetic_df = synthesizer.sample(
         ctx.aggregated_state,
         ctx.config.num_synthetic_rows or 1000,
@@ -109,12 +127,13 @@ def write_artifacts(ctx: RunContext) -> None:
 
     ctx.synthetic_df.to_csv(outputdir.joinpath("synthetic.csv"), index=False)
 
-    log_info(__file__, f"Benchmark artifacts written to {outputdir}.")
+    log_info(__name__, f"Benchmark artifacts written to {outputdir}.")
 
 
 def pipeline() -> Iterable[Command]:
-    yield resolve_components
+    yield create_components
     yield load_dataset
+    yield global_init
     yield federated_train_eval_loop
     yield aggregate_per_client_metrics
     yield global_sample

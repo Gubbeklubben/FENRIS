@@ -10,7 +10,8 @@ from flwr.common import (
     RecordDict,
 )
 
-from fedbench.core.update import Objects, Update
+from fedbench.core.types import Objects
+from fedbench.core.update import Update
 
 _METADATA_KEY = f"{__package__}.metadata"
 
@@ -111,7 +112,7 @@ def from_flwr_pickle(
     return update
 
 
-def to_flwr_disable_pickle(
+def to_flwr_no_pickle(
     update: Update,
     message_type: str | None = None,
     dst_node_id: int | None = None,

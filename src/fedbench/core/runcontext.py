@@ -6,7 +6,7 @@ from typing import Any, Mapping, cast, overload
 from pandas import DataFrame
 
 from fedbench.config import Config
-from fedbench.core.algorithm import Algorithm
+from fedbench.core.algorithm import Algorithm, GlobalInitArtifacts
 from fedbench.core.data import PartitionedDataset, Partitioner
 from fedbench.core.eval import EvaluationSuite
 from fedbench.core.eventbus import EventBus
@@ -62,16 +62,17 @@ class _RunCtxField[T]:
 
 class RunContext:
     # fmt: off
-    algorithm           = _RunCtxField[Algorithm]()
-    df_loader           = _RunCtxField[Callable[[], DataFrame]]()
-    partitioner         = _RunCtxField[Partitioner]()
-    eval_suite          = _RunCtxField[EvaluationSuite]()
-    dataset             = _RunCtxField[PartitionedDataset]()
-    aggregated_state    = _RunCtxField[Update]()
-    per_client_metrics  = _RunCtxField[Mapping[int, Mapping[str, Any]]]()
-    aggregated_metrics  = _RunCtxField[Mapping[str, float]]()
-    centralized_metrics = _RunCtxField[Mapping[str, float]]()
-    synthetic_df        = _RunCtxField[DataFrame]()
+    algorithm             = _RunCtxField[Algorithm]()
+    df_loader             = _RunCtxField[Callable[[], DataFrame]]()
+    partitioner           = _RunCtxField[Partitioner]()
+    eval_suite            = _RunCtxField[EvaluationSuite]()
+    dataset               = _RunCtxField[PartitionedDataset]()
+    global_init_artifacts = _RunCtxField[GlobalInitArtifacts]()
+    aggregated_state      = _RunCtxField[Update]()
+    per_client_metrics    = _RunCtxField[Mapping[int, Mapping[str, Any]]]()
+    aggregated_metrics    = _RunCtxField[Mapping[str, float]]()
+    centralized_metrics   = _RunCtxField[Mapping[str, float]]()
+    synthetic_df          = _RunCtxField[DataFrame]()
     # fmt: on
 
     def __init__(self, run_id: str, config: Config, eventbus: EventBus) -> None:

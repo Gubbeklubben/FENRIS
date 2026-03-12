@@ -1,7 +1,5 @@
 from abc import ABC, abstractmethod
-from collections.abc import Generator, Iterable
-
-from pandas import DataFrame
+from typing import Iterable, Generator
 
 from fedbench.core.data import TableSchema
 from fedbench.core.update import Update
@@ -14,19 +12,17 @@ class Coordinator(ABC):
         return f"<{self.__class__.__name__}>"
 
     @property
-    def arrays_to_ml_framework_map(self) -> dict[str, str] | None:
-        return None
-
-    # We could choose to return global state from aggregate hooks.
-    # However, the contract is: The returned Update contains the
-    # current global state, one way or the other, such that the framework
-    # can feed it into Synthesizer.sample and expect it to sample
-    # using whatever the current global state is.
-    # Therefore, I prefer to let the coordinator keep this state,
-    # and ask for it when needed.
-    @property
     def global_state(self) -> Update | None:
         return None
+
+    def attach_global_init_artifacts(self, artifacts: Update) -> None:
+        """Attach globally computed preprocessing artifacts.
+
+        Override if you depend on global_init to do preprocessing. Always
+        called right after creating an instance.
+        """
+
+        pass
 
     # noinspection PyMethodMayBeStatic,PyUnusedLocal
     def fed_init(
@@ -106,56 +102,3 @@ class SingleStepCoordinator(Coordinator):
     ]:
         replies = yield self.configure_train(client_ids)
         self.aggregate_train(replies)
-
-
-class Synthesizer(ABC):
-    """The framework view of the model to train and sample from."""
-
-    def __repr__(self) -> str:
-        return f"<{self.__class__.__name__}>"
-
-    @property
-    def arrays_to_ml_framework_map(self) -> dict[str, str] | None:
-        return None
-
-    # noinspection PyMethodMayBeStatic,PyUnusedLocal
-    def fed_init(
-        self,
-        request: Update,
-        seed: int,
-        schema: TableSchema,
-        data: DataFrame,
-    ) -> Update:
-        return Update()
-
-    @abstractmethod
-    def train(
-        self,
-        request: Update,
-        data: DataFrame,
-    ) -> Update:
-        pass
-
-    @abstractmethod
-    def sample(
-        self,
-        request: Update,
-        num_rows: int,
-        seed: int,
-    ) -> DataFrame:
-        pass
-
-
-class Algorithm(ABC):
-    """Algorithm entry point."""
-
-    def __repr__(self) -> str:
-        return f"<{self.__class__.__name__}>"
-
-    @abstractmethod
-    def create_coordinator(self) -> Coordinator:
-        pass
-
-    @abstractmethod
-    def create_synthesizer(self) -> Synthesizer:
-        pass

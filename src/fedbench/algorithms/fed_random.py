@@ -3,19 +3,11 @@ from typing import Generator, Iterable, cast
 
 from pandas import DataFrame
 
-from fedbench.core.algorithm import Algorithm, Coordinator, Synthesizer
+from fedbench.core.algorithm import (
+    Algorithm, Coordinator, Synthesizer, coordinator_spec, synthesizer_spec
+)
 from fedbench.core.logger import ELBOW, TEE, log_info
 from fedbench.core.update import Update
-
-
-class FedRandom(Algorithm):
-    """A degenerate demo of multistep capabilities."""
-
-    def create_coordinator(self) -> Coordinator:
-        return FedRandomCoordinator()
-
-    def create_synthesizer(self) -> Synthesizer:
-        return FedRandomSynthesizer()
 
 
 class FedRandomCoordinator(Coordinator):
@@ -90,3 +82,10 @@ class FedRandomSynthesizer(Synthesizer):
 
     def sample(self, request: Update, num_rows: int, seed: int) -> DataFrame:
         return DataFrame()
+
+
+class FedRandom(Algorithm):
+    """A degenerate demo of multistep capabilities."""
+
+    coordinator_spec = coordinator_spec(FedRandomCoordinator)
+    synthesizer_spec = synthesizer_spec(FedRandomSynthesizer)

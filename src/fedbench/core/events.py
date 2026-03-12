@@ -37,7 +37,7 @@ class CommandCompleted(Event):
 
 @dataclass(frozen=True)
 class ClientsConfigured(Event):
-    num_clients: int
+    pass
 
 
 @dataclass(frozen=True)
