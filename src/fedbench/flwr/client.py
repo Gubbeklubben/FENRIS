@@ -43,11 +43,12 @@ class FlwrClient:
             client_cache=None,  # TODO!
         )
         request = self.from_flwr(
-            flwr_message,
+            flwr_message.content,
             self.synthesizer_spec.arrays_to_ml_framework_map,
         )
         reply = synthesizer.fed_init(request, seed, self.dataset.schema, train_df)
-        return self.to_flwr(update=reply, reply_to=flwr_message)
+        rdict = self.to_flwr(reply)
+        return Message(content=rdict, reply_to=flwr_message)
 
     def train(self, flwr_message: Message, flwr_context: Context) -> Message:
         partition_id = self._get_partition_id(flwr_context)
@@ -58,11 +59,12 @@ class FlwrClient:
             client_cache=None,  # TODO!
         )
         request = self.from_flwr(
-            flwr_message,
+            flwr_message.content,
             self.synthesizer_spec.arrays_to_ml_framework_map,
         )
         reply = synthesizer.train(request, train_df)
-        return self.to_flwr(update=reply, reply_to=flwr_message)
+        rdict = self.to_flwr(reply)
+        return Message(content=rdict, reply_to=flwr_message)
 
     def evaluate(
         self,
@@ -84,7 +86,7 @@ class FlwrClient:
             client_cache=None,
         )
         request = self.from_flwr(
-            flwr_message,
+            flwr_message.content,
             self.synthesizer_spec.arrays_to_ml_framework_map,
         )
         synthetic_df = synthesizer.sample(
@@ -112,11 +114,8 @@ class FlwrClient:
             metrics[key] = json.dumps(value, cls=FedbenchEncoder)
 
         update = Update(extras={"metrics": metrics})
-
-        return self.to_flwr(
-            update=update,
-            reply_to=flwr_message,
-        )
+        rdict = self.to_flwr(update)
+        return Message(content=rdict, reply_to=flwr_message)
 
     @staticmethod
     def _get_partition_id(flwr_context: Context) -> int:

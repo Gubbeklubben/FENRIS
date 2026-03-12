@@ -62,7 +62,7 @@ def recv_artifacts(flwr_message: Message, _: Context) -> Message:
     synthesizer_spec = algorithm.synthesizer_spec
     if flwr_message.has_content():
         artifacts = from_flwr_pickle(
-            flwr_message,
+            flwr_message.content,
             synthesizer_spec.arrays_to_ml_framework_map,
         )
     else:

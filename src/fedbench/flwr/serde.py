@@ -5,7 +5,6 @@ from flwr.common import (
     Array,
     ArrayRecord,
     ConfigRecord,
-    Message,
     MetricRecord,
     RecordDict,
 )
@@ -16,39 +15,20 @@ _METADATA_KEY = f"{__package__}.metadata"
 
 
 class FlwrSerializer(Protocol):
-    def __call__(
-        self,
-        update: Update,
-        message_type: str | None = None,
-        dst_node_id: int | None = None,
-        reply_to: Message | None = None,
-    ) -> Message:
+    def __call__(self, update: Update) -> RecordDict:
         pass
 
 
 class FlwrDeserializer(Protocol):
     def __call__(
         self,
-        message: Message,
+        rdict: RecordDict,
         arrays_to_ml_framework_map: dict[str, str] | None = None,
     ) -> Update:
         pass
 
 
-def to_flwr_pickle(
-    update: Update,
-    message_type: str | None = None,
-    dst_node_id: int | None = None,
-    reply_to: Message | None = None,
-) -> Message:
-
-    if reply_to is None:
-        if dst_node_id is None:
-            raise ValueError("Either dst_node_id or reply_to is required.")
-
-        if message_type is None:
-            raise ValueError("message_type required when reply_to is None.")
-
+def to_flwr_pickle(update: Update) -> RecordDict:
     rdict = RecordDict()
     pickle_records = []
 
@@ -67,25 +47,15 @@ def to_flwr_pickle(
         rdict[key] = ConfigRecord(extras)
 
     _inject_metadata(rdict, pickle_records)
-
-    if reply_to is not None:
-        return Message(content=rdict, reply_to=reply_to)
-
-    # noinspection PyUnnecessaryCast
-    return Message(
-        content=rdict,
-        message_type=cast(str, message_type),
-        dst_node_id=cast(int, dst_node_id),
-    )
+    return rdict
 
 
 def from_flwr_pickle(
-    message: Message,
+    rdict: RecordDict,
     arrays_to_ml_framework_map: dict[str, str] | None = None,
 ) -> Update:
 
     arrays_to_ml_framework_map = arrays_to_ml_framework_map or {}
-    rdict = message.content
     update = Update()
 
     pickle_records = _extract_metadata(rdict)
@@ -111,18 +81,12 @@ def from_flwr_pickle(
     return update
 
 
-def to_flwr_no_pickle(
-    update: Update,
-    message_type: str | None = None,
-    dst_node_id: int | None = None,
-    reply_to: Message | None = None,
-) -> Message:
-
+def to_flwr_no_pickle(update: Update) -> RecordDict:
     if update.objects:
         raise RuntimeError(
             "Pickle is disabled, but update has non-empty objects field."
         )
-    return to_flwr_pickle(update, message_type, dst_node_id, reply_to)
+    return to_flwr_pickle(update)
 
 
 def _pickle_objects(objects: Objects) -> dict[str, Array]:
