@@ -65,12 +65,10 @@ class Strategy:
         requests = []
 
         for dst_id in grid.get_node_ids():
-            request = self._to_flwr(
-                global_state,
-                message_type=msg_type,
-                dst_node_id=dst_id,
+            rdict = self._to_flwr(global_state)
+            requests.append(
+                Message(content=rdict, message_type=msg_type, dst_node_id=dst_id)
             )
-            requests.append(request)
             self._eventbus.emit(ServerRequest(dst_id, msg_type=msg_type))
 
         for reply in grid.send_and_receive(requests):
@@ -129,18 +127,18 @@ class Strategy:
 
             requests = []
             for dst_id, update in batch:
-                request = self._to_flwr(
-                    update,
-                    message_type=msg_type,
-                    dst_node_id=dst_id,
+                rdict = self._to_flwr(update)
+                requests.append(
+                    Message(content=rdict, message_type=msg_type, dst_node_id=dst_id)
                 )
-                requests.append(request)
                 self._eventbus.emit(ServerRequest(dst_id, msg_type=internal_msg_type))
 
             replies = []
             for reply in grid.send_and_receive(requests):
                 src_id = reply.metadata.src_node_id
-                replies.append((src_id, self._from_flwr(reply, self._arrays_map)))
+                replies.append(
+                    (src_id, self._from_flwr(reply.content, self._arrays_map))
+                )
                 self._eventbus.emit(ClientReply(src_id, msg_type=internal_msg_type))
 
     def _get_and_check_global_state(self) -> Update:
@@ -181,11 +179,8 @@ def send_artifacts(
     artifacts = synthesizer_artifacts or Update()
 
     messages = (
-        to_flwr(
-            artifacts,
-            message_type="query.artifacts",
-            dst_node_id=cid,
-        )
+        Message(content=to_flwr(artifacts), message_type="query.artifacts",
+                dst_node_id=cid)
         for cid in grid.get_node_ids()
     )
     return grid.send_and_receive(messages)

@@ -32,12 +32,8 @@ def make_random_ndarrays() -> Callable[[], list[np.ndarray]]:
 def test_empty(serde):
     orig = Update()
     to_flwr, from_flwr = serde
-    flwr_message = to_flwr(
-        orig,
-        message_type="train",
-        dst_node_id=1
-    )
-    deserialized = from_flwr(flwr_message)
+    rdict = to_flwr(orig)
+    deserialized = from_flwr(rdict)
     assert orig.is_empty()
     assert deserialized.is_empty()
 
@@ -49,12 +45,8 @@ def test_to_flwr_single_array_group(
     orig = make_random_ndarrays()
     update.arrays["test-arrays"] = orig
     to_flwr, _ = serde
-    flwr_message = to_flwr(
-        update,
-        message_type="train",
-        dst_node_id=1
-    )
-    retrieved = flwr_message.content["test-arrays"].to_numpy_ndarrays()
+    rdict = to_flwr(update)
+    retrieved = rdict["test-arrays"].to_numpy_ndarrays()
     for idx, arr in enumerate(orig):
         assert np.array_equal(arr, retrieved[idx]), "Arrays not equal"
 
@@ -65,12 +57,8 @@ def test_from_flwr_single_array_group(
 
     orig = make_random_ndarrays()
     _, from_flwr = serde
-    flwr_message = Message(
-        message_type="train",
-        dst_node_id=1,
-        content=RecordDict({"test-arrays": ArrayRecord(orig)})
-    )
-    update = from_flwr(flwr_message)
+    rdict = RecordDict({"test-arrays": ArrayRecord(orig)})
+    update = from_flwr(rdict)
     retrieved = update.arrays["test-arrays"]
     for idx, arr in enumerate(orig):
         assert np.array_equal(arr, retrieved[idx]), "Arrays not equal"
@@ -87,13 +75,9 @@ def test_to_flwr_multiple_array_groups(
     update.arrays["test-arrays2"] = orig2
 
     to_flwr, _ = serde
-    flwr_message = to_flwr(
-        update,
-        message_type="train",
-        dst_node_id=1
-    )
-    retrieved1 = flwr_message.content["test-arrays1"].to_numpy_ndarrays()
-    retrieved2 = flwr_message.content["test-arrays2"].to_numpy_ndarrays()
+    rdict = to_flwr(update)
+    retrieved1 = rdict["test-arrays1"].to_numpy_ndarrays()
+    retrieved2 = rdict["test-arrays2"].to_numpy_ndarrays()
 
     for idx, arr in enumerate(orig1):
         assert np.array_equal(arr, retrieved1[idx]), "Arrays not equal"
@@ -109,15 +93,11 @@ def test_from_flwr_multiple_array_groups(
     orig1 = make_random_ndarrays()
     orig2 = make_random_ndarrays()
     _, from_flwr = serde
-    flwr_message = Message(
-        message_type="train",
-        dst_node_id=1,
-        content=RecordDict({
+    rdict = RecordDict({
             "test-arrays1": ArrayRecord(orig1),
             "test-arrays2": ArrayRecord(orig2),
         })
-    )
-    update = from_flwr(flwr_message)
+    update = from_flwr(rdict)
     retrieved1 = update.arrays["test-arrays1"]
     retrieved2 = update.arrays["test-arrays2"]
 
@@ -136,8 +116,8 @@ def test_round_trip_combined(serde, make_random_ndarrays) -> None:
     update.metrics["train-metrics"] = {"loss": 0.42, "acc": 0.91}
     update.extras["meta"] = {"round": 3, "tag": "combined", "flag": True}
 
-    flwr_message = to_flwr(update, message_type="train", dst_node_id=1)
-    result = from_flwr(flwr_message)
+    rdict = to_flwr(update)
+    result = from_flwr(rdict)
 
     for idx, arr in enumerate(update.arrays["weights"]):
         assert np.array_equal(arr, result.arrays["weights"][idx])
@@ -159,12 +139,8 @@ def test_single_object_pickle():
     update = Update()
     orig = PickleMe("Some Name")
     update.objects["test-objects"] = {"pickle-me": orig}
-    flwr_message = to_flwr_pickle(
-        update,
-        message_type="train",
-        dst_node_id=1
-    )
-    deserialized = from_flwr_pickle(flwr_message)
+    rdict = to_flwr_pickle(update)
+    deserialized = from_flwr_pickle(rdict)
     unpickled = deserialized.objects["test-objects"]["pickle-me"]
     assert isinstance(unpickled, PickleMe), "Not a PickleMe instance"
     assert unpickled.name == orig.name
@@ -182,12 +158,8 @@ def test_metrics_single_group_all_types(serde):
         "list[float]": [1.1, 2.2, 3.3],
     }
     update.metrics["test-metrics"] = metrics
-    flwr_message = to_flwr(
-        update,
-        message_type="train",
-        dst_node_id=1,
-    )
-    deserialized = from_flwr(flwr_message)
+    rdict = to_flwr(update)
+    deserialized = from_flwr(rdict)
     assert deserialized.metrics["test-metrics"] == metrics
 
 
@@ -207,12 +179,8 @@ def test_extras_single_group_all_types(serde):
         "list[str]": ["1", "2", "3"],
     }
     update.extras["test-extras"] = extras
-    flwr_message = to_flwr(
-        update,
-        message_type="train",
-        dst_node_id=1,
-    )
-    deserialized = from_flwr(flwr_message)
+    rdict = to_flwr(update)
+    deserialized = from_flwr(rdict)
     assert deserialized.extras["test-extras"] == extras
 
 
@@ -220,8 +188,4 @@ def test_disable_pickle_raises():
     update = Update()
     update.objects["test-objects"] = {"pickle-me": None}
     with pytest.raises(RuntimeError):
-        to_flwr_no_pickle(
-            update,
-            message_type="train",
-            dst_node_id=1
-        )
+        to_flwr_no_pickle(update)
