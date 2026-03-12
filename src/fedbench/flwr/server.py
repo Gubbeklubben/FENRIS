@@ -179,8 +179,9 @@ def send_artifacts(
     artifacts = synthesizer_artifacts or Update()
 
     messages = (
-        Message(content=to_flwr(artifacts), message_type="query.artifacts",
-                dst_node_id=cid)
+        Message(
+            content=to_flwr(artifacts), message_type="query.artifacts", dst_node_id=cid
+        )
         for cid in grid.get_node_ids()
     )
     return grid.send_and_receive(messages)
