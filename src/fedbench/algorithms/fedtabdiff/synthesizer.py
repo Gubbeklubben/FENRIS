@@ -1,17 +1,17 @@
-from typing import Callable, cast, Iterator, Iterable
+from typing import Callable, Iterable, Iterator, cast
 
 import numpy as np
 import pandas as pd
 import torch
 from pandas import DataFrame, Series
-from sklearn.preprocessing import QuantileTransformer, LabelEncoder
-from torch import nn, Tensor, optim
-from torch.utils.data import TensorDataset, DataLoader
+from sklearn.preprocessing import LabelEncoder, QuantileTransformer
+from torch import Tensor, nn, optim
+from torch.utils.data import DataLoader, TensorDataset
 
 from fedbench.algorithms.fedtabdiff.diffuser import Diffuser
 from fedbench.algorithms.fedtabdiff.mlpsynthesizer import MLPSynthesizer
 from fedbench.core.algorithm import Synthesizer
-from fedbench.core.logger import log_info, ELBOW
+from fedbench.core.logger import ELBOW, log_info
 from fedbench.core.update import Update
 
 
@@ -24,7 +24,7 @@ class FedTabDiffSynthesizer(Synthesizer):
         n_cat_emb: int,
         last_diff_step: int,
         diffuser_factory: Callable[[torch.device], Diffuser],
-        mlp_synth_factory: Callable[[int, int], MLPSynthesizer]
+        mlp_synth_factory: Callable[[int, int], MLPSynthesizer],
     ) -> None:
 
         self._batch_size = batch_size
@@ -44,9 +44,7 @@ class FedTabDiffSynthesizer(Synthesizer):
         self._num_scaler: QuantileTransformer | None = None
         self._label_encoder: LabelEncoder | None = None
 
-        self._device = torch.device(
-            "cuda" if torch.cuda.is_available() else "cpu"
-        )
+        self._device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
     # noinspection PyUnnecessaryCast
     def attach_global_init_artifacts(self, artifacts: Update) -> None:
@@ -172,8 +170,7 @@ class FedTabDiffSynthesizer(Synthesizer):
         state_dict = request.arrays["state"]
         # noinspection PyUnnecessaryCast
         mlp_synth = self._mlp_synth_factory(
-            cast(int, self._encoded_dim),
-            cast(int, self._n_cat_tokens)
+            cast(int, self._encoded_dim), cast(int, self._n_cat_tokens)
         )
         mlp_synth.load_state_dict(state_dict)
         mlp_synth.to(self._device)
@@ -188,18 +185,17 @@ class FedTabDiffSynthesizer(Synthesizer):
         log_info(str(self), "Finished sampling.")
 
         return self._decode_samples(
-            samples=tensor,
-            embeddings=mlp_synth.get_embeddings()
+            samples=tensor, embeddings=mlp_synth.get_embeddings()
         )
 
     # https://github.com/sattarov/FedTabDiff/blob/main/fedtabdiff_modules.py
     @torch.no_grad()  # type: ignore[untyped-decorator]
     def _generate_samples(
-            self,
-            mlp_synth: MLPSynthesizer,
-            diffuser: Diffuser,
-            n_samples: int | None = None,
-            label: Tensor | None = None,
+        self,
+        mlp_synth: MLPSynthesizer,
+        diffuser: Diffuser,
+        n_samples: int | None = None,
+        label: Tensor | None = None,
     ) -> Tensor:
 
         if n_samples is None and label is None:
@@ -234,19 +230,17 @@ class FedTabDiffSynthesizer(Synthesizer):
         vocab_per_attr = cast(dict[str, list[int]], self._vocab_per_attr)
 
         # split sample into numeric and categorical parts
-        samples_num = samples[:, self._cat_dim:]
-        samples_cat = samples[:, :self._cat_dim]
+        samples_num = samples[:, self._cat_dim :]
+        samples_cat = samples[:, : self._cat_dim]
 
         # denormalize numeric attributes
-        z_norm_upscaled = num_scaler.inverse_transform(
-            samples_num.cpu().numpy()
-        )
+        z_norm_upscaled = num_scaler.inverse_transform(samples_num.cpu().numpy())
         z_norm_df = DataFrame(z_norm_upscaled, columns=num_attrs)
 
         # reshape back to batch_size * n_dim_cat * cat_emb_dim
         samples_cat = samples_cat.reshape(-1, len(cat_attrs), self._n_cat_emb)
-        # Compute batch-wise distances; large embedding token counts can be memory costly
-        # when done in a single pass.
+        # Compute batch-wise distances; large embedding token counts
+        # can be memory-hungry when done in a single pass.
         batch_size = 2048
         n_samples = len(samples)
         z_cat_df_list = []
@@ -254,7 +248,7 @@ class FedTabDiffSynthesizer(Synthesizer):
         # iterate over generated categorical samples
         for i in range(0, n_samples, batch_size):
             # get batch of samples
-            samples_cat_subset = samples_cat[i: i + batch_size]
+            samples_cat_subset = samples_cat[i : i + batch_size]
             # compute pairwise distances between embeddings and generated samples
             distances = torch.cdist(x1=embeddings, x2=samples_cat_subset)
             # create temp dataframes for collection of intermediate results

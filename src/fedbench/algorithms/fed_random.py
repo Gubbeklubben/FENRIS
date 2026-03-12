@@ -4,7 +4,11 @@ from typing import Generator, Iterable, cast
 from pandas import DataFrame
 
 from fedbench.core.algorithm import (
-    Algorithm, Coordinator, Synthesizer, coordinator_spec, synthesizer_spec
+    Algorithm,
+    Coordinator,
+    Synthesizer,
+    coordinator_spec,
+    synthesizer_spec,
 )
 from fedbench.core.logger import ELBOW, TEE, log_info
 from fedbench.core.update import Update

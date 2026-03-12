@@ -6,9 +6,13 @@ import pandas as pd
 from numpy.typing import NDArray
 
 from fedbench.core.algorithm import (
-    Algorithm, ComponentSpec, coordinator_spec, synthesizer_spec,
-    Coordinator, SingleStepCoordinator,
+    Algorithm,
+    ComponentSpec,
+    Coordinator,
+    SingleStepCoordinator,
     Synthesizer,
+    coordinator_spec,
+    synthesizer_spec,
 )
 from fedbench.core.data import TableSchema
 from fedbench.core.logger import log_info
@@ -101,4 +105,3 @@ class FedHello(Algorithm):
     @property
     def synthesizer_spec(self) -> ComponentSpec[Synthesizer]:
         return synthesizer_spec(self._synth_factory)
-

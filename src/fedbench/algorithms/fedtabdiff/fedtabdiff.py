@@ -8,11 +8,17 @@ from pandas import DataFrame
 from sklearn.preprocessing import LabelEncoder, QuantileTransformer
 
 from fedbench.core.algorithm import (
-    Algorithm, ComponentSpec, GlobalInitArtifacts,
-    Synthesizer, Coordinator, synthesizer_spec, coordinator_spec,
+    Algorithm,
+    ComponentSpec,
+    Coordinator,
+    GlobalInitArtifacts,
+    Synthesizer,
+    coordinator_spec,
+    synthesizer_spec,
 )
 from fedbench.core.data import TableSchema
 from fedbench.core.update import Update
+
 # Relative imports for algorithm specifics.
 from .coordinator import FedTabDiffCoordinator
 from .diffuser import Diffuser
@@ -103,8 +109,9 @@ class FedTabDiff(Algorithm):
                 total_steps=diffusion_steps,
                 beta_start=diffusion_beta_start,
                 beta_end=diffusion_beta_end,
-                scheduler=scheduler,),
-            mlp_synth_factory=mlp_synth_factory
+                scheduler=scheduler,
+            ),
+            mlp_synth_factory=mlp_synth_factory,
         )
 
     @property
@@ -118,10 +125,7 @@ class FedTabDiff(Algorithm):
         return synthesizer_spec(self._synth_factory, {"state": "torch"})
 
     def global_init(
-        self,
-        seed: int,
-        schema: TableSchema,
-        dataset: DataFrame
+        self, seed: int, schema: TableSchema, dataset: DataFrame
     ) -> GlobalInitArtifacts | None:
 
         np.random.seed(seed)
@@ -144,9 +148,7 @@ class FedTabDiff(Algorithm):
         label_encoder = LabelEncoder().fit(vocab_classes)
         cat_scaled = dataset[cat_attrs].apply(label_encoder.transform)
 
-        vocab_per_attr = {
-            attr: set(cat_scaled[attr]) for attr in cat_attrs
-        }
+        vocab_per_attr = {attr: set(cat_scaled[attr]) for attr in cat_attrs}
         n_cat_tokens = len(vocab_classes)
         cat_dim = self._n_cat_emb * len(cat_attrs)
         encoded_dim = cat_dim + len(num_attrs)
@@ -171,5 +173,3 @@ class FedTabDiff(Algorithm):
             coordinator=Update(arrays={"initial-state": mlp_synth.state_dict()}),
             synthesizer=synth_artifacts,
         )
-
-

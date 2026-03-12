@@ -10,10 +10,10 @@ from fedbench.core.eval import CentralizedEvalContext
 from fedbench.core.logger import log_info
 from fedbench.runtime.command import Command
 from fedbench.runtime.component_factory import (
-    create_df_loader,
     create_algorithm,
-    create_partitioner,
+    create_df_loader,
     create_evaluation_suite,
+    create_partitioner,
     create_synthesizer,
 )
 from fedbench.runtime.registry_builder import (
@@ -85,7 +85,7 @@ def global_sample(ctx: RunContext) -> None:
     synthesizer = create_synthesizer(
         spec=ctx.algorithm.synthesizer_spec,
         artifacts=ctx.global_init_artifacts.synthesizer,
-        client_cache=None
+        client_cache=None,
     )
     ctx.synthetic_df = synthesizer.sample(
         ctx.aggregated_state,

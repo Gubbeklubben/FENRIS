@@ -18,8 +18,8 @@ from fedbench.flwr.serde import (
     to_flwr_pickle,
 )
 from fedbench.runtime.component_factory import (
-    create_df_loader,
     create_algorithm,
+    create_df_loader,
     create_evaluation_suite,
     create_partitioner,
 )

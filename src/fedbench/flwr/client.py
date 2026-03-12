@@ -15,10 +15,7 @@ from fedbench.core.encoder import FedbenchEncoder
 from fedbench.core.eval import EvaluationSuite, LocalEvalContext
 from fedbench.core.logger import log_warning
 from fedbench.core.update import Extras, Update
-from fedbench.flwr.serde import (
-    FlwrDeserializer,
-    FlwrSerializer
-)
+from fedbench.flwr.serde import FlwrDeserializer, FlwrSerializer
 from fedbench.runtime.component_factory import create_synthesizer
 
 
@@ -43,7 +40,7 @@ class FlwrClient:
         synthesizer = create_synthesizer(
             spec=self.synthesizer_spec,
             artifacts=self.synthesizer_artifacts,
-            client_cache=None  # TODO!
+            client_cache=None,  # TODO!
         )
         request = self.from_flwr(
             flwr_message,
@@ -58,7 +55,7 @@ class FlwrClient:
         synthesizer = create_synthesizer(
             spec=self.synthesizer_spec,
             artifacts=self.synthesizer_artifacts,
-            client_cache=None  # TODO!
+            client_cache=None,  # TODO!
         )
         request = self.from_flwr(
             flwr_message,
