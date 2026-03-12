@@ -14,9 +14,9 @@ from fedbench.core.events import (
     ClientReply,
     FedInitCompleted,
     FedInitStarted,
+    RoundCompleted,
+    RoundStarted,
     ServerRequest,
-    TrainingCompleted,
-    TrainingStarted,
 )
 from fedbench.core.update import Metrics, Update
 from fedbench.flwr.serde import (
@@ -24,6 +24,7 @@ from fedbench.flwr.serde import (
     FlwrSerializer,
 )
 from fedbench.runtime.eventbus import EventBus
+from fedbench.util.metrics import count_rdict_bytes
 
 
 class Strategy:
@@ -69,11 +70,23 @@ class Strategy:
             requests.append(
                 Message(content=rdict, message_type=msg_type, dst_node_id=dst_id)
             )
-            self._eventbus.emit(ServerRequest(dst_id, msg_type=msg_type))
+            self._eventbus.emit(
+                ServerRequest(
+                    dst_id,
+                    msg_type=msg_type,
+                    byte_count=count_rdict_bytes(rdict),
+                )
+            )
 
         for reply in grid.send_and_receive(requests):
             src_id = reply.metadata.src_node_id
-            self._eventbus.emit(ClientReply(src_id, msg_type=msg_type))
+            self._eventbus.emit(
+                ClientReply(
+                    src_id,
+                    msg_type=msg_type,
+                    byte_count=count_rdict_bytes(reply.content),
+                )
+            )
             metrics = reply.content.config_records["metrics"]
             # noinspection PyUnnecessaryCast
             self._per_client_metrics[src_id] = {
@@ -95,10 +108,10 @@ class Strategy:
         self._eventbus.emit(FedInitCompleted())
 
         for curr_round in range(1, num_rounds + 1):
-            self._eventbus.emit(TrainingStarted(curr_round, num_rounds))
+            self._eventbus.emit(RoundStarted(curr_round, num_rounds))
             self.train(grid)
-            self._eventbus.emit(TrainingCompleted(curr_round, num_rounds))
             self.evaluate(grid)
+            self._eventbus.emit(RoundCompleted(curr_round, num_rounds))
 
         return self._get_and_check_global_state(), self._per_client_metrics
 
@@ -131,7 +144,13 @@ class Strategy:
                 requests.append(
                     Message(content=rdict, message_type=msg_type, dst_node_id=dst_id)
                 )
-                self._eventbus.emit(ServerRequest(dst_id, msg_type=internal_msg_type))
+                self._eventbus.emit(
+                    ServerRequest(
+                        dst_id,
+                        msg_type=internal_msg_type,
+                        byte_count=count_rdict_bytes(rdict),
+                    )
+                )
 
             replies = []
             for reply in grid.send_and_receive(requests):
@@ -139,7 +158,13 @@ class Strategy:
                 replies.append(
                     (src_id, self._from_flwr(reply.content, self._arrays_map))
                 )
-                self._eventbus.emit(ClientReply(src_id, msg_type=internal_msg_type))
+                self._eventbus.emit(
+                    ClientReply(
+                        src_id,
+                        msg_type=internal_msg_type,
+                        byte_count=count_rdict_bytes(reply.content),
+                    )
+                )
 
     def _get_and_check_global_state(self) -> Update:
         global_state = self._coordinator.global_state

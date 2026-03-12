@@ -3,14 +3,19 @@ from collections.abc import Iterable
 
 from fedbench.config import Config
 from fedbench.core.events import (
+    ClientReply,
     CommandCompleted,
     CommandStarted,
     Event,
+    RoundCompleted,
+    RoundStarted,
     RunCompleted,
     RunFailed,
     RunStarted,
+    ServerRequest,
 )
 from fedbench.core.logger import log_debug, log_error
+from fedbench.core.scalability_collector import ScalabilityCollector
 from fedbench.runtime.command import Command
 from fedbench.runtime.eventbus import EventBus
 from fedbench.runtime.runcontext import RunContext
@@ -21,8 +26,20 @@ def run(config: Config, commands: Iterable[Command]) -> None:
     eventbus = EventBus()
     eventbus.register(lambda event: log_debug("Event", event), (Event,))
 
+    # Register the scalability collector before EventBus is opened
+    collector = ScalabilityCollector()
+    eventbus.register(
+        observer=collector,
+        event_types=(
+            RoundStarted,
+            RoundCompleted,
+            ServerRequest,
+            ClientReply,
+        ),
+    )
+
     with eventbus:
-        _run(run_id, config, commands, eventbus)
+        _run(run_id, config, commands, eventbus, collector)
 
 
 def _run(
@@ -30,10 +47,12 @@ def _run(
     config: Config,
     commands: Iterable[Command],
     eventbus: EventBus,
+    scalability_collector: ScalabilityCollector,
 ) -> None:
 
     eventbus.emit(RunStarted(run_id))
     ctx = RunContext(run_id, config, eventbus)
+    ctx.scalability_collector = scalability_collector
 
     for command in commands:
         name = _infer_name(command)

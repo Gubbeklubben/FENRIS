@@ -4,6 +4,7 @@ from typing import Any, Iterable, Literal
 
 import numpy as np
 import pandas as pd
+from flwr.common import RecordDict
 from sklearn.base import BaseEstimator
 from sklearn.compose import ColumnTransformer
 from sklearn.impute import SimpleImputer
@@ -17,6 +18,24 @@ type TaskType = Literal[
 ]
 
 NAN_TOKEN = "__NaN__"
+
+
+def count_rdict_bytes(rdict: RecordDict) -> int:
+    """
+    Count the uncompressed model-parameter payload bytes in a RecordDict.
+
+    Counts only array_records (which carry both real tensors and
+    pickle-serialized objects). Excludes metric_records and config_records,
+    which carry only scalar values and JSON strings, not model parameters.
+
+    Each Array.data is the raw bytes as stored; shape[0] equals len(data)
+    for both numpy arrays (raw buffer) and pickle objects (uint8 encoding).
+    """
+    total = 0
+    for record in rdict.array_records.values():
+        for arr in record.values():
+            total += len(arr.data)
+    return total
 
 
 def make_tabular_preprocessor(df: pd.DataFrame) -> ColumnTransformer:

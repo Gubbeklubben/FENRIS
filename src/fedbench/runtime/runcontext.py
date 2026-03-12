@@ -9,6 +9,7 @@ from fedbench.config import Config
 from fedbench.core.algorithm import Algorithm, GlobalInitArtifacts
 from fedbench.core.data import PartitionedDataset, Partitioner
 from fedbench.core.eval import EvaluationSuite
+from fedbench.core.scalability_collector import ScalabilityCollector
 from fedbench.core.update import Update
 from fedbench.runtime.eventbus import EventBus
 
@@ -73,6 +74,7 @@ class RunContext:
     aggregated_metrics    = _RunCtxField[Mapping[str, float]]()
     centralized_metrics   = _RunCtxField[Mapping[str, float]]()
     synthetic_df          = _RunCtxField[DataFrame]()
+    scalability_collector = _RunCtxField[ScalabilityCollector]()
     # fmt: on
 
     def __init__(self, run_id: str, config: Config, eventbus: EventBus) -> None:

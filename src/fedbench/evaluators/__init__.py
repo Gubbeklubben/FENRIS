@@ -51,3 +51,9 @@ def register_builtin_evaluators(
         "fairness",
         f"{__package__}.fairness:FairnessEvaluator",
     )
+
+    # Fairness Evaluators
+    registries[Category.SCALABILITY].add_builtin(
+        "scalability",
+        f"{__package__}.scalability:ScalabilityEvaluator",
+    )
