@@ -5,9 +5,9 @@ from fedbench.algorithms import register_builtin_algorithms
 from fedbench.core.algorithm import Algorithm
 from fedbench.core.data import Partitioner
 from fedbench.core.eval import Category, Evaluator
-from fedbench.core.factory_registry import FactoryRegistry
 from fedbench.evaluators import register_builtin_evaluators
 from fedbench.partitioners import register_builtin_partitioners
+from fedbench.runtime.registry import FactoryRegistry
 
 
 def build_algorithm_registry() -> FactoryRegistry[Algorithm]:

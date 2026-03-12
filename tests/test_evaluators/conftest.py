@@ -19,10 +19,12 @@ import math
 
 import numpy as np
 import pandas as pd
-import pytest
 
 from fedbench.core.data.schemas import TableSchema, ColumnSchema, infer_schema
-from fedbench.core.eval.evalcontext import GlobalEvalContext, CentralizedEvalContext
+from fedbench.core.eval.evalcontext import (
+    GlobalEvalContext,
+    CentralizedEvalContext
+)
 from fedbench.evaluators.fidelity import (
     DistributionSimilarityMetricsEvaluator,
     MomentReductionMetricsEvaluator,

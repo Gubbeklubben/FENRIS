@@ -4,13 +4,11 @@ from collections.abc import Callable, Mapping
 from pandas import DataFrame
 
 from fedbench.config import Config
-from fedbench.core.algorithm import (
-    Algorithm, Coordinator, Synthesizer, ComponentSpec
-)
+from fedbench.core.algorithm import Algorithm, ComponentSpec, Coordinator, Synthesizer
 from fedbench.core.data import Partitioner, load_csv
 from fedbench.core.eval import EvaluationSuite, Evaluator
-from fedbench.core.factory_registry import FactoryRegistry
 from fedbench.core.update import Update
+from fedbench.runtime.registry import FactoryRegistry
 
 
 # Wrap up loading in a partial for easy replay in client subprocs.

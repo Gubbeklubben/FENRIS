@@ -9,8 +9,8 @@ from fedbench.config import Config
 from fedbench.core.algorithm import Algorithm, GlobalInitArtifacts
 from fedbench.core.data import PartitionedDataset, Partitioner
 from fedbench.core.eval import EvaluationSuite
-from fedbench.core.eventbus import EventBus
 from fedbench.core.update import Update
+from fedbench.runtime.eventbus import EventBus
 
 
 class _RunCtxField[T]:

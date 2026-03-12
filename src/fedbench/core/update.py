@@ -25,7 +25,7 @@ type Extras = dict[
 # fmt: on
 
 
-@dataclass(frozen=True)  # Can not replace top level dicts once created
+@dataclass(frozen=True)
 class Update:
     arrays: dict[str, Arrays] = field(default_factory=dict)
     objects: dict[str, Objects] = field(default_factory=dict)

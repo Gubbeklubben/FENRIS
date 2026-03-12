@@ -1,5 +1,16 @@
+from __future__ import annotations
+
 import time
+from collections.abc import Iterable
 from dataclasses import dataclass, field
+from typing import Protocol
+
+type ObserverEntry = tuple[Observer, Iterable[type[Event]]]
+
+
+class Observer(Protocol):
+    def __call__(self, event: Event) -> None:
+        pass
 
 
 @dataclass(frozen=True)

@@ -10,7 +10,6 @@ from fedbench.config import Config
 from fedbench.core.algorithm import Coordinator
 from fedbench.core.data import TableSchema
 from fedbench.core.encoder import FedbenchEncoder
-from fedbench.core.eventbus import EventBus
 from fedbench.core.events import (
     ClientReply,
     FedInitCompleted,
@@ -24,6 +23,7 @@ from fedbench.flwr.serde import (
     FlwrDeserializer,
     FlwrSerializer,
 )
+from fedbench.runtime.eventbus import EventBus
 
 
 class Strategy:
@@ -135,19 +135,13 @@ class Strategy:
                     dst_node_id=dst_id,
                 )
                 requests.append(request)
-                self._eventbus.emit(
-                    ServerRequest(dst_id, msg_type=internal_msg_type)
-                )
+                self._eventbus.emit(ServerRequest(dst_id, msg_type=internal_msg_type))
 
             replies = []
             for reply in grid.send_and_receive(requests):
                 src_id = reply.metadata.src_node_id
-                replies.append(
-                    (src_id, self._from_flwr(reply, self._arrays_map))
-                )
-                self._eventbus.emit(ClientReply(
-                    src_id, msg_type=internal_msg_type)
-                )
+                replies.append((src_id, self._from_flwr(reply, self._arrays_map)))
+                self._eventbus.emit(ClientReply(src_id, msg_type=internal_msg_type))
 
     def _get_and_check_global_state(self) -> Update:
         global_state = self._coordinator.global_state
@@ -169,9 +163,7 @@ def send_config(grid: Grid, config: Config) -> Iterable[Message]:
 
     messages = (
         Message(
-            content=RecordDict(
-                {"config": ConfigRecord({"jsons": config.jsons()})}
-            ),
+            content=RecordDict({"config": ConfigRecord({"jsons": config.jsons()})}),
             message_type="query.config",
             dst_node_id=cid,
         )

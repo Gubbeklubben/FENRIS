@@ -1,7 +1,7 @@
 from typing import Mapping
 
 from fedbench.core.eval import Category, Evaluator
-from fedbench.core.factory_registry import FactoryRegistry
+from fedbench.runtime.registry import FactoryRegistry
 
 
 def register_builtin_evaluators(

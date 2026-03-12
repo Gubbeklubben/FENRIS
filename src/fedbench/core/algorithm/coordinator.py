@@ -1,5 +1,5 @@
 from abc import ABC, abstractmethod
-from typing import Iterable, Generator
+from typing import Generator, Iterable
 
 from fedbench.core.data import TableSchema
 from fedbench.core.update import Update

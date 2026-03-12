@@ -9,7 +9,6 @@ Covers:
 """
 
 import json
-import math
 from dataclasses import dataclass
 
 import pytest

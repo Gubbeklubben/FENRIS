@@ -1,10 +1,10 @@
-from typing import cast, Iterable
+from typing import Iterable, cast
 
 import torch
 from torch import Tensor
 
 from fedbench.core.algorithm import SingleStepCoordinator
-from fedbench.core.logger import log_warning, ELBOW
+from fedbench.core.logger import ELBOW, log_warning
 from fedbench.core.update import Update
 
 

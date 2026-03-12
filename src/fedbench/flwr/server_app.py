@@ -2,15 +2,15 @@ from flwr.common import Context
 from flwr.server import Grid
 from flwr.serverapp import ServerApp
 
-from fedbench.component_factory import create_coordinator
 from fedbench.core.events import ClientsConfigured
-from fedbench.core.runcontext import RunContext
 from fedbench.flwr.serde import (
     from_flwr_pickle,
     to_flwr_no_pickle,
     to_flwr_pickle,
 )
-from fedbench.flwr.server import send_config, send_artifacts, Strategy
+from fedbench.flwr.server import Strategy, send_artifacts, send_config
+from fedbench.runtime.component_factory import create_coordinator
+from fedbench.runtime.runcontext import RunContext
 
 
 def make_server_app(ctx: RunContext) -> ServerApp:
@@ -23,19 +23,13 @@ def make_server_app(ctx: RunContext) -> ServerApp:
     def main(grid: Grid, _: Context) -> None:
         for reply in send_config(grid, ctx.config):
             if reply.has_error():
-                raise RuntimeError(
-                    f"Failed to send config: {reply.error.reason}"
-                )
+                raise RuntimeError(f"Failed to send config: {reply.error.reason}")
 
         for reply in send_artifacts(
-                grid,
-                to_flwr,
-                ctx.global_init_artifacts.synthesizer
+            grid, to_flwr, ctx.global_init_artifacts.synthesizer
         ):
             if reply.has_error():
-                raise RuntimeError(
-                    f"Failed to send artifacts: {reply.error.reason}"
-                )
+                raise RuntimeError(f"Failed to send artifacts: {reply.error.reason}")
 
         ctx.eventbus.emit(ClientsConfigured())
 
@@ -52,7 +46,7 @@ def make_server_app(ctx: RunContext) -> ServerApp:
             from_flwr=from_flwr,
             eventbus=ctx.eventbus,
             coordinator=coordinator,
-            arrays_to_ml_framework_map=arrays_map
+            arrays_to_ml_framework_map=arrays_map,
         )
         state, metrics = strategy.run(grid, ctx.config.num_rounds)
         ctx.aggregated_state = state

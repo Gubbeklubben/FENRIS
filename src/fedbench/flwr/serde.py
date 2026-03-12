@@ -10,8 +10,7 @@ from flwr.common import (
     RecordDict,
 )
 
-from fedbench.core.types import Objects
-from fedbench.core.update import Update
+from fedbench.core.update import Objects, Update
 
 _METADATA_KEY = f"{__package__}.metadata"
 

@@ -8,12 +8,6 @@ from flwr.common import (
     RecordDict,
 )
 
-from fedbench.component_factory import (
-    create_df_loader,
-    create_algorithm,
-    create_evaluation_suite,
-    create_partitioner,
-)
 from fedbench.config import Config
 from fedbench.core.data import PartitionedDataset
 from fedbench.core.data.schemas import infer_schema
@@ -23,7 +17,13 @@ from fedbench.flwr.serde import (
     to_flwr_no_pickle,
     to_flwr_pickle,
 )
-from fedbench.registries import (
+from fedbench.runtime.component_factory import (
+    create_algorithm,
+    create_df_loader,
+    create_evaluation_suite,
+    create_partitioner,
+)
+from fedbench.runtime.registry_builder import (
     build_algorithm_registry,
     build_evaluator_registries,
     build_partitioner_registry,
