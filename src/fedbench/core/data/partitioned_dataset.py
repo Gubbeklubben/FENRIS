@@ -39,7 +39,7 @@ class PartitionedDataset:
         return self._partitioner.num_partitions
 
     def load_global_holdout(self) -> pd.DataFrame:
-        return self._global_holdout
+        return self._global_holdout.copy()
 
     def load_train_partition(self, partition_id: int) -> pd.DataFrame:
         return self._partitioner.load_partition(
