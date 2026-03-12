@@ -1,5 +1,6 @@
+import logging
 from pathlib import Path
-from typing import Optional, Union, Any
+from typing import Any, Optional, Union
 
 import pytest
 
@@ -8,8 +9,8 @@ from fedbench.config.builder import build_config, parse_for_function
 from fedbench.core.algorithm import Algorithm
 from fedbench.core.data import Partitioner
 from fedbench.core.eval import Category
-from fedbench.runtime.registry import FactoryRegistry
 from fedbench.partitioners import register_builtin_partitioners
+from fedbench.runtime.registry import FactoryRegistry
 from fedbench.util.parsing import coerce, is_optional
 
 
@@ -572,6 +573,49 @@ def test_parse_for_function_with_tuple_coercion():
     result = parse_for_function(dummy_func, {"items": "(1, 2, 3)"})
 
     assert result["items"] == (1, 2, 3)
+
+
+# --- parse_for_function untyped parameter tests ---------------------------
+
+def test_parse_for_function_untyped_param_passes_raw_string():
+    """Untyped required param provided in raw → passed through as-is."""
+    def dummy_func(x):
+        pass
+
+    result = parse_for_function(dummy_func, {"x": "42"})
+
+    assert result["x"] == "42"
+
+
+def test_parse_for_function_untyped_param_with_default_passes_raw_string():
+    """Untyped param with default provided in raw → passed through as-is."""
+    def dummy_func(x=10):
+        pass
+
+    result = parse_for_function(dummy_func, {"x": "99"})
+
+    assert result["x"] == "99"
+
+
+def test_parse_for_function_untyped_missing_required_still_raises():
+    """Untyped required param not in raw → still raises TypeError."""
+    def dummy_func(x):
+        pass
+
+    with pytest.raises(TypeError, match="Missing required parameter"):
+        parse_for_function(dummy_func, {})
+
+
+def test_parse_for_function_untyped_emits_warning(caplog):
+    """Untyped param in raw → a warning is emitted."""
+    def dummy_func(x):
+        pass
+
+    with caplog.at_level(logging.WARNING, logger="FedBench"):
+        parse_for_function(dummy_func, {"x": "hello"})
+
+    assert "Untyped" in caplog.text
+    assert "x" in caplog.text
 
 
 # --- validation tests --------------------------------------------------
