@@ -54,15 +54,14 @@ def partitioned_dataset(sample_df):
     return PartitionedDataset(sample_df, schema, partitioner, test_size=0.25, seed=42)
 
 
-def test_holdout_mutation_does_not_affect_source(partitioned_dataset):
-    holdout = partitioned_dataset.load_global_holdout()
-    original_values = partitioned_dataset.load_global_holdout().copy()
-    holdout.iloc[0, 0] = -9999
-    assert partitioned_dataset.load_global_holdout().equals(original_values)
-
-
-def test_partition_mutation_does_not_affect_source(partitioned_dataset):
-    partition = partitioned_dataset.load_train_partition(0)
-    original_values = partitioned_dataset.load_train_partition(0).copy()
-    partition.iloc[0, 0] = -9999
-    assert partitioned_dataset.load_train_partition(0).equals(original_values)
+@pytest.mark.parametrize("load_fn,kwargs", [
+    ("load_global_holdout", {}),
+    ("load_train_partition", {"partition_id": 0}),
+    ("load_test_partition", {"partition_id": 0}),
+])
+def test_mutation_does_not_affect_source(partitioned_dataset, load_fn, kwargs):
+    load = lambda: getattr(partitioned_dataset, load_fn)(**kwargs)
+    result = load()
+    original_values = load().copy()
+    result.iloc[0, 0] = -9999
+    assert load().equals(original_values)
