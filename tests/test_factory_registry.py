@@ -34,8 +34,7 @@ def product_registry() -> FactoryRegistry[Product]:
 @pytest.fixture
 def abstract_product_registry() -> FactoryRegistry[AbstractProduct]:
     return FactoryRegistry(
-        group=f"{__name__}.abstract_product",
-        product_cls=AbstractProduct
+        group=f"{__name__}.abstract_product", product_cls=AbstractProduct
     )
 
 
@@ -90,3 +89,19 @@ def test_can_not_call_abstract_class(abstract_product_registry) -> None:
     abstract_product_registry.add_builtin("product", f"{__name__}:AbstractProduct")
     with pytest.raises(TypeError, match=f"{AbstractProduct} is an abstract class"):
         abstract_product_registry.call("product")
+
+
+def raising_factory():
+    raise ValueError("bad config")
+
+
+def test_factory_exception_wrapped_as_runtime_error(product_registry) -> None:
+    product_registry.add_builtin("bad", f"{__name__}:raising_factory")
+    with pytest.raises(RuntimeError, match="Factory 'bad' raised an exception"):
+        product_registry.call("bad")
+
+
+def test_load_bad_module_wrapped_as_runtime_error(product_registry) -> None:
+    product_registry.add_builtin("missing", "no_such_module_xyz:SomeClass")
+    with pytest.raises(RuntimeError, match="Failed to load factory 'missing'"):
+        product_registry.load("missing")

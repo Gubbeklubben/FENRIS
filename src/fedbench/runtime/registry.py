@@ -79,7 +79,10 @@ class FactoryRegistry[T]:
         if not callable(factory):
             raise TypeError(f"{factory} is not callable.")
 
-        instance = factory(**factory_kwargs)
+        try:
+            instance = factory(**factory_kwargs)
+        except Exception as e:
+            raise RuntimeError(f"Factory '{name}' raised an exception: {e}") from e
         if not isinstance(instance, self._product_cls):
             raise TypeError(
                 f"Unexpected type {type(instance)} produced by factory {name}"
@@ -94,10 +97,14 @@ class FactoryRegistry[T]:
             yield Metadata(name=ep.name, locator=ep.value, source="plugin")
 
     def load(self, name: str) -> Any:
-        factory = self._load_builtin(name)
-
-        if factory is None:
-            factory = self._load_plugin(name)
+        try:
+            factory = self._load_builtin(name)
+            if factory is None:
+                factory = self._load_plugin(name)
+        except (ValueError, TypeError):
+            raise
+        except Exception as e:
+            raise RuntimeError(f"Failed to load factory '{name}': {e}") from e
 
         if factory is None:
             raise ValueError(f"No such factory: '{name}'.")
