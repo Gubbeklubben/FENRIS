@@ -1,4 +1,6 @@
 import json
+import math
+import time
 from typing import cast
 
 from flwr.clientapp import ClientApp
@@ -71,7 +73,9 @@ def train(message: Message, flwr_context: Context) -> Message:
         message.content,
         ctx.synthesizer_spec.arrays_to_ml_framework_map,
     )
+    start_time = time.perf_counter_ns()
     reply = synthesizer.train(request, train_df)
+    local_train_seconds = (time.perf_counter_ns() - start_time) / 1e9
 
     rdict = ctx.to_flwr(reply)
     return Message(content=rdict, reply_to=message)
@@ -114,6 +118,7 @@ def evaluate(message: Message, flwr_context: Context) -> Message:
         target_column=ctx.config.data.target_col,
         sensitive_columns=ctx.config.data.sensitive_cols,
         schema=ctx.dataset.schema,
+        local_train_seconds=math.nan,  # TODO: get from train()
     )
 
     metrics: Extras = {}
