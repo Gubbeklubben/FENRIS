@@ -9,7 +9,7 @@ from fedbench.config import Config
 from fedbench.core.algorithm import Algorithm, GlobalInitArtifacts
 from fedbench.core.data import PartitionedDataset, Partitioner
 from fedbench.core.eval import EvaluationSuite
-from fedbench.core.scalability_collector import ScalabilityCollector
+from fedbench.runtime.scalability_collector import ScalabilityCollector
 from fedbench.core.update import Update
 from fedbench.runtime.eventbus import EventBus
 

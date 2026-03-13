@@ -15,7 +15,7 @@ from fedbench.core.events import (
     ServerRequest,
 )
 from fedbench.core.logger import log_debug, log_error
-from fedbench.core.scalability_collector import ScalabilityCollector
+from fedbench.runtime.scalability_collector import ScalabilityCollector
 from fedbench.runtime.command import Command
 from fedbench.runtime.eventbus import EventBus
 from fedbench.runtime.runcontext import RunContext
