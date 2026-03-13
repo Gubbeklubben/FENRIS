@@ -44,9 +44,8 @@ merged in aggregate_federated_metrics:
   EvaluationSuite.aggregate() → ScalabilityEvaluator.aggregate()
       local_train_seconds_mean
       ──────────────────────────────────────────────────────────────────
-      Each client self-reports local_train_seconds via LocalEvalContext
-      (measured in FlwrClient.train(), stored in FlwrClient._timing, read in
-      FlwrClient.evaluate()).  The server computes a row-count-weighted mean.
+      Each client self-reports local_train_seconds via LocalEvalContext.
+      The server computes a row-count-weighted mean.
 
 Scalability metrics are inherently federated and have no centralized analogue.
 global_evaluate returns NaN for all keys so that metrics.centralized.json
