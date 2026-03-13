@@ -74,13 +74,20 @@ class RunContext:
     aggregated_metrics    = _RunCtxField[Mapping[str, float]]()
     centralized_metrics   = _RunCtxField[Mapping[str, float]]()
     synthetic_df          = _RunCtxField[DataFrame]()
-    scalability_collector = _RunCtxField[ScalabilityCollector]()
     # fmt: on
 
-    def __init__(self, run_id: str, config: Config, eventbus: EventBus) -> None:
+    def __init__(
+        self,
+        run_id: str,
+        config: Config,
+        eventbus: EventBus,
+        scalability_collector: ScalabilityCollector,
+    ) -> None:
+
         self._run_id = run_id
         self._config = config
         self._eventbus = eventbus
+        self._scalability_collector = scalability_collector
 
     def __repr__(self) -> str:
         return f"<{self.__class__.__name__}>"
@@ -96,3 +103,7 @@ class RunContext:
     @property
     def eventbus(self) -> EventBus:
         return self._eventbus
+
+    @property
+    def scalability_collector(self) -> ScalabilityCollector:
+        return self._scalability_collector
