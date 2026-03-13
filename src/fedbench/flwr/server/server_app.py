@@ -8,7 +8,7 @@ from fedbench.flwr.serde import (
     to_flwr_no_pickle,
     to_flwr_pickle,
 )
-from fedbench.flwr.server import Strategy, send_artifacts, send_config
+from fedbench.flwr.server.server import Strategy, send_artifacts, send_config
 from fedbench.runtime.component_factory import create_coordinator
 from fedbench.runtime.runcontext import RunContext
 

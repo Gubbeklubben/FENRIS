@@ -1,5 +1,9 @@
+from collections.abc import Generator
+from contextlib import contextmanager
 from dataclasses import dataclass
 from typing import cast
+
+from flwr.common import RecordDict
 
 from fedbench.config import Config
 from fedbench.core.algorithm import ComponentSpec, Synthesizer
@@ -7,7 +11,7 @@ from fedbench.core.data import PartitionedDataset
 from fedbench.core.data.schemas import infer_schema
 from fedbench.core.eval import EvaluationSuite
 from fedbench.core.update import Update
-from fedbench.flwr.client_cache_wrapper import ClientCacheWrapper
+from fedbench.flwr.client.cache_manager import CacheManager, Namespace
 from fedbench.flwr.serde import (
     FlwrDeserializer,
     FlwrSerializer,
@@ -38,13 +42,27 @@ class ClientContext:
     to_flwr: FlwrSerializer
     from_flwr: FlwrDeserializer
 
+    @contextmanager
+    def use_synthesizer_cache(
+        self, cache_mgr: CacheManager
+    ) -> Generator[Update, None, None]:
+
+        cache = self.from_flwr(
+            cache_mgr.get_cache(Namespace.SYNTHESIZER),
+            self.synthesizer_spec.arrays_to_ml_framework_map,
+        )
+        try:
+            yield cache
+        finally:
+            cache_mgr.set_cache(Namespace.SYNTHESIZER, self.to_flwr(cache))
+
 
 _config: Config | None = None
 _dataset: PartitionedDataset | None = None
 
 
-def build_client_context(cache: ClientCacheWrapper) -> ClientContext:
-    config = _get_config(cache)
+def build_client_context(cache_mgr: CacheManager) -> ClientContext:
+    config = _get_config(cache_mgr.get_cache(Namespace.FRAMEWORK))
     dataset = _get_dataset(config)
 
     algorithm = create_algorithm(config, build_algorithm_registry())
@@ -52,9 +70,9 @@ def build_client_context(cache: ClientCacheWrapper) -> ClientContext:
     to_flwr = to_flwr_no_pickle if config.disable_pickle else to_flwr_pickle
     from_flwr = from_flwr_pickle
 
-    artifacts_rdict = cache.get_artifacts()
+    artifacts_rdict = cache_mgr.get_cache(Namespace.GLOBAL_INIT_ARTIFACTS)
 
-    if artifacts_rdict is not None:
+    if artifacts_rdict:
         artifacts = from_flwr(
             artifacts_rdict, algorithm.synthesizer_spec.arrays_to_ml_framework_map
         )
@@ -72,12 +90,12 @@ def build_client_context(cache: ClientCacheWrapper) -> ClientContext:
     )
 
 
-def _get_config(cache: ClientCacheWrapper) -> Config:
+def _get_config(cache: RecordDict) -> Config:
     global _config
     if _config is not None:
         return _config
 
-    config = cache.get_config()
+    config = cache.config_records.get("config", None)
     if config is None:
         raise RuntimeError("Missing config, can not build client context.")
 
