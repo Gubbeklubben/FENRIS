@@ -1,4 +1,4 @@
-from flwr.common import RecordDict, ConfigRecord
+from flwr.common import ConfigRecord, RecordDict
 
 _CONFIG = "config"
 _ARTIFACTS = "artifacts"
