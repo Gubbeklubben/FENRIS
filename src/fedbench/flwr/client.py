@@ -1,4 +1,6 @@
 import json
+import math
+import time
 from dataclasses import dataclass
 from typing import cast
 
@@ -51,6 +53,7 @@ class FlwrClient:
         return Message(content=rdict, reply_to=flwr_message)
 
     def train(self, flwr_message: Message, flwr_context: Context) -> Message:
+        start_time = time.time_ns()
         partition_id = self._get_partition_id(flwr_context)
         train_df = self.dataset.load_train_partition(partition_id)
         synthesizer = create_synthesizer(
@@ -64,6 +67,10 @@ class FlwrClient:
         )
         reply = synthesizer.train(request, train_df)
         rdict = self.to_flwr(reply)
+
+        # TODO: cache and get this into evaluate somehow
+        _local_train_seconds = (time.time_ns() - start_time) / 1e9
+
         return Message(content=rdict, reply_to=flwr_message)
 
     def evaluate(
@@ -108,6 +115,7 @@ class FlwrClient:
             target_column=target_column,
             sensitive_columns=sensitive_columns,
             schema=self.dataset.schema,
+            local_train_seconds=math.nan,  # TODO: get from train()
         )
         metrics: Extras = {}
         for key, value in self.eval_suite.local_evaluate(eval_ctx).items():

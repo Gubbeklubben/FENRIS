@@ -11,8 +11,9 @@ def instance() -> RunContext:
     # noinspection PyTypeChecker
     return RunContext(
         "test",
-        config=object(),
-        eventbus=object(),
+        config=None,
+        eventbus=None,
+        scalability_collector=None,
     )
 
 
