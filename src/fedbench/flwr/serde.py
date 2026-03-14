@@ -1,5 +1,5 @@
 import pickle
-from typing import Protocol, cast
+from typing import Protocol
 
 from flwr.common import (
     Array,
@@ -10,8 +10,6 @@ from flwr.common import (
 )
 
 from fedbench.core.update import Objects, Update
-
-_METADATA_KEY = f"{__package__}.metadata"
 
 
 class FlwrSerializer(Protocol):
@@ -30,7 +28,6 @@ class FlwrDeserializer(Protocol):
 
 def to_flwr_pickle(update: Update) -> RecordDict:
     rdict = RecordDict()
-    pickle_records = []
 
     for key, arrays in update.arrays.items():
         rdict[key] = ArrayRecord(arrays)
@@ -38,7 +35,6 @@ def to_flwr_pickle(update: Update) -> RecordDict:
     for key, objects in update.objects.items():
         # noinspection PyUnnecessaryCast
         rdict[key] = ArrayRecord(_pickle_objects(objects))
-        pickle_records.append(key)
 
     for key, metrics in update.metrics.items():
         rdict[key] = MetricRecord(metrics)
@@ -46,7 +42,6 @@ def to_flwr_pickle(update: Update) -> RecordDict:
     for key, extras in update.extras.items():
         rdict[key] = ConfigRecord(extras)
 
-    _inject_metadata(rdict, pickle_records)
     return rdict
 
 
@@ -58,11 +53,8 @@ def from_flwr_pickle(
     arrays_to_ml_framework_map = arrays_to_ml_framework_map or {}
     update = Update()
 
-    pickle_records = _extract_metadata(rdict)
-
     for key, arrays in rdict.array_records.items():
-        if key in pickle_records:
-            # noinspection PyUnnecessaryCast
+        if list(arrays.values())[0].stype == "pickle":
             objects = _unpickle_arrays(arrays)
             update.objects[key] = objects
         else:
@@ -109,16 +101,3 @@ def _unpickle_arrays(arrays: ArrayRecord) -> Objects:
     for key, value in arrays.items():
         objects[key] = pickle.loads(value.data)
     return objects
-
-
-def _inject_metadata(rdict: RecordDict, pickle_records: list[str]) -> None:
-    cfg_record = ConfigRecord({"pickle-records": pickle_records})
-    rdict.config_records[_METADATA_KEY] = cfg_record
-
-
-def _extract_metadata(rdict: RecordDict) -> list[str]:
-    cfg_record = rdict.config_records.pop(_METADATA_KEY, None)
-    if cfg_record is None:
-        return []
-    # noinspection PyUnnecessaryCast
-    return cast(list[str], cfg_record["pickle-records"])
