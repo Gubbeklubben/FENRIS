@@ -19,10 +19,7 @@ from fedbench.core.events import (
     ServerRequest,
 )
 from fedbench.core.update import Metrics, Update
-from fedbench.flwr.serde import (
-    FlwrDeserializer,
-    FlwrSerializer,
-)
+from fedbench.flwr.serde import FlwrSerde
 from fedbench.runtime.eventbus import EventBus
 from fedbench.util.metrics import count_rdict_bytes
 
@@ -32,8 +29,7 @@ class Strategy:
         self,
         seed: int,
         schema: TableSchema,
-        to_flwr: FlwrSerializer,
-        from_flwr: FlwrDeserializer,
+        serde: FlwrSerde,
         eventbus: EventBus,
         coordinator: Coordinator,
         arrays_to_ml_framework_map: dict[str, str] | None,
@@ -41,8 +37,7 @@ class Strategy:
 
         self._seed = seed
         self._schema = schema
-        self._to_flwr = to_flwr
-        self._from_flwr = from_flwr
+        self._serde = serde
         self._eventbus = eventbus
         self._coordinator = coordinator
         self._arrays_map = arrays_to_ml_framework_map
@@ -66,7 +61,7 @@ class Strategy:
         requests = []
 
         for dst_id in grid.get_node_ids():
-            rdict = self._to_flwr(global_state)
+            rdict = self._serde.to_flwr(global_state)
             requests.append(
                 Message(content=rdict, message_type=msg_type, dst_node_id=dst_id)
             )
@@ -140,7 +135,7 @@ class Strategy:
 
             requests = []
             for dst_id, update in batch:
-                rdict = self._to_flwr(update)
+                rdict = self._serde.to_flwr(update)
                 requests.append(
                     Message(content=rdict, message_type=msg_type, dst_node_id=dst_id)
                 )
@@ -156,7 +151,7 @@ class Strategy:
             for reply in grid.send_and_receive(requests):
                 src_id = reply.metadata.src_node_id
                 replies.append(
-                    (src_id, self._from_flwr(reply.content, self._arrays_map))
+                    (src_id, self._serde.from_flwr(reply.content, self._arrays_map))
                 )
                 self._eventbus.emit(
                     ClientReply(
@@ -197,7 +192,7 @@ def send_config(grid: Grid, config: Config) -> Iterable[Message]:
 
 def send_artifacts(
     grid: Grid,
-    to_flwr: FlwrSerializer,
+    serde: FlwrSerde,
     synthesizer_artifacts: Update | None,
 ) -> Iterable[Message]:
 
@@ -205,7 +200,9 @@ def send_artifacts(
 
     messages = (
         Message(
-            content=to_flwr(artifacts), message_type="query.artifacts", dst_node_id=cid
+            content=serde.to_flwr(artifacts),
+            message_type="query.artifacts",
+            dst_node_id=cid,
         )
         for cid in grid.get_node_ids()
     )

@@ -44,7 +44,7 @@ def fed_init(message: Message, flwr_context: Context) -> Message:
     partition_id = get_partition_id(flwr_context)
     train_df = ctx.dataset.load_train_partition(partition_id)
 
-    request = ctx.from_flwr(
+    request = ctx.serde.from_flwr(
         message.content,
         ctx.synthesizer_spec.arrays_to_ml_framework_map,
     )
@@ -57,7 +57,7 @@ def fed_init(message: Message, flwr_context: Context) -> Message:
         reply = synthesizer.fed_init(
             request, ctx.config.seed, ctx.dataset.schema, train_df
         )
-    rdict = ctx.to_flwr(reply)
+    rdict = ctx.serde.to_flwr(reply)
     return Message(content=rdict, reply_to=message)
 
 
@@ -68,7 +68,7 @@ def train(message: Message, flwr_context: Context) -> Message:
     partition_id = get_partition_id(flwr_context)
     train_df = ctx.dataset.load_train_partition(partition_id)
 
-    request = ctx.from_flwr(
+    request = ctx.serde.from_flwr(
         message.content,
         ctx.synthesizer_spec.arrays_to_ml_framework_map,
     )
@@ -82,7 +82,7 @@ def train(message: Message, flwr_context: Context) -> Message:
         reply = synthesizer.train(request, train_df)
         local_train_seconds = (time.perf_counter_ns() - start_time) / 1e9
 
-    rdict = ctx.to_flwr(reply)
+    rdict = ctx.serde.to_flwr(reply)
     return Message(content=rdict, reply_to=message)
 
 
@@ -94,7 +94,7 @@ def evaluate(message: Message, flwr_context: Context) -> Message:
     train_df = ctx.dataset.load_train_partition(partition_id)
     test_df = ctx.dataset.load_test_partition(partition_id)
 
-    request = ctx.from_flwr(
+    request = ctx.serde.from_flwr(
         message.content,
         ctx.synthesizer_spec.arrays_to_ml_framework_map,
     )
@@ -133,5 +133,5 @@ def evaluate(message: Message, flwr_context: Context) -> Message:
         metrics[key] = json.dumps(value, cls=FedbenchEncoder)
 
     update = Update(extras={"metrics": metrics})
-    rdict = ctx.to_flwr(update)
+    rdict = ctx.serde.to_flwr(update)
     return Message(content=rdict, reply_to=message)

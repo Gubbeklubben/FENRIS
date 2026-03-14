@@ -12,13 +12,7 @@ from fedbench.core.data.schemas import infer_schema
 from fedbench.core.eval import EvaluationSuite
 from fedbench.core.update import Update
 from fedbench.flwr.client.cache_manager import CacheManager, Namespace
-from fedbench.flwr.serde import (
-    FlwrDeserializer,
-    FlwrSerializer,
-    from_flwr_pickle,
-    to_flwr_no_pickle,
-    to_flwr_pickle,
-)
+from fedbench.flwr.serde import FlwrSerde, Pickle
 from fedbench.runtime.component_factory import (
     create_algorithm,
     create_df_loader,
@@ -39,22 +33,21 @@ class ClientContext:
     synthesizer_spec: ComponentSpec[Synthesizer]
     synthesizer_artifacts: Update | None
     eval_suite: EvaluationSuite
-    to_flwr: FlwrSerializer
-    from_flwr: FlwrDeserializer
+    serde: FlwrSerde
 
     @contextmanager
     def use_synthesizer_cache(
         self, cache_mgr: CacheManager
     ) -> Generator[Update, None, None]:
 
-        cache = self.from_flwr(
+        cache = self.serde.from_flwr(
             cache_mgr.get_cache(Namespace.SYNTHESIZER),
             self.synthesizer_spec.arrays_to_ml_framework_map,
         )
         try:
             yield cache
         finally:
-            cache_mgr.set_cache(Namespace.SYNTHESIZER, self.to_flwr(cache))
+            cache_mgr.set_cache(Namespace.SYNTHESIZER, self.serde.to_flwr(cache))
 
 
 _config: Config | None = None
@@ -67,13 +60,12 @@ def build_client_context(cache_mgr: CacheManager) -> ClientContext:
 
     algorithm = create_algorithm(config, build_algorithm_registry())
     eval_suite = create_evaluation_suite(config, build_evaluator_registries())
-    to_flwr = to_flwr_no_pickle if config.disable_pickle else to_flwr_pickle
-    from_flwr = from_flwr_pickle
+    serde = FlwrSerde(object_serde=Pickle(config.disable_pickle))
 
     artifacts_rdict = cache_mgr.get_cache(Namespace.GLOBAL_INIT_ARTIFACTS)
 
     if artifacts_rdict:
-        artifacts = from_flwr(
+        artifacts = serde.from_flwr(
             artifacts_rdict, algorithm.synthesizer_spec.arrays_to_ml_framework_map
         )
     else:
@@ -85,8 +77,7 @@ def build_client_context(cache_mgr: CacheManager) -> ClientContext:
         synthesizer_spec=algorithm.synthesizer_spec,
         synthesizer_artifacts=artifacts,
         eval_suite=eval_suite,
-        to_flwr=to_flwr,
-        from_flwr=from_flwr,
+        serde=serde,
     )
 
 
