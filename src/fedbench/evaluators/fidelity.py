@@ -48,7 +48,6 @@ from fedbench.util.metrics import (
     get_numeric_columns,
     safe_nanmean,
     sanitize_numeric_df,
-    to_numeric_series,
     weighted_mean,
 )
 
@@ -87,6 +86,11 @@ class MomentReductionMetricsEvaluator(Evaluator):
     |Δstd| over columns.
     """
 
+    # noinspection PyMethodMayBeStatic
+    def _to_numeric_series(self, series: pd.Series) -> pd.Series:
+        """Coerce to numeric and drop NaNs, returning a clean pd.Series."""
+        return pd.Series(pd.to_numeric(series, errors="coerce")).dropna()
+
     def global_evaluate(self, ctx: GlobalEvalContext) -> dict[str, float]:
         nan_result = {
             "mean_abs_diff": math.nan,
@@ -99,8 +103,8 @@ class MomentReductionMetricsEvaluator(Evaluator):
 
         mean_abs_diffs, std_abs_diffs = [], []
         for col in numeric_columns:
-            r = to_numeric_series(ctx.holdout_df[col])
-            s = to_numeric_series(ctx.synthetic_df[col])
+            r = self._to_numeric_series(ctx.holdout_df[col])
+            s = self._to_numeric_series(ctx.synthetic_df[col])
             if len(r) == 0 or len(s) == 0:
                 continue
             mean_abs_diffs.append(abs(r.mean() - s.mean()))
@@ -118,8 +122,8 @@ class MomentReductionMetricsEvaluator(Evaluator):
         numeric_columns = get_numeric_columns(ctx.train_df, ctx.schema)
         payload: dict[str, dict[str, dict[str, float | int]]] = {}
         for col in numeric_columns:
-            r = to_numeric_series(ctx.train_df[col])
-            s = to_numeric_series(ctx.synthetic_df[col])
+            r = self._to_numeric_series(ctx.train_df[col])
+            s = self._to_numeric_series(ctx.synthetic_df[col])
             r_n, s_n = len(r), len(s)
             r_mean = float(r.mean()) if r_n > 0 else math.nan
             s_mean = float(s.mean()) if s_n > 0 else math.nan

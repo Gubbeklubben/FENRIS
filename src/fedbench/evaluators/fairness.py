@@ -21,7 +21,7 @@ from sklearn.linear_model import LogisticRegression
 from fedbench.core.eval import Evaluator, LocalEvalContext
 from fedbench.core.eval.evalcontext import GlobalEvalContext
 from fedbench.core.logger import log_debug
-from fedbench.util.metrics import fit_tabular_model, nanptp
+from fedbench.util.metrics import fit_tabular_model
 from fedbench.util.parsing import to_snake_case
 
 
@@ -88,6 +88,12 @@ class FairnessEvaluator(Evaluator):
         return out
 
     # noinspection PyMethodMayBeStatic
+    def _nanptp(self, sequence: np.ndarray) -> float:
+        """NaN-safe peak-to-peak (max − min). Returns NaN if all values are NaN."""
+        if np.all(np.isnan(sequence)):
+            return math.nan
+        return float(np.nanmax(sequence)) - float(np.nanmin(sequence))
+
     def _fairness_metrics_from_counts(
         self,
         group_counts: Mapping[str, _PerGroupConfusion],
@@ -141,9 +147,9 @@ class FairnessEvaluator(Evaluator):
         tprs_a = np.array(tprs, dtype=float)
         fprs_a = np.array(fprs, dtype=float)
 
-        dp = nanptp(pos_rates_a)
-        eopp = nanptp(tprs_a)
-        fprs_ptp = nanptp(fprs_a)
+        dp = self._nanptp(pos_rates_a)
+        eopp = self._nanptp(tprs_a)
+        fprs_ptp = self._nanptp(fprs_a)
         if math.isnan(eopp) or math.isnan(fprs_ptp):
             eo = math.nan
         else:

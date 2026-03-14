@@ -38,6 +38,7 @@ AIASupervisedAttackEvaluator — **exact** federated aggregation (per
   all clients run the same attacker.
 """
 
+import hashlib
 import math
 from dataclasses import dataclass
 from typing import Any, Iterable
@@ -52,10 +53,8 @@ from fedbench.core.eval import Evaluator, LocalEvalContext
 from fedbench.core.eval.evalcontext import CentralizedEvalContext, GlobalEvalContext
 from fedbench.core.logger import log_debug
 from fedbench.util.metrics import (
-    canonical_row_hash,
     fit_tabular_model,
     get_numeric_columns,
-    get_quasi_identifiers,
     sanitize_numeric_df,
     weighted_mean,
 )
@@ -102,6 +101,34 @@ class DirectOverlapDiagnosticEvaluator(Evaluator):
             "partial_match_any": math.nan,
         }
 
+    # noinspection PyMethodMayBeStatic
+    def _canonical_value(self, val: Any) -> str:
+        """Deterministic string representation for a value."""
+        if pd.isna(val):
+            return "__NaN__"
+        # explicit bool handling before int (bool is a subclass of int)
+        if isinstance(val, (bool, np.bool_)):
+            return str(int(val))
+        if isinstance(val, (np.floating, float)):
+            return f"{float(val):.8f}"
+        if isinstance(val, (np.integer, int)):
+            return str(int(val))
+        if isinstance(val, str):
+            return val.strip()
+        return str(val)
+
+    # noinspection PyMethodMayBeStatic
+    def _canonical_row_hash(self, df: pd.DataFrame) -> pd.Series:
+        df = df.copy()
+        df = df[df.columns.sort_values()]
+
+        def hash_row(row: pd.Series) -> str:
+            canonical = [self._canonical_value(v) for v in row.values]
+            joined = "|".join(canonical)
+            return hashlib.md5(joined.encode("utf-8")).hexdigest()
+
+        return df.apply(hash_row, axis=1)
+
     def global_evaluate(self, ctx: GlobalEvalContext) -> dict[str, float]:
         """Overlap must be checked against client training records (federated mode).
 
@@ -123,10 +150,6 @@ class DirectOverlapDiagnosticEvaluator(Evaluator):
         if not common:
             return None
 
-        H_train = set(canonical_row_hash(ctx.train_df[common]))
-        H_syn = canonical_row_hash(ctx.synthetic_df[common])
-        exact_matches = int(sum(h in H_train for h in H_syn))
-
         excluded = set(ctx.sensitive_columns or [])
         if ctx.target_column:
             excluded.add(ctx.target_column)
@@ -141,9 +164,13 @@ class DirectOverlapDiagnosticEvaluator(Evaluator):
         partial_matches: dict[int, int] = {}
         for k in (1, 2, 3):
             cols = ranked[:k]
-            Ht = set(canonical_row_hash(ctx.train_df[cols]))
-            Hs = canonical_row_hash(ctx.synthetic_df[cols])
-            partial_matches[k] = int(sum(h in Ht for h in Hs))
+            H_train = set(self._canonical_row_hash(ctx.train_df[cols]))
+            H_syn = self._canonical_row_hash(ctx.synthetic_df[cols])
+            partial_matches[k] = int(sum(h in H_train for h in H_syn))
+
+        H_train = set(self._canonical_row_hash(ctx.train_df[common]))
+        H_syn = self._canonical_row_hash(ctx.synthetic_df[common])
+        exact_matches = int(sum(h in H_train for h in H_syn))
 
         return {
             "exact_matches": exact_matches,
@@ -404,8 +431,10 @@ class AIASupervisedAttackEvaluator(Evaluator):
             "n_test": 0,
         }
 
-        all_columns = set(test_df.columns)
-        quasi_ids = get_quasi_identifiers(all_columns, sensitive_column, target_column)
+        qi = set(test_df.columns) - {sensitive_column}
+        if target_column:
+            qi -= {target_column}
+        quasi_ids = sorted(qi)
         if (
             not quasi_ids
             or sensitive_column not in test_df.columns

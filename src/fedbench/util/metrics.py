@@ -1,6 +1,5 @@
-import hashlib
 import math
-from typing import Any, Iterable, Literal
+from typing import Iterable, Literal
 
 import numpy as np
 import pandas as pd
@@ -16,8 +15,6 @@ from fedbench.core.data import TableSchema
 type TaskType = Literal[
     "binary_classification", "multiclass_classification", "regression"
 ]
-
-NAN_TOKEN = "__NaN__"
 
 
 def count_rdict_bytes(rdict: RecordDict) -> int:
@@ -133,11 +130,6 @@ def sanitize_numeric_df(
     return clean
 
 
-def to_numeric_series(series: pd.Series) -> pd.Series:
-    """Coerce to numeric and drop NaNs, returning a clean pd.Series."""
-    return pd.Series(pd.to_numeric(series, errors="coerce")).dropna()
-
-
 def safe_nanmean(values: Iterable[float]) -> float:
     """Like ``np.nanmean`` but returns ``nan`` silently for all-NaN inputs.
 
@@ -158,49 +150,3 @@ def weighted_mean(pairs: Iterable[tuple[float, int]]) -> float:
             num += float(v) * int(w)
             den += int(w)
     return math.nan if den == 0 else num / den
-
-
-def nanptp(sequence: np.ndarray) -> float:
-    """Like np.ptp but ignores NaNs and returns NaN if all values are NaN."""
-    if np.all(np.isnan(sequence)):
-        return math.nan
-    return float(np.nanmax(sequence)) - float(np.nanmin(sequence))
-
-
-def get_quasi_identifiers(
-    all_columns: set[str],
-    sensitive_column: str,
-    target_column: str | None,
-) -> list[str]:
-    qi = set(all_columns) - {sensitive_column}
-    if target_column:
-        qi -= {target_column}
-    return sorted(qi)
-
-
-def canonical_value(val: Any) -> str:
-    """Deterministic string representation for a value."""
-    if pd.isna(val):
-        return NAN_TOKEN
-    # explicit bool handling before int (bool is a subclass of int)
-    if isinstance(val, (bool, np.bool_)):
-        return str(int(val))
-    if isinstance(val, (np.floating, float)):
-        return f"{float(val):.8f}"
-    if isinstance(val, (np.integer, int)):
-        return str(int(val))
-    if isinstance(val, str):
-        return val.strip()
-    return str(val)
-
-
-def canonical_row_hash(df: pd.DataFrame) -> pd.Series:
-    df = df.copy()
-    df = df[df.columns.sort_values()]
-
-    def hash_row(row: pd.Series) -> str:
-        canonical = [canonical_value(v) for v in row.values]
-        joined = "|".join(canonical)
-        return hashlib.md5(joined.encode("utf-8")).hexdigest()
-
-    return df.apply(hash_row, axis=1)
