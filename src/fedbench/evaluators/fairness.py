@@ -24,187 +24,19 @@ from fedbench.core.logger import log_debug
 from fedbench.util.metrics import fit_tabular_model, nanptp
 from fedbench.util.parsing import to_snake_case
 
-MIN_GROUP_SIZE = 30
-
 
 @dataclass
-class PerGroupConfusion:
+class _PerGroupConfusion:
     tp: int = 0
     fp: int = 0
     tn: int = 0
     fn: int = 0
 
 
-class FairnessMetrics(NamedTuple):
+class _FairnessMetrics(NamedTuple):
     demographic_parity_diff: float = math.nan
     equalized_odds_diff: float = math.nan
     equal_opportunity_diff: float = math.nan
-
-
-def _per_group_confusion(
-    y_true: np.ndarray,
-    y_pred: np.ndarray,
-    sensitive: np.ndarray,
-    min_group_size: int = MIN_GROUP_SIZE,
-) -> dict[str, PerGroupConfusion]:
-    """Return per-group TP/FP/TN/FN counts, skipping small groups."""
-    out: dict[str, PerGroupConfusion] = {}
-    for g in pd.unique(pd.Series(sensitive)):
-        mask = sensitive == g
-        if int(mask.sum()) < min_group_size:
-            continue
-        yt = y_true[mask]
-        yp = y_pred[mask]
-        out[str(g)] = PerGroupConfusion(
-            tp=int(((yt == 1) & (yp == 1)).sum()),
-            fp=int(((yt == 0) & (yp == 1)).sum()),
-            tn=int(((yt == 0) & (yp == 0)).sum()),
-            fn=int(((yt == 1) & (yp == 0)).sum()),
-        )
-    return out
-
-
-def _fairness_metrics_from_counts(
-    group_counts: Mapping[str, PerGroupConfusion],
-) -> FairnessMetrics:
-    """Compute the three fairness metrics from per-group confusion counts.
-
-    Parameters
-    ----------
-    group_counts :
-        Mapping from group label to a ``PerGroupConfusion`` instance with
-        fields ``tp``, ``fp``, ``tn``, ``fn``.
-
-    Returns
-    -------
-    FairnessMetrics
-        Named tuple with fields ``demographic_parity_diff``,
-        ``equalized_odds_diff``, and ``equal_opportunity_diff``.
-        Returns all-NaN ``FairnessMetrics`` if ``group_counts`` is empty.
-
-    Notes
-    -----
-    Metrics are defined as max – min across groups (NaN groups ignored):
-
-    * ``demographic_parity_diff`` = max(pos_rate) – min(pos_rate)
-    * ``equal_opportunity_diff``  = max(TPR) – min(TPR)
-    * ``equalized_odds_diff``     = max(max(Δ TPR, Δ FPR))
-    """
-    if not group_counts:
-        return FairnessMetrics()
-
-    pos_rates, tprs, fprs = [], [], []
-
-    for cm in group_counts.values():
-        tp, fp, tn, fn = cm.tp, cm.fp, cm.tn, cm.fn
-        n = tp + fp + tn + fn
-        if n == 0:
-            pos_rates.append(math.nan)
-            tprs.append(math.nan)
-            fprs.append(math.nan)
-            continue
-
-        pos_rate = (tp + fp) / n
-        tpr = tp / (tp + fn) if (tp + fn) else math.nan
-        fpr = fp / (fp + tn) if (fp + tn) else math.nan
-
-        pos_rates.append(pos_rate)
-        tprs.append(tpr)
-        fprs.append(fpr)
-
-    pos_rates_a = np.array(pos_rates, dtype=float)
-    tprs_a = np.array(tprs, dtype=float)
-    fprs_a = np.array(fprs, dtype=float)
-
-    dp = nanptp(pos_rates_a)
-    eopp = nanptp(tprs_a)
-    fprs_ptp = nanptp(fprs_a)
-    if math.isnan(eopp) or math.isnan(fprs_ptp):
-        eo = math.nan
-    else:
-        eo = float(max(eopp, fprs_ptp))
-
-    return FairnessMetrics(
-        demographic_parity_diff=dp,
-        equalized_odds_diff=eo,
-        equal_opportunity_diff=eopp,
-    )
-
-
-def _get_group_counts_for_column(
-    train_df: pd.DataFrame,
-    syn_df: pd.DataFrame,
-    target_column: str,
-    sensitive_column: str,
-    seed: int,
-    min_group_size: int = MIN_GROUP_SIZE,
-) -> dict[str, PerGroupConfusion]:
-    """Run the TSTR prediction step and return raw per-group confusion matrix counts."""
-    for col in [sensitive_column, target_column]:
-        for df in [train_df, syn_df]:
-            if col not in df.columns:
-                log_debug(
-                    "Fairness",
-                    f"Column '{col}' missing from DataFrame "
-                    f"with columns {df.columns.tolist()}",
-                )
-                return {}
-
-    feature_columns = [
-        col
-        for col in syn_df.columns
-        if col not in (sensitive_column, target_column) and col in train_df.columns
-    ]
-    if not feature_columns:
-        log_debug(
-            "Fairness",
-            f"No usable feature columns found. syn_df columns: "
-            f"{syn_df.columns.tolist()}, train_df columns: {train_df.columns.tolist()}",
-        )
-        return {}
-
-    X_syn = syn_df[feature_columns]
-    y_syn = syn_df[target_column]
-    X_real = train_df[feature_columns]
-    y_real = train_df[target_column]
-    sens = train_df[sensitive_column]
-
-    try:
-        y_syn_enc = pd.to_numeric(y_syn, errors="raise").astype(int)
-        y_real_enc = pd.to_numeric(y_real, errors="raise").astype(int)
-    except (ValueError, TypeError):
-        log_debug(
-            "Fairness",
-            "Target column contains non-numeric values "
-            "that cannot be encoded as integers.",
-        )
-        return {}
-
-    if np.unique(y_syn_enc).size > 2 or np.unique(y_real_enc).size > 2:
-        log_debug(
-            "Fairness", "Target column must be binary (exactly two unique values)."
-        )
-        return {}
-
-    model = LogisticRegression(max_iter=1000, solver="lbfgs", random_state=seed)
-    try:
-        pipe = fit_tabular_model(X_syn, pd.Series(y_syn_enc), model)
-    except ValueError as e:
-        log_debug(
-            "Fairness",
-            "Error fitting model. "
-            "Check that feature columns are valid and contain no NaNs.",
-        )
-        log_debug("Fairness", str(e))
-        return {}
-
-    y_pred = pipe.predict(X_real)
-    return _per_group_confusion(
-        pd.Series(y_real_enc).to_numpy(),
-        np.array(y_pred),
-        sens.to_numpy(),
-        min_group_size=min_group_size,
-    )
 
 
 class FairnessEvaluator(Evaluator):
@@ -217,7 +49,7 @@ class FairnessEvaluator(Evaluator):
 
     Notes
     -----
-    Requires ``ctx.schema`` to expose ``sensitive_column`` and ``target_column``.
+    Requires ``ctx.sensitive_columns`` and ``ctx.target_column`` to be set.
     The task must be binary classification (target encoded as 0/1 or bool).
     Groups with fewer than ``min_group_size`` samples are excluded from metric
     computation to avoid unreliable estimates on tiny strata.
@@ -229,20 +61,193 @@ class FairnessEvaluator(Evaluator):
     * ``fairness.equal_opportunity_diff.<column>``
     """
 
-    def global_evaluate(self, ctx: GlobalEvalContext) -> dict[str, float]:
-        nan_result = {
+    MIN_GROUP_SIZE = 30
+
+    # noinspection PyMethodMayBeStatic
+    def _per_group_confusion(
+        self,
+        y_true: np.ndarray,
+        y_pred: np.ndarray,
+        sensitive: np.ndarray,
+        min_group_size: int = MIN_GROUP_SIZE,
+    ) -> dict[str, _PerGroupConfusion]:
+        """Return per-group TP/FP/TN/FN counts, skipping small groups."""
+        out: dict[str, _PerGroupConfusion] = {}
+        for g in pd.unique(pd.Series(sensitive)):
+            mask = sensitive == g
+            if int(mask.sum()) < min_group_size:
+                continue
+            yt = y_true[mask]
+            yp = y_pred[mask]
+            out[str(g)] = _PerGroupConfusion(
+                tp=int(((yt == 1) & (yp == 1)).sum()),
+                fp=int(((yt == 0) & (yp == 1)).sum()),
+                tn=int(((yt == 0) & (yp == 0)).sum()),
+                fn=int(((yt == 1) & (yp == 0)).sum()),
+            )
+        return out
+
+    # noinspection PyMethodMayBeStatic
+    def _fairness_metrics_from_counts(
+        self,
+        group_counts: Mapping[str, _PerGroupConfusion],
+    ) -> _FairnessMetrics:
+        """Compute the three fairness metrics from per-group confusion counts.
+
+        Parameters
+        ----------
+        group_counts :
+            Mapping from group label to a ``PerGroupConfusion`` instance with
+            fields ``tp``, ``fp``, ``tn``, ``fn``.
+
+        Returns
+        -------
+        _FairnessMetrics
+            Named tuple with fields ``demographic_parity_diff``,
+            ``equalized_odds_diff``, and ``equal_opportunity_diff``.
+            Returns all-NaN ``FairnessMetrics`` if ``group_counts`` is empty.
+
+        Notes
+        -----
+        Metrics are defined as max – min across groups (NaN groups ignored):
+
+        * ``demographic_parity_diff`` = ptp(positive_rate)
+        * ``equal_opportunity_diff``  = ptp(TPR)
+        * ``equalized_odds_diff``     = max(ptp(TPR), ptp(FPR))
+        """
+        if not group_counts:
+            return _FairnessMetrics()
+
+        pos_rates, tprs, fprs = [], [], []
+
+        for cm in group_counts.values():
+            tp, fp, tn, fn = cm.tp, cm.fp, cm.tn, cm.fn
+            n = tp + fp + tn + fn
+            if n == 0:
+                pos_rates.append(math.nan)
+                tprs.append(math.nan)
+                fprs.append(math.nan)
+                continue
+
+            pos_rate = (tp + fp) / n
+            tpr = tp / (tp + fn) if (tp + fn) else math.nan
+            fpr = fp / (fp + tn) if (fp + tn) else math.nan
+
+            pos_rates.append(pos_rate)
+            tprs.append(tpr)
+            fprs.append(fpr)
+
+        pos_rates_a = np.array(pos_rates, dtype=float)
+        tprs_a = np.array(tprs, dtype=float)
+        fprs_a = np.array(fprs, dtype=float)
+
+        dp = nanptp(pos_rates_a)
+        eopp = nanptp(tprs_a)
+        fprs_ptp = nanptp(fprs_a)
+        if math.isnan(eopp) or math.isnan(fprs_ptp):
+            eo = math.nan
+        else:
+            eo = float(max(eopp, fprs_ptp))
+
+        return _FairnessMetrics(
+            demographic_parity_diff=dp,
+            equalized_odds_diff=eo,
+            equal_opportunity_diff=eopp,
+        )
+
+    def _get_group_counts_for_column(
+        self,
+        train_df: pd.DataFrame,
+        syn_df: pd.DataFrame,
+        target_column: str,
+        sensitive_column: str,
+        seed: int,
+        min_group_size: int = MIN_GROUP_SIZE,
+    ) -> dict[str, _PerGroupConfusion]:
+        """Run TSTR prediction and return raw per-group confusion matrix counts."""
+        for col in [sensitive_column, target_column]:
+            for df in [train_df, syn_df]:
+                if col not in df.columns:
+                    log_debug(
+                        "Fairness",
+                        f"Column '{col}' missing from DataFrame "
+                        f"with columns {df.columns.tolist()}",
+                    )
+                    return {}
+
+        feature_columns = [
+            col
+            for col in syn_df.columns
+            if col not in (sensitive_column, target_column) and col in train_df.columns
+        ]
+        if not feature_columns:
+            log_debug(
+                "Fairness",
+                f"No usable feature columns found. "
+                f"syn_df columns: {syn_df.columns.tolist()}, "
+                f"train_df columns: {train_df.columns.tolist()}",
+            )
+            return {}
+
+        X_syn = syn_df[feature_columns]
+        y_syn = syn_df[target_column]
+        X_real = train_df[feature_columns]
+        y_real = train_df[target_column]
+        sens = train_df[sensitive_column]
+
+        try:
+            y_syn_enc = pd.to_numeric(y_syn, errors="raise").astype(int)
+            y_real_enc = pd.to_numeric(y_real, errors="raise").astype(int)
+        except (ValueError, TypeError):
+            log_debug(
+                "Fairness",
+                "Target column contains non-numeric values "
+                "that cannot be encoded as integers.",
+            )
+            return {}
+
+        if np.unique(y_syn_enc).size > 2 or np.unique(y_real_enc).size > 2:
+            log_debug(
+                "Fairness", "Target column must be binary (exactly two unique values)."
+            )
+            return {}
+
+        model = LogisticRegression(max_iter=1000, solver="lbfgs", random_state=seed)
+        try:
+            pipe = fit_tabular_model(X_syn, pd.Series(y_syn_enc), model)
+        except ValueError as e:
+            log_debug(
+                "Fairness",
+                "Error fitting model. "
+                "Check that feature columns are valid and contain no NaNs.",
+            )
+            log_debug("Fairness", str(e))
+            return {}
+
+        y_pred = pipe.predict(X_real)
+        return self._per_group_confusion(
+            pd.Series(y_real_enc).to_numpy(),
+            np.array(y_pred),
+            sens.to_numpy(),
+            min_group_size=min_group_size,
+        )
+
+    # noinspection PyMethodMayBeStatic
+    def _nan_result(self) -> dict[str, float]:
+        return {
             "demographic_parity_diff": math.nan,
             "equalized_odds_diff": math.nan,
             "equal_opportunity_diff": math.nan,
         }
 
+    def global_evaluate(self, ctx: GlobalEvalContext) -> dict[str, float]:
         if not ctx.target_column:
-            return nan_result
+            return self._nan_result()
 
         metrics: dict[str, float] = {}
 
         for sensitive_column in ctx.sensitive_columns or []:
-            group_counts = _get_group_counts_for_column(
+            group_counts = self._get_group_counts_for_column(
                 train_df=ctx.holdout_df,
                 syn_df=ctx.synthetic_df,
                 target_column=ctx.target_column,
@@ -250,18 +255,18 @@ class FairnessEvaluator(Evaluator):
                 seed=ctx.seed,
             )
 
-            result = _fairness_metrics_from_counts(group_counts)
+            result = self._fairness_metrics_from_counts(group_counts)
             key = to_snake_case(sensitive_column)
 
             metrics[f"demographic_parity_diff.{key}"] = result.demographic_parity_diff
             metrics[f"equalized_odds_diff.{key}"] = result.equalized_odds_diff
             metrics[f"equal_opportunity_diff.{key}"] = result.equal_opportunity_diff
 
-        return metrics or nan_result
+        return metrics or self._nan_result()
 
     def local_evaluate(
         self, ctx: LocalEvalContext
-    ) -> dict[str, dict[str, PerGroupConfusion]]:
+    ) -> dict[str, dict[str, _PerGroupConfusion]]:
         """Train on syn_df, predict on real train_df, and report per-group confusion
         matrix cells for each sensitive column.
 
@@ -271,23 +276,23 @@ class FairnessEvaluator(Evaluator):
         if not ctx.target_column:
             return {}
 
-        col_counts: dict[str, dict[str, PerGroupConfusion]] = {}
+        col_counts: dict[str, dict[str, _PerGroupConfusion]] = {}
 
         for sensitive_column in ctx.sensitive_columns or []:
-            col_counts[sensitive_column] = _get_group_counts_for_column(
+            col_counts[sensitive_column] = self._get_group_counts_for_column(
                 train_df=ctx.train_df,
                 syn_df=ctx.synthetic_df,
                 target_column=ctx.target_column,
                 sensitive_column=sensitive_column,
                 seed=ctx.seed,
-                min_group_size=MIN_GROUP_SIZE,
+                min_group_size=self.MIN_GROUP_SIZE,
             )
 
         return col_counts
 
-    @staticmethod
     def aggregate(
-        stats: Iterable[Mapping[str, Mapping[str, PerGroupConfusion]]],
+        self,
+        stats: Iterable[Mapping[str, Mapping[str, _PerGroupConfusion]]],
     ) -> dict[str, float]:
         """Sum confusion matrix cells across clients, then derive fairness metrics.
 
@@ -296,19 +301,13 @@ class FairnessEvaluator(Evaluator):
         The ``MIN_GROUP_SIZE`` guard is re-applied on aggregated totals before
         emitting metrics to avoid unreliable estimates from small groups.
         """
-        nan_result = {
-            "demographic_parity_diff": math.nan,
-            "equalized_odds_diff": math.nan,
-            "equal_opportunity_diff": math.nan,
-        }
-
-        agg: dict[str, dict[str, PerGroupConfusion]] = {}
+        agg: dict[str, dict[str, _PerGroupConfusion]] = {}
 
         for st in stats:
             for sensitive_column, group_counts in st.items():
                 agg.setdefault(sensitive_column, {})
                 for group, cm in group_counts.items():
-                    acc = agg[sensitive_column].setdefault(group, PerGroupConfusion())
+                    acc = agg[sensitive_column].setdefault(group, _PerGroupConfusion())
                     acc.tp += cm.tp
                     acc.fp += cm.fp
                     acc.tn += cm.tn
@@ -320,14 +319,14 @@ class FairnessEvaluator(Evaluator):
             valid_counts = {
                 g: cm
                 for g, cm in group_counts.items()
-                if cm.tp + cm.fp + cm.tn + cm.fn >= MIN_GROUP_SIZE
+                if cm.tp + cm.fp + cm.tn + cm.fn >= self.MIN_GROUP_SIZE
             }
 
-            result = _fairness_metrics_from_counts(valid_counts)
+            result = self._fairness_metrics_from_counts(valid_counts)
             key = to_snake_case(sensitive_column)
 
             metrics[f"demographic_parity_diff.{key}"] = result.demographic_parity_diff
             metrics[f"equalized_odds_diff.{key}"] = result.equalized_odds_diff
             metrics[f"equal_opportunity_diff.{key}"] = result.equal_opportunity_diff
 
-        return metrics or nan_result
+        return metrics or self._nan_result()

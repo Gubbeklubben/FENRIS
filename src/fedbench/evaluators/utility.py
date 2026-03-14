@@ -21,8 +21,9 @@ from fedbench.util.metrics import fit_tabular_model, weighted_mean
 
 
 class TSTREvaluator(Evaluator):
-    @staticmethod
+    # noinspection PyMethodMayBeStatic
     def _compute(
+        self,
         D_test: pd.DataFrame,
         D_syn: pd.DataFrame,
         y_col: str | None,
@@ -91,8 +92,9 @@ class TSTREvaluator(Evaluator):
             seed=ctx.seed,
         )
 
-    @staticmethod
-    def aggregate(stats: Iterable[tuple[int, Mapping[str, float]]]) -> dict[str, float]:
+    def aggregate(
+        self, stats: Iterable[tuple[int, Mapping[str, float]]]
+    ) -> dict[str, float]:
         keys = ["tstr_auc", "tstr_accuracy", "tstr_rmse"]
         if not stats:
             return {key: math.nan for key in keys}

@@ -61,10 +61,6 @@ from fedbench.util.metrics import (
 )
 from fedbench.util.parsing import to_snake_case
 
-MAX_MIA_SYNTHETIC = 5000
-DEFAULT_MIA_K = 1000
-
-
 # ---------------------------------------------------------------------------
 # Direct overlap evaluator
 # ---------------------------------------------------------------------------
@@ -95,8 +91,8 @@ class DirectOverlapDiagnosticEvaluator(Evaluator):
     (same synthetic DF broadcast to all), so any client's value is used.
     """
 
-    @staticmethod
-    def _nan_result() -> dict[str, float]:
+    # noinspection PyMethodMayBeStatic
+    def _nan_result(self) -> dict[str, float]:
         return {
             "exact_row_match_rate_train": math.nan,
             "exact_row_match_any": math.nan,
@@ -155,16 +151,18 @@ class DirectOverlapDiagnosticEvaluator(Evaluator):
             "n_syn": len(H_syn),
         }
 
-    @staticmethod
-    def aggregate(stats: Iterable[dict[str, Any] | None]) -> dict[str, float]:
+    def aggregate(
+        self,
+        stats: Iterable[dict[str, Any] | None],
+    ) -> dict[str, float]:
         valid = [s for s in stats if s]
         if not valid:
-            return DirectOverlapDiagnosticEvaluator._nan_result()
+            return self._nan_result()
 
         # n_syn is identical across clients (same synthetic DF)
         n_syn = valid[0]["n_syn"]
         if not n_syn:
-            return DirectOverlapDiagnosticEvaluator._nan_result()
+            return self._nan_result()
 
         exact_rate = sum(s["exact_matches"] for s in valid) / n_syn
         partial_rates = {
@@ -185,6 +183,14 @@ class DirectOverlapDiagnosticEvaluator(Evaluator):
 # ---------------------------------------------------------------------------
 # MIA — nearest-neighbour attack
 # ---------------------------------------------------------------------------
+
+
+@dataclass(frozen=True)
+class _MIAResult:
+    mia_auc: float
+    mia_accuracy: float
+    mia_advantage: float
+    K: int
 
 
 class MIANearestNeighborAttackEvaluator(Evaluator):
@@ -210,23 +216,18 @@ class MIANearestNeighborAttackEvaluator(Evaluator):
     reference guide §15.3.2).
     """
 
-    @dataclass(frozen=True)
-    class MIAResult:
-        mia_auc: float
-        mia_accuracy: float
-        mia_advantage: float
-        K: int
+    DEFAULT_MIA_K = 1000
 
-    @staticmethod
     def _compute(
+        self,
         train_df: pd.DataFrame,
         test_df: pd.DataFrame,
         syn_df: pd.DataFrame,
         schema: TableSchema,
         seed: int,
-    ) -> MIAResult:
+    ) -> _MIAResult:
         """Core NN-MIA logic shared by centralized and federated paths."""
-        nan_result = MIANearestNeighborAttackEvaluator.MIAResult(
+        nan_result = _MIAResult(
             mia_auc=math.nan,
             mia_accuracy=math.nan,
             mia_advantage=math.nan,
@@ -247,7 +248,7 @@ class MIANearestNeighborAttackEvaluator(Evaluator):
         if members_pool.empty or nonmembers_pool.empty or sx.empty:
             return nan_result
 
-        K = min(DEFAULT_MIA_K, len(members_pool), len(nonmembers_pool))
+        K = min(self.DEFAULT_MIA_K, len(members_pool), len(nonmembers_pool))
         if K == 0:
             return nan_result
 
@@ -277,7 +278,7 @@ class MIANearestNeighborAttackEvaluator(Evaluator):
         scores = np.where(np.isfinite(scores), scores, finite.min())
 
         threshold = np.median(scores)
-        return MIANearestNeighborAttackEvaluator.MIAResult(
+        return _MIAResult(
             K=K,
             mia_auc=roc_auc_score(y, scores),
             mia_accuracy=accuracy_score(y, scores > threshold),
@@ -331,8 +332,7 @@ class MIANearestNeighborAttackEvaluator(Evaluator):
         )
         return result.mia_auc, result.K
 
-    @staticmethod
-    def aggregate(stats: Iterable[tuple[float, int]]) -> dict[str, float]:
+    def aggregate(self, stats: Iterable[tuple[float, int]]) -> dict[str, float]:
         """Weighted-mean AUC across clients (approximate federated proxy)."""
         pairs: list[tuple[float, int]] = [
             (auc, n)  # nofmt
@@ -373,8 +373,17 @@ class AIASupervisedAttackEvaluator(Evaluator):
     Weighted mean per metric key, weighted by ``n_test``.
     """
 
-    @staticmethod
+    # noinspection PyMethodMayBeStatic
+    def _nan_result(self) -> dict[str, float]:
+        return {
+            "aia_accuracy": math.nan,
+            "aia_auc": math.nan,
+            "aia_rmse": math.nan,
+        }
+
+    # noinspection PyMethodMayBeStatic
     def _compute_column(
+        self,
         test_df: pd.DataFrame,
         syn_df: pd.DataFrame,
         target_column: str | None,
@@ -433,8 +442,9 @@ class AIASupervisedAttackEvaluator(Evaluator):
 
         return entry
 
-    @staticmethod
+    # noinspection PyMethodMayBeStatic
     def _compute(
+        self,
         test_df: pd.DataFrame,
         syn_df: pd.DataFrame,
         target_column: str | None,
@@ -447,7 +457,7 @@ class AIASupervisedAttackEvaluator(Evaluator):
         for sensitive_column in sensitive_columns or []:
             key = to_snake_case(sensitive_column)
 
-            payload[key] = AIASupervisedAttackEvaluator._compute_column(
+            payload[key] = self._compute_column(
                 test_df,
                 syn_df,
                 target_column,
@@ -459,12 +469,6 @@ class AIASupervisedAttackEvaluator(Evaluator):
         return payload
 
     def global_evaluate(self, ctx: GlobalEvalContext) -> dict[str, float]:
-        nan_result = {
-            "aia_accuracy": math.nan,
-            "aia_auc": math.nan,
-            "aia_rmse": math.nan,
-        }
-
         results = self._compute(
             ctx.holdout_df,
             ctx.synthetic_df,
@@ -480,7 +484,7 @@ class AIASupervisedAttackEvaluator(Evaluator):
             metrics[f"aia_auc.{key}"] = scores["auc"]
             metrics[f"aia_rmse.{key}"] = scores["rmse"]
 
-        return metrics or nan_result
+        return metrics or self._nan_result()
 
     def local_evaluate(
         self, ctx: LocalEvalContext
@@ -494,8 +498,8 @@ class AIASupervisedAttackEvaluator(Evaluator):
             ctx.seed,
         )
 
-    @staticmethod
     def aggregate(
+        self,
         stats: Iterable[dict[str, dict[str, float | int]]],
     ) -> dict[str, float]:
         acc: dict[str, list[tuple[float, int]]] = {}
@@ -511,11 +515,7 @@ class AIASupervisedAttackEvaluator(Evaluator):
                         acc[full_key].append((float(v), n))
 
         if not acc:
-            return {
-                "aia_accuracy": math.nan,
-                "aia_auc": math.nan,
-                "aia_rmse": math.nan,
-            }
+            return self._nan_result()
 
         return {
             key: weighted_mean(pairs)  # nofmt

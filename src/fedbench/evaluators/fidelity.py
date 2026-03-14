@@ -137,8 +137,8 @@ class MomentReductionMetricsEvaluator(Evaluator):
             }
         return payload
 
-    @staticmethod
     def aggregate(
+        self,
         stats: Iterable[dict[str, dict[str, dict[str, float | int]]]],
     ) -> dict[str, float]:
         real_acc: dict[str, dict[str, float | int]] = {}
@@ -226,8 +226,9 @@ class DistributionSimilarityMetricsEvaluator(Evaluator):
     and ``n_rows`` is the number of real rows used on this client.
     """
 
-    @staticmethod
+    # noinspection PyMethodMayBeStatic
     def _compute(
+        self,
         real_df: pd.DataFrame,
         syn_df: pd.DataFrame,
         schema: TableSchema,
@@ -280,8 +281,10 @@ class DistributionSimilarityMetricsEvaluator(Evaluator):
     def local_evaluate(self, ctx: LocalEvalContext) -> tuple[dict[str, float], int]:
         return self._compute(ctx.train_df, ctx.synthetic_df, ctx.schema)
 
-    @staticmethod
-    def aggregate(stats: Iterable[tuple[dict[str, float], int]]) -> dict[str, float]:
+    def aggregate(
+        self,
+        stats: Iterable[tuple[dict[str, float], int]],
+    ) -> dict[str, float]:
         keys = ["ks_mean", "wasserstein_mean", "t_stat_mean_abs"]
         pairs: dict[str, list[tuple[float, int]]] = {k: [] for k in keys}
         for scores, n in stats:
@@ -323,8 +326,9 @@ class CategoricalTvMeanEvaluator(Evaluator):
     frequencies from global totals, then derives TV distance.
     """
 
-    @staticmethod
+    # noinspection PyMethodMayBeStatic
     def _compute(
+        self,
         real_df: pd.DataFrame,
         syn_df: pd.DataFrame,
         schema: TableSchema,
@@ -354,8 +358,8 @@ class CategoricalTvMeanEvaluator(Evaluator):
     ) -> dict[str, dict[str, dict[str, int]]]:
         return self._compute(ctx.train_df, ctx.synthetic_df, ctx.schema)
 
-    @staticmethod
     def aggregate(
+        self,
         stats: Iterable[dict[str, dict[str, dict[str, int]]]],
     ) -> dict[str, float]:
         acc: dict[str, dict[str, dict[str, int]]] = {}
@@ -427,8 +431,7 @@ class CorrFroDiffEvaluator(Evaluator):
         )
         return {"corr_fro_diff": math.nan}
 
-    @staticmethod
-    def aggregate(stats: Iterable[Any]) -> dict[str, float]:
+    def aggregate(self, stats: Iterable[Any]) -> dict[str, float]:
         log_debug(
             "CorrFroDiffEvaluator",
             "CorrFroDiffEvaluator does not support federated aggregation. "

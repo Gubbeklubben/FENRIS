@@ -122,8 +122,7 @@ class ScalabilityEvaluator(Evaluator):
     # Federated server-side path
     # ------------------------------------------------------------------
 
-    @staticmethod
-    def aggregate(stats: Iterable[dict[str, Any]]) -> dict[str, float]:
+    def aggregate(self, stats: Iterable[dict[str, Any]]) -> dict[str, float]:
         """
         Compute a row-count-weighted mean of per-client local_train_seconds.
 
