@@ -65,6 +65,13 @@ from fedbench.util.parsing import to_snake_case
 # ---------------------------------------------------------------------------
 
 
+@dataclass(frozen=True)
+class _DirectOverlapResult:
+    exact_matches: int
+    partial_matches: dict[str, int]
+    n_syn: int
+
+
 class DirectOverlapDiagnosticEvaluator(Evaluator):
     """Detect exact and near-exact row memorization in the synthetic dataset.
 
@@ -79,7 +86,7 @@ class DirectOverlapDiagnosticEvaluator(Evaluator):
 
     * ``"exact_matches"``   — int, number of synthetic rows whose hash
       appears in the client's training-row hash set.
-    * ``"partial_matches"`` — ``dict[int, int]`` mapping k → match count
+    * ``"partial_matches"`` — ``dict[str, int]`` mapping str(k) → match count
       for k ∈ {1, 2, 3}.
     * ``"n_syn"``           — int, total number of synthetic rows evaluated.
 
@@ -117,7 +124,6 @@ class DirectOverlapDiagnosticEvaluator(Evaluator):
             return val.strip()
         return str(val)
 
-    # noinspection PyMethodMayBeStatic
     def _canonical_row_hash(self, df: pd.DataFrame) -> pd.Series:
         df = df.copy()
         df = df[df.columns.sort_values()]
@@ -128,6 +134,11 @@ class DirectOverlapDiagnosticEvaluator(Evaluator):
             return hashlib.md5(joined.encode("utf-8")).hexdigest()
 
         return df.apply(hash_row, axis=1)
+
+    def _count_matches(self, ctx: LocalEvalContext, cols: Iterable[str]) -> int:
+        H_train = set(self._canonical_row_hash(ctx.train_df[cols]))
+        H_syn = self._canonical_row_hash(ctx.synthetic_df[cols])
+        return int(sum(h in H_train for h in H_syn))
 
     def global_evaluate(self, ctx: GlobalEvalContext) -> dict[str, float]:
         """Overlap must be checked against client training records (federated mode).
@@ -144,7 +155,7 @@ class DirectOverlapDiagnosticEvaluator(Evaluator):
         )
         return self._nan_result()
 
-    def local_evaluate(self, ctx: LocalEvalContext) -> dict[str, Any] | None:
+    def local_evaluate(self, ctx: LocalEvalContext) -> _DirectOverlapResult | None:
         """Compute exact and partial match counts between train_df and syn_df."""
         common = sorted(set(ctx.train_df.columns) & set(ctx.synthetic_df.columns))
         if not common:
@@ -161,39 +172,34 @@ class DirectOverlapDiagnosticEvaluator(Evaluator):
             reverse=True,
         )
 
-        partial_matches: dict[int, int] = {}
-        for k in (1, 2, 3):
-            cols = ranked[:k]
-            H_train = set(self._canonical_row_hash(ctx.train_df[cols]))
-            H_syn = self._canonical_row_hash(ctx.synthetic_df[cols])
-            partial_matches[k] = int(sum(h in H_train for h in H_syn))
-
-        H_train = set(self._canonical_row_hash(ctx.train_df[common]))
-        H_syn = self._canonical_row_hash(ctx.synthetic_df[common])
-        exact_matches = int(sum(h in H_train for h in H_syn))
-
-        return {
-            "exact_matches": exact_matches,
-            "partial_matches": partial_matches,
-            "n_syn": len(H_syn),
+        exact_matches = self._count_matches(ctx, common)
+        partial_matches = {
+            str(k): self._count_matches(ctx, ranked[:k])  # nofmt
+            for k in (1, 2, 3)
         }
+
+        return _DirectOverlapResult(
+            exact_matches=exact_matches,
+            partial_matches=partial_matches,
+            n_syn=len(ctx.synthetic_df),
+        )
 
     def aggregate(
         self,
-        stats: Iterable[dict[str, Any] | None],
+        stats: Iterable[_DirectOverlapResult | None],
     ) -> dict[str, float]:
         valid = [s for s in stats if s]
         if not valid:
             return self._nan_result()
 
         # n_syn is identical across clients (same synthetic DF)
-        n_syn = valid[0]["n_syn"]
+        n_syn = valid[0].n_syn
         if not n_syn:
             return self._nan_result()
 
-        exact_rate = sum(s["exact_matches"] for s in valid) / n_syn
+        exact_rate = sum(s.exact_matches for s in valid) / n_syn
         partial_rates = {
-            k: sum(s["partial_matches"].get(k, 0) for s in valid) / n_syn
+            k: sum(s.partial_matches[str(k)] for s in valid) / n_syn  # nofmt
             for k in (1, 2, 3)
         }
 
