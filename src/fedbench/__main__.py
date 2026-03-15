@@ -175,7 +175,8 @@ def run(
     test_size: Annotated[
         float | None, typer.Option(help="Fraction of data to hold out for testing.")
     ] = None,
-    seed: Annotated[int | None, typer.Option(help="Master random seed.")] = None,
+    seed: Annotated[int | None, typer.Option(help="Master random seed.")
+    ] = None,
     outputdir: Annotated[
         str | None, typer.Option(help="Output directory for artifacts.")
     ] = None,
