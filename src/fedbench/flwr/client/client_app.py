@@ -126,7 +126,12 @@ def evaluate(message: Message, flwr_context: Context) -> Message:
 
     metrics: Extras = {}
     for key, value in ctx.eval_suite.local_evaluate(eval_ctx).items():
-        metrics[key] = json.dumps(value, cls=FedbenchEncoder)
+        try:
+            metrics[key] = json.dumps(value, cls=FedbenchEncoder)
+        except Exception as e:
+            raise ValueError(
+                f"Could not encode metric {key} with value {value}."
+            ) from e
 
     update = Update(extras={"metrics": metrics})
     rdict = ctx.serde.to_flwr(update)

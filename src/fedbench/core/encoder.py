@@ -17,13 +17,18 @@ class FedbenchEncoder(json.JSONEncoder):
     """
 
     def default(self, obj: Any) -> Any:
-        if dataclasses.is_dataclass(obj) and not isinstance(obj, type):
-            return {
-                "__dataclass__": type(obj).__qualname__,
-                "__module__": type(obj).__module__,
-                **dataclasses.asdict(obj),
-            }
-        return super().default(obj)
+        try:
+            if dataclasses.is_dataclass(obj) and not isinstance(obj, type):
+                return {
+                    "__dataclass__": type(obj).__qualname__,
+                    "__module__": type(obj).__module__,
+                    **dataclasses.asdict(obj),
+                }
+            return super().default(obj)
+        except Exception as e:
+            raise ValueError(
+                f"Could not encode object {obj} with type {type(obj)}"
+            ) from e
 
     @staticmethod
     def decode(obj: dict[str, Any]) -> Any:
