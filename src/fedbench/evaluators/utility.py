@@ -83,26 +83,26 @@ class TSTREvaluator(Evaluator):
             seed=ctx.seed,
         )
 
-    def local_evaluate(self, ctx: LocalEvalContext) -> tuple[int, dict[str, float]]:
-        return len(ctx.test_df), self._compute(
+    def local_evaluate(self, ctx: LocalEvalContext) -> tuple[dict[str, float], int]:
+        return self._compute(
             D_test=ctx.test_df,
             D_syn=ctx.synthetic_df,
             y_col=ctx.target_column,
             schema=ctx.schema,
             seed=ctx.seed,
-        )
+        ), len(ctx.test_df)
 
     def aggregate(
-        self, stats: Iterable[tuple[int, Mapping[str, float]]]
+        self, stats: Iterable[tuple[Mapping[str, float], int]]
     ) -> dict[str, float]:
-        keys = ["tstr_auc", "tstr_accuracy", "tstr_rmse"]
+        keys = ("tstr_auc", "tstr_accuracy", "tstr_rmse")
         if not stats:
             return {key: math.nan for key in keys}
 
         pairs: dict[str, list[tuple[float, int]]] = {key: [] for key in keys}
 
-        for key in keys:
-            for n_test, metrics in stats:
+        for metrics, n_test in stats:
+            for key in keys:
                 pairs[key].append((metrics[key], n_test))
 
         return {
