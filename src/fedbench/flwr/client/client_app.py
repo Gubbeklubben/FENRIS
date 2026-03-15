@@ -10,8 +10,8 @@ from fedbench.core.encoder import FedbenchEncoder
 from fedbench.core.eval import LocalEvalContext
 from fedbench.core.logger import log_warning
 from fedbench.core.update import Extras, Update
-from fedbench.flwr.client.cache_manager import CacheManager, Namespace
 from fedbench.flwr.client.context import build_client_context
+from fedbench.flwr.namespace import Namespace
 from fedbench.runtime.component_factory import create_synthesizer
 
 app = ClientApp()
@@ -24,58 +24,58 @@ def get_partition_id(flwr_context: Context) -> int:
 
 @app.query("config")
 def recv_config(message: Message, flwr_context: Context) -> Message:
-    cache_mgr = CacheManager(flwr_context.state)
-    cache_mgr.set_cache(Namespace.FRAMEWORK, message.content)
-
+    cache = Namespace.FRAMEWORK.create_view(flwr_context.state)
+    cache.update(message.content)
     return Message(content=RecordDict(), reply_to=message)
 
 
 @app.query("artifacts")
 def recv_artifacts(message: Message, flwr_context: Context) -> Message:
-    cache_mgr = CacheManager(flwr_context.state)
-    cache_mgr.set_cache(Namespace.GLOBAL_INIT_ARTIFACTS, message.content)
+    cache = Namespace.GLOBAL_INIT_ARTIFACTS.create_view(flwr_context.state)
+    cache.update(message.content)
     return Message(content=RecordDict(), reply_to=message)
 
 
 @app.query("fed_init")
 def fed_init(message: Message, flwr_context: Context) -> Message:
-    cache_mgr = CacheManager(flwr_context.state)
-    ctx = build_client_context(cache_mgr)
+    ctx = build_client_context(flwr_context.state)
     partition_id = get_partition_id(flwr_context)
     train_df = ctx.dataset.load_train_partition(partition_id)
+    artifacts = ctx.serde.from_flwr(ctx.artifacts_cache)
 
     request = ctx.serde.from_flwr(
         message.content,
         ctx.synthesizer_spec.arrays_to_ml_framework_map,
     )
-    with ctx.use_synthesizer_cache(cache_mgr) as cache:
+    with ctx.serde.use_deserialized(ctx.synthesizer_cache) as cache:
         synthesizer = create_synthesizer(
-            spec=ctx.synthesizer_spec,
-            artifacts=ctx.synthesizer_artifacts,
+            ctx.synthesizer_spec.factory,
+            artifacts=artifacts,
             client_cache=cache,
         )
         reply = synthesizer.fed_init(
             request, ctx.config.seed, ctx.dataset.schema, train_df
         )
+
     rdict = ctx.serde.to_flwr(reply)
     return Message(content=rdict, reply_to=message)
 
 
 @app.train()
 def train(message: Message, flwr_context: Context) -> Message:
-    cache_mgr = CacheManager(flwr_context.state)
-    ctx = build_client_context(cache_mgr)
+    ctx = build_client_context(flwr_context.state)
     partition_id = get_partition_id(flwr_context)
     train_df = ctx.dataset.load_train_partition(partition_id)
+    artifacts = ctx.serde.from_flwr(ctx.artifacts_cache)
 
     request = ctx.serde.from_flwr(
         message.content,
         ctx.synthesizer_spec.arrays_to_ml_framework_map,
     )
-    with ctx.use_synthesizer_cache(cache_mgr) as cache:
+    with ctx.serde.use_deserialized(ctx.synthesizer_cache) as cache:
         synthesizer = create_synthesizer(
-            spec=ctx.synthesizer_spec,
-            artifacts=ctx.synthesizer_artifacts,
+            ctx.synthesizer_spec.factory,
+            artifacts=artifacts,
             client_cache=cache,
         )
         start_time = time.perf_counter_ns()
@@ -88,27 +88,23 @@ def train(message: Message, flwr_context: Context) -> Message:
 
 @app.evaluate()
 def evaluate(message: Message, flwr_context: Context) -> Message:
-    cache_mgr = CacheManager(flwr_context.state)
-    ctx = build_client_context(cache_mgr)
+    ctx = build_client_context(flwr_context.state)
     partition_id = get_partition_id(flwr_context)
     train_df = ctx.dataset.load_train_partition(partition_id)
     test_df = ctx.dataset.load_test_partition(partition_id)
+    artifacts = ctx.serde.from_flwr(ctx.artifacts_cache)
 
     request = ctx.serde.from_flwr(
         message.content,
         ctx.synthesizer_spec.arrays_to_ml_framework_map,
     )
-    with ctx.use_synthesizer_cache(cache_mgr) as cache:
+    with ctx.serde.use_deserialized(ctx.synthesizer_cache) as cache:
         synthesizer = create_synthesizer(
-            ctx.synthesizer_spec,
-            ctx.synthesizer_artifacts,
+            ctx.synthesizer_spec.factory,
+            artifacts=artifacts,
             client_cache=cache,
         )
-        synthetic_df = synthesizer.sample(
-            request,
-            len(train_df),
-            ctx.config.seed,
-        )
+        synthetic_df = synthesizer.sample(request, len(train_df), ctx.config.seed)
 
     if synthetic_df.empty:
         log_warning(__name__, f"Recv empty sample from {synthesizer}.")

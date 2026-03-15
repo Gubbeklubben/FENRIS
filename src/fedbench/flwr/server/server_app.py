@@ -11,7 +11,10 @@ from fedbench.runtime.runcontext import RunContext
 
 def make_server_app(ctx: RunContext) -> ServerApp:
     app = ServerApp()
-    serde = FlwrSerde(Pickle(ctx.config.disable_pickle))
+    serde = FlwrSerde(
+        object_serde=Pickle(ctx.config.disable_pickle),
+        default_arrays_map=ctx.algorithm.coordinator_spec.arrays_to_ml_framework_map,
+    )
 
     @app.main()
     def main(grid: Grid, _: Context) -> None:
@@ -26,10 +29,9 @@ def make_server_app(ctx: RunContext) -> ServerApp:
         ctx.eventbus.emit(ClientsConfigured())
 
         coordinator = create_coordinator(
-            spec=ctx.algorithm.coordinator_spec,
+            ctx.algorithm.coordinator_spec.factory,
             artifacts=ctx.global_init_artifacts.coordinator,
         )
-        arrays_map = ctx.algorithm.coordinator_spec.arrays_to_ml_framework_map
 
         strategy = Strategy(
             seed=ctx.config.seed,
@@ -37,7 +39,6 @@ def make_server_app(ctx: RunContext) -> ServerApp:
             serde=serde,
             eventbus=ctx.eventbus,
             coordinator=coordinator,
-            arrays_to_ml_framework_map=arrays_map,
         )
         state, metrics = strategy.run(grid, ctx.config.num_rounds)
         ctx.aggregated_state = state

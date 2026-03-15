@@ -3,9 +3,10 @@ from collections.abc import Callable
 
 import numpy as np
 import pytest
-from flwr.common import RecordDict, ArrayRecord
+from flwr.common import RecordDict, ArrayRecord, ConfigRecord, MetricRecord
 
 from fedbench.core.update import Update
+from fedbench.flwr.rdict import RDictNamespaceView
 from fedbench.flwr.serde import FlwrSerde, Pickle
 
 _RNG = np.random.default_rng(42)
@@ -162,6 +163,28 @@ def test_extras_single_group_all_types(serde):
     rdict = serde.to_flwr(update)
     deserialized = serde.from_flwr(rdict)
     assert deserialized.extras["test-extras"] == extras
+
+
+def test_deserialize_rdict_view(serde, make_random_ndarrays):
+    backing = RecordDict()
+
+    backing["not-my-arrays"] = ArrayRecord(make_random_ndarrays())
+    backing["not-my-config"] = ConfigRecord({"hello": "not-my-world"})
+    backing["not-my-metrics"] = MetricRecord({"not-my-value": 1.2})
+
+    view = RDictNamespaceView("my-awesome-space", backing)
+    view["arrays"] = ArrayRecord(make_random_ndarrays())
+    view["config"] = ConfigRecord({"hello": "world"})
+    view["metrics"] = MetricRecord({"value": 1.0})
+    update = serde.from_flwr(view)
+
+    assert "arrays" in update.arrays
+    assert "config" in update.extras
+    assert "metrics" in update.metrics
+
+    assert "not-my-arrays" not in update.arrays
+    assert "not-my-config" not in update.extras
+    assert "not-my-metrics" not in update.metrics
 
 
 def test_disable_pickle_raises():

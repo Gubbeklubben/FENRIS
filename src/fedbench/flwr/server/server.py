@@ -32,7 +32,6 @@ class Strategy:
         serde: FlwrSerde,
         eventbus: EventBus,
         coordinator: Coordinator,
-        arrays_to_ml_framework_map: dict[str, str] | None,
     ) -> None:
 
         self._seed = seed
@@ -40,7 +39,6 @@ class Strategy:
         self._serde = serde
         self._eventbus = eventbus
         self._coordinator = coordinator
-        self._arrays_map = arrays_to_ml_framework_map
         self._per_client_metrics: dict[int, Metrics] = {}
 
     def fed_init(self, grid: Grid) -> None:
@@ -150,9 +148,8 @@ class Strategy:
             replies = []
             for reply in grid.send_and_receive(requests):
                 src_id = reply.metadata.src_node_id
-                replies.append(
-                    (src_id, self._serde.from_flwr(reply.content, self._arrays_map))
-                )
+                replies.append((src_id, self._serde.from_flwr(reply.content)))
+
                 self._eventbus.emit(
                     ClientReply(
                         src_id,

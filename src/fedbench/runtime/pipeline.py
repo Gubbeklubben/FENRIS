@@ -86,7 +86,7 @@ def aggregate_federated_metrics(ctx: RunContext) -> None:
 
 def global_sample(ctx: RunContext) -> None:
     synthesizer = create_synthesizer(
-        spec=ctx.algorithm.synthesizer_spec,
+        ctx.algorithm.synthesizer_spec.factory,
         artifacts=ctx.global_init_artifacts.synthesizer,
         client_cache=None,
     )

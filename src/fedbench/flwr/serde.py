@@ -1,6 +1,8 @@
 import pickle
 from abc import ABC, abstractmethod
-from typing import Any
+from collections.abc import Generator
+from contextlib import contextmanager
+from typing import Any, overload
 
 from flwr.common import (
     Array,
@@ -11,6 +13,7 @@ from flwr.common import (
 )
 
 from fedbench.core.update import Objects, Update
+from fedbench.flwr.rdict import RDictNamespaceView
 
 
 class ObjectSerde(ABC):
@@ -51,40 +54,60 @@ class Pickle(ObjectSerde):
 
 
 class FlwrSerde:
-    def __init__(self, object_serde: ObjectSerde) -> None:
-        self._object_serde = object_serde
+    def __init__(
+        self,
+        object_serde: ObjectSerde,
+        default_arrays_map: dict[str, str] | None = None,
+    ) -> None:
 
-    def to_flwr(self, update: Update) -> RecordDict:
-        rdict = RecordDict()
+        self._object_serde = object_serde
+        self._default_arrays_map = default_arrays_map or {}
+
+    @overload
+    def to_flwr(self, update: Update) -> RecordDict: ...
+
+    @overload
+    def to_flwr(self, update: Update, target: None) -> RecordDict: ...
+
+    @overload
+    def to_flwr[T: (RecordDict, RDictNamespaceView)](
+        self, update: Update, target: T
+    ) -> T: ...
+
+    def to_flwr(
+        self, update: Update, target: RecordDict | RDictNamespaceView | None = None
+    ) -> RecordDict | RDictNamespaceView:
+
+        out = target if target is not None else RecordDict()
 
         for key, arrays in update.arrays.items():
-            rdict[key] = ArrayRecord(arrays)
+            out[key] = ArrayRecord(arrays)
 
         for key, objects in update.objects.items():
-            rdict[key] = ArrayRecord(self._serialize_objects(objects))
+            out[key] = ArrayRecord(self._serialize_objects(objects))
 
         for key, metrics in update.metrics.items():
-            rdict[key] = MetricRecord(metrics)
+            out[key] = MetricRecord(metrics)
 
         for key, extras in update.extras.items():
-            rdict[key] = ConfigRecord(extras)
+            out[key] = ConfigRecord(extras)
 
-        return rdict
+        return out
 
     def from_flwr(
         self,
-        rdict: RecordDict,
+        rdict: RecordDict | RDictNamespaceView,
         arrays_to_ml_framework_map: dict[str, str] | None = None,
     ) -> Update:
 
-        arrays_to_ml_framework_map = arrays_to_ml_framework_map or {}
+        arrays_map = arrays_to_ml_framework_map or self._default_arrays_map
         update = Update()
 
         for key, arrays in rdict.array_records.items():
             if list(arrays.values())[0].stype == self._object_serde.stype:
                 update.objects[key] = self._deserialize_objects(arrays)
             else:
-                ml_framework = arrays_to_ml_framework_map.get(key, "numpy")
+                ml_framework = arrays_map.get(key, "numpy")
                 if ml_framework == "torch":
                     update.arrays[key] = arrays.to_torch_state_dict()
                 else:
@@ -97,6 +120,19 @@ class FlwrSerde:
             update.extras[key] = dict(extras)
 
         return update
+
+    @contextmanager
+    def use_deserialized(
+        self,
+        target: RecordDict | RDictNamespaceView,
+        arrays_to_ml_framework_map: dict[str, str] | None = None,
+    ) -> Generator[Update, None, None]:
+
+        update = self.from_flwr(target, arrays_to_ml_framework_map)
+        try:
+            yield update
+        finally:
+            target.update(self.to_flwr(update))
 
     def _serialize_objects(self, objects: Objects) -> dict[str, Array]:
         arrays = {}

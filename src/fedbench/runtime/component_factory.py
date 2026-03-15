@@ -4,7 +4,7 @@ from collections.abc import Callable, Mapping
 from pandas import DataFrame
 
 from fedbench.config import Config
-from fedbench.core.algorithm import Algorithm, ComponentSpec, Coordinator, Synthesizer
+from fedbench.core.algorithm import Algorithm, Coordinator, Synthesizer
 from fedbench.core.data import Partitioner, load_csv
 from fedbench.core.eval import EvaluationSuite, Evaluator
 from fedbench.core.update import Update
@@ -53,11 +53,11 @@ def create_evaluation_suite(
 
 
 def create_coordinator(
-    spec: ComponentSpec[Coordinator],
+    factory: Callable[[], Coordinator],
     artifacts: Update | None,
 ) -> Coordinator:
 
-    instance = spec.factory()
+    instance = factory()
     if not isinstance(instance, Coordinator):
         raise TypeError(f"{instance} is not a Coordinator.")
 
@@ -68,12 +68,12 @@ def create_coordinator(
 
 
 def create_synthesizer(
-    spec: ComponentSpec[Synthesizer],
+    factory: Callable[[], Synthesizer],
     artifacts: Update | None,
     client_cache: Update | None,
 ) -> Synthesizer:
 
-    instance = spec.factory()
+    instance = factory()
     if not isinstance(instance, Synthesizer):
         raise TypeError(f"{instance} is not a Synthesizer.")
 

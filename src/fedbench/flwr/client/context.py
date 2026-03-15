@@ -1,5 +1,3 @@
-from collections.abc import Generator
-from contextlib import contextmanager
 from dataclasses import dataclass
 from typing import cast
 
@@ -10,8 +8,8 @@ from fedbench.core.algorithm import ComponentSpec, Synthesizer
 from fedbench.core.data import PartitionedDataset
 from fedbench.core.data.schemas import infer_schema
 from fedbench.core.eval import EvaluationSuite
-from fedbench.core.update import Update
-from fedbench.flwr.client.cache_manager import CacheManager, Namespace
+from fedbench.flwr.namespace import Namespace
+from fedbench.flwr.rdict import RDictNamespaceView
 from fedbench.flwr.serde import FlwrSerde, Pickle
 from fedbench.runtime.component_factory import (
     create_algorithm,
@@ -25,63 +23,46 @@ from fedbench.runtime.registry_builder import (
     build_partitioner_registry,
 )
 
+_config: Config | None = None
+_dataset: PartitionedDataset | None = None
+
 
 @dataclass(frozen=True)
 class ClientContext:
     config: Config
     dataset: PartitionedDataset
     synthesizer_spec: ComponentSpec[Synthesizer]
-    synthesizer_artifacts: Update | None
     eval_suite: EvaluationSuite
     serde: FlwrSerde
-
-    @contextmanager
-    def use_synthesizer_cache(
-        self, cache_mgr: CacheManager
-    ) -> Generator[Update, None, None]:
-
-        cache = self.serde.from_flwr(
-            cache_mgr.get_cache(Namespace.SYNTHESIZER),
-            self.synthesizer_spec.arrays_to_ml_framework_map,
-        )
-        try:
-            yield cache
-        finally:
-            cache_mgr.set_cache(Namespace.SYNTHESIZER, self.serde.to_flwr(cache))
+    framework_cache: RDictNamespaceView
+    artifacts_cache: RDictNamespaceView
+    synthesizer_cache: RDictNamespaceView
 
 
-_config: Config | None = None
-_dataset: PartitionedDataset | None = None
-
-
-def build_client_context(cache_mgr: CacheManager) -> ClientContext:
-    config = _get_config(cache_mgr.get_cache(Namespace.FRAMEWORK))
+def build_client_context(flwr_cache: RecordDict) -> ClientContext:
+    framework_cache = Namespace.FRAMEWORK.create_view(flwr_cache)
+    config = _get_config(framework_cache)
     dataset = _get_dataset(config)
 
     algorithm = create_algorithm(config, build_algorithm_registry())
     eval_suite = create_evaluation_suite(config, build_evaluator_registries())
-    serde = FlwrSerde(object_serde=Pickle(config.disable_pickle))
-
-    artifacts_rdict = cache_mgr.get_cache(Namespace.GLOBAL_INIT_ARTIFACTS)
-
-    if artifacts_rdict:
-        artifacts = serde.from_flwr(
-            artifacts_rdict, algorithm.synthesizer_spec.arrays_to_ml_framework_map
-        )
-    else:
-        artifacts = None
-
+    serde = FlwrSerde(
+        object_serde=Pickle(config.disable_pickle),
+        default_arrays_map=algorithm.synthesizer_spec.arrays_to_ml_framework_map,
+    )
     return ClientContext(
-        config=config,
-        dataset=dataset,
-        synthesizer_spec=algorithm.synthesizer_spec,
-        synthesizer_artifacts=artifacts,
-        eval_suite=eval_suite,
-        serde=serde,
+        config,
+        dataset,
+        algorithm.synthesizer_spec,
+        eval_suite,
+        serde,
+        framework_cache,
+        Namespace.GLOBAL_INIT_ARTIFACTS.create_view(flwr_cache),
+        Namespace.SYNTHESIZER.create_view(flwr_cache),
     )
 
 
-def _get_config(cache: RecordDict) -> Config:
+def _get_config(cache: RDictNamespaceView) -> Config:
     global _config
     if _config is not None:
         return _config
