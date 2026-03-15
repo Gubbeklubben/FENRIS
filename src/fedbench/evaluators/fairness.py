@@ -153,7 +153,7 @@ class FairnessEvaluator(Evaluator):
         if math.isnan(eopp) or math.isnan(fprs_ptp):
             eo = math.nan
         else:
-            eo = float(max(eopp, fprs_ptp))
+            eo = max(eopp, fprs_ptp)
 
         return _FairnessMetrics(
             demographic_parity_diff=dp,
