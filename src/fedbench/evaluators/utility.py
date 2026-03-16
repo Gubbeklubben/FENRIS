@@ -49,6 +49,8 @@ class TSTREvaluator(Evaluator):
             return metrics
 
         if schema.kind_of(y_col) in ["binary", "categorical"]:
+            y_syn = y_syn.astype(str)
+            y_test = y_test.astype(str)
             if y_syn.nunique() < 2:
                 return metrics
 

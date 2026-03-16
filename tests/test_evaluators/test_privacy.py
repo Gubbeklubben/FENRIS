@@ -280,3 +280,69 @@ class TestAIA:
         assert math.isnan(result["aia_accuracy.sensitive"])
         assert math.isnan(result["aia_auc.sensitive"])
         assert math.isnan(result["aia_rmse.sensitive"])
+
+
+# ===================================================================
+# AIA label type coercion
+# ===================================================================
+
+
+class TestAIALabelCoercion:
+    """Regression tests for label type coercion in the AIA categorical path.
+
+    The AIA evaluator calls accuracy_score(y_test, y_pred) where y_pred is
+    produced by a model trained on synthetic labels.  If synthetic labels are
+    string-encoded ("0.0", "1.0") but real test labels are floats (0.0, 1.0),
+    accuracy_score either raises TypeError or silently returns 0.0 depending
+    on the sklearn version.
+
+    These tests use perfectly separable data so accuracy == 1.0 is expected,
+    making a wrong result of 0.0 unmistakable.  Removing the
+    ``y_syn.astype(str)`` / ``y_test.astype(str)`` calls in
+    ``AIASupervisedAttackEvaluator._compute_column`` will cause these tests
+    to fail.
+    """
+
+    evaluator = AIASupervisedAttackEvaluator()
+
+    def _make_separable_aia(self, rng: np.random.Generator, n_per_class: int = 30):
+        """Return (syn_df, real_df, schema) for a perfectly separable AIA task.
+
+        Sensitive attribute is binary: 0 when x < 0, 1 when x > 0.
+        syn_df uses string-encoded labels; real_df uses float labels.
+        """
+        x_neg = rng.normal(-5, 0.1, n_per_class)
+        x_pos = rng.normal( 5, 0.1, n_per_class)
+        x = np.concatenate([x_neg, x_pos])
+
+        y_float = pd.Series(
+            [0.0] * n_per_class + [1.0] * n_per_class
+        )
+        y_str = y_float.astype(str)  # "0.0", "1.0"
+
+        syn_df = pd.DataFrame({"x": x, "sensitive": y_str})
+        real_df = pd.DataFrame({"x": x, "sensitive": y_float})
+        schema = make_schema(("x", "continuous"), ("sensitive", "binary"))
+        return syn_df, real_df, schema
+
+    def test_categorical_string_labels_correct_accuracy(self):
+        """AIA categorical: syn has string labels, real has float labels.
+
+        With coercion: accuracy == 1.0 on separable data.
+        Without coercion: accuracy == 0.0 or TypeError.
+        """
+        rng = np.random.default_rng(0)
+        syn_df, real_df, schema = self._make_separable_aia(rng)
+
+        from .conftest import make_ctx
+        ctx = make_ctx(
+            real_df, syn_df,
+            sensitive_columns=("sensitive",),
+            schema=schema,
+        )
+        result = self.evaluator.global_evaluate(ctx)
+
+        assert result["aia_accuracy.sensitive"] == pytest.approx(1.0), (
+            f"Expected accuracy 1.0 on separable data; "
+            f"got {result['aia_accuracy.sensitive']}. "
+        )

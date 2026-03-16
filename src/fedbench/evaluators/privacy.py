@@ -454,26 +454,25 @@ class AIASupervisedAttackEvaluator(Evaluator):
         y_syn = syn_df[sensitive_column]
         entry["n_test"] = len(test_df)
 
-        try:
-            if schema.kind_of(sensitive_column) in ["binary", "categorical"]:
-                model = LogisticRegression(
-                    max_iter=1000,
-                    solver="lbfgs",
-                    random_state=seed,
-                )
-                pipe = fit_tabular_model(X_syn, y_syn, model)
-                y_pred = pipe.predict(X_test)
-                entry["accuracy"] = accuracy_score(y_test, y_pred)
-                if len(np.unique(y_syn)) == 2:
-                    y_proba = pipe.predict_proba(X_test)[:, 1]
-                    entry["auc"] = roc_auc_score(y_test, y_proba)
-            else:
-                model = Ridge(random_state=seed)
-                pipe = fit_tabular_model(X_syn, y_syn, model)
-                y_pred = pipe.predict(X_test)
-                entry["rmse"] = math.sqrt(mean_squared_error(y_test, y_pred))
-        except Exception:
-            pass  # leave values as nan
+        if schema.kind_of(sensitive_column) in ["binary", "categorical"]:
+            y_syn = y_syn.astype(str)
+            y_test = y_test.astype(str)
+            model = LogisticRegression(
+                max_iter=1000,
+                solver="lbfgs",
+                random_state=seed,
+            )
+            pipe = fit_tabular_model(X_syn, y_syn, model)
+            y_pred = pipe.predict(X_test)
+            entry["accuracy"] = accuracy_score(y_test, y_pred)
+            if len(np.unique(y_syn)) == 2:
+                y_proba = pipe.predict_proba(X_test)[:, 1]
+                entry["auc"] = roc_auc_score(y_test, y_proba)
+        else:
+            model = Ridge(random_state=seed)
+            pipe = fit_tabular_model(X_syn, y_syn, model)
+            y_pred = pipe.predict(X_test)
+            entry["rmse"] = math.sqrt(mean_squared_error(y_test, y_pred))
 
         return entry
 
