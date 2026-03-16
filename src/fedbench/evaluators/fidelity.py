@@ -33,7 +33,8 @@ Federated aggregation notes
 from __future__ import annotations
 
 import math
-from typing import Any, Iterable
+from dataclasses import dataclass
+from typing import Any, Iterable, Mapping
 
 import numpy as np
 import pandas as pd
@@ -54,6 +55,13 @@ from fedbench.util.metrics import (
 # ---------------------------------------------------------------------------
 # Moment metrics  (mean / std)
 # ---------------------------------------------------------------------------
+
+
+@dataclass(frozen=True)
+class _MomentReductionResult:
+    mean: float
+    sumsq_dev: float
+    n: int
 
 
 class MomentReductionMetricsEvaluator(Evaluator):
@@ -91,6 +99,16 @@ class MomentReductionMetricsEvaluator(Evaluator):
         """Coerce to numeric and drop NaNs, returning a clean pd.Series."""
         return pd.Series(pd.to_numeric(series, errors="coerce")).dropna()
 
+    def _compute(self, df: pd.DataFrame, col: str) -> _MomentReductionResult:
+        series = self._to_numeric_series(df[col])
+        n = len(series)
+        mean = series.mean() if n > 0 else math.nan
+        return _MomentReductionResult(
+            mean=float(mean),
+            sumsq_dev=float(((series - mean) ** 2).sum()) if n > 0 else 0.0,
+            n=n,
+        )
+
     def global_evaluate(self, ctx: GlobalEvalContext) -> dict[str, float]:
         nan_result = {
             "mean_abs_diff": math.nan,
@@ -118,82 +136,58 @@ class MomentReductionMetricsEvaluator(Evaluator):
 
     def local_evaluate(
         self, ctx: LocalEvalContext
-    ) -> dict[str, dict[str, dict[str, float | int]]]:
+    ) -> dict[str, dict[str, _MomentReductionResult]]:
         numeric_columns = get_numeric_columns(ctx.train_df, ctx.schema)
-        payload: dict[str, dict[str, dict[str, float | int]]] = {}
+        payload: dict[str, dict[str, _MomentReductionResult]] = {}
         for col in numeric_columns:
-            r = self._to_numeric_series(ctx.train_df[col])
-            s = self._to_numeric_series(ctx.synthetic_df[col])
-            r_n, s_n = len(r), len(s)
-            r_mean = float(r.mean()) if r_n > 0 else math.nan
-            s_mean = float(s.mean()) if s_n > 0 else math.nan
             payload[col] = {
-                "real": {
-                    "mean": r_mean,
-                    "sumsq_dev": float(((r - r_mean) ** 2).sum()) if r_n > 0 else 0.0,
-                    "n": float(r_n),
-                },
-                "syn": {
-                    "mean": s_mean,
-                    "sumsq_dev": float(((s - s_mean) ** 2).sum()) if s_n > 0 else 0.0,
-                    "n": float(s_n),
-                },
+                "real": self._compute(ctx.train_df, col),
+                "syn": self._compute(ctx.synthetic_df, col),
             }
         return payload
 
     def aggregate(
         self,
-        stats: Iterable[dict[str, dict[str, dict[str, float | int]]]],
+        stats: Iterable[Mapping[str, Mapping[str, _MomentReductionResult]]],
     ) -> dict[str, float]:
-        real_acc: dict[str, dict[str, float | int]] = {}
-        syn_stats: dict[
-            str, dict[str, float | int]
-        ] = {}  # from first client that has data
+        real_acc: dict[str, _MomentReductionResult] = {}
+        syn_stats: dict[str, _MomentReductionResult] = {}
 
         for payload in stats:
             for col, rec in payload.items():
                 # Synthetic side: record once per column (identical across clients)
                 syn = rec["syn"]
-                if col not in syn_stats and syn["n"] > 0:
-                    syn_stats[col] = syn.copy()
+                if col not in syn_stats and syn.n > 0:
+                    syn_stats[col] = syn
 
                 # Accumulate real side via Chan's parallel algorithm
                 real = rec["real"]
-                if real["n"] <= 0:
+                if real.n <= 0:
                     continue
 
                 if col not in real_acc:
-                    real_acc[col] = real.copy()
+                    real_acc[col] = real
                     continue
 
                 a, b = real_acc[col], real
-                n_a, n_b = a["n"], b["n"]
-                n_c = n_a + n_b
-                delta = b["mean"] - a["mean"]
+                n = a.n + b.n
+                delta = b.mean - a.mean
 
-                # fmt: off
-                real_acc[col] = {
-                    "mean": (
-                        n_a * a["mean"]
-                        + n_b * b["mean"]
-                    ) / n_c,
-                    "sumsq_dev":
-                        a["sumsq_dev"] + b["sumsq_dev"]
-                        + delta ** 2 * n_a * n_b / n_c,
-                    "n": n_c,
-                }
-                # fmt: on
+                real_acc[col] = _MomentReductionResult(
+                    mean=(a.n * a.mean + b.n * b.mean) / n,
+                    sumsq_dev=a.sumsq_dev + b.sumsq_dev + delta**2 * a.n * b.n / n,
+                    n=n,
+                )
 
         mean_abs_diffs, std_abs_diffs = [], []
         for col, r in real_acc.items():
             s = syn_stats.get(col)
             if s is None:
                 continue
-            mean_abs_diffs.append(abs(r["mean"] - s["mean"]))
-            r_n, s_n = int(r["n"]), int(s["n"])
-            if r_n >= 2 and s_n >= 2:
-                r_std = math.sqrt(max(r["sumsq_dev"] / (r_n - 1), 0.0))
-                s_std = math.sqrt(max(s["sumsq_dev"] / (s_n - 1), 0.0))
+            mean_abs_diffs.append(abs(r.mean - s.mean))
+            if r.n >= 2 and s.n >= 2:
+                r_std = math.sqrt(max(r.sumsq_dev / (r.n - 1), 0.0))
+                s_std = math.sqrt(max(s.sumsq_dev / (s.n - 1), 0.0))
                 std_abs_diffs.append(abs(r_std - s_std))
 
         return {
