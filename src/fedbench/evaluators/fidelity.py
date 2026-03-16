@@ -34,7 +34,7 @@ from __future__ import annotations
 
 import math
 from dataclasses import dataclass
-from typing import Any, Iterable, Mapping
+from typing import Iterable, Mapping
 
 import numpy as np
 import pandas as pd
@@ -397,20 +397,29 @@ class CorrFroDiffEvaluator(Evaluator):
         if len(numeric_columns) < 2:
             return {"corr_fro_diff": math.nan}
 
-        def safe_corr(df: pd.DataFrame) -> pd.DataFrame:
-            non_constant = df.columns[df.nunique(dropna=True) > 1]
-            return df[non_constant].corr().fillna(0.0)
+        r = ctx.holdout_df[numeric_columns]
+        s = ctx.synthetic_df[numeric_columns]
 
-        r_corr = safe_corr(ctx.holdout_df[numeric_columns])
-        s_corr = safe_corr(ctx.synthetic_df[numeric_columns])
+        # Filter columns jointly to ensure that both matrices have the same column set.
+        # A constant column produces NaN correlations on its own side and would bias
+        # the computation if included.
+        non_constant = [
+            col
+            for col in numeric_columns
+            if r[col].nunique(dropna=True) > 1 and s[col].nunique(dropna=True) > 1
+        ]
+        if len(non_constant) < 2:
+            return {"corr_fro_diff": math.nan}
 
-        common = r_corr.index.intersection(s_corr.index)
-        diff = r_corr.loc[common, common].values - s_corr.loc[common, common].values
+        r_corr = r[non_constant].corr().fillna(0.0)
+        s_corr = s[non_constant].corr().fillna(0.0)
+
+        diff = r_corr.values - s_corr.values
         return {
             "corr_fro_diff": float(np.linalg.norm(diff, ord="fro")),
         }
 
-    def local_evaluate(self, ctx: LocalEvalContext) -> Any:
+    def local_evaluate(self, ctx: LocalEvalContext) -> dict[str, float]:
         log_debug(
             "CorrFroDiffEvaluator",
             "CorrFroDiffEvaluator does not support federated evaluation. "
@@ -418,7 +427,7 @@ class CorrFroDiffEvaluator(Evaluator):
         )
         return {"corr_fro_diff": math.nan}
 
-    def aggregate(self, stats: Iterable[Any]) -> dict[str, float]:
+    def aggregate(self, stats: Iterable[Mapping[str, float]]) -> dict[str, float]:
         log_debug(
             "CorrFroDiffEvaluator",
             "CorrFroDiffEvaluator does not support federated aggregation. "
