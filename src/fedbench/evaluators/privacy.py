@@ -367,13 +367,8 @@ class MIANearestNeighborAttackEvaluator(Evaluator):
 
     def aggregate(self, stats: Iterable[tuple[float, int]]) -> dict[str, float]:
         """Weighted-mean AUC across clients (approximate federated proxy)."""
-        pairs: list[tuple[float, int]] = [
-            (auc, n)  # nofmt
-            for auc, n in stats
-            if not math.isnan(auc) and n > 0
-        ]
         return {
-            "mia_auc": weighted_mean(pairs),
+            "mia_auc": weighted_mean(stats),
             # accuracy and advantage cannot be meaningfully aggregated
             # across clients without pooling raw scores
             "mia_accuracy": math.nan,
@@ -547,11 +542,9 @@ class AIASupervisedAttackEvaluator(Evaluator):
             for col_key, entry in payload.items():
                 n = int(entry.n_test)
                 for metric in ("accuracy", "auc", "rmse"):
-                    full_key = f"aia_{metric}.{col_key}"
-                    acc.setdefault(full_key, [])
                     v = getattr(entry, metric)
-                    if not math.isnan(v) and n > 0:
-                        acc[full_key].append((v, n))
+                    full_key = f"aia_{metric}.{col_key}"
+                    acc.setdefault(full_key, []).append((v, n))
 
         if not acc:
             return self._nan_result()

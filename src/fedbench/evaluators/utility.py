@@ -17,7 +17,10 @@ from sklearn.metrics import accuracy_score, mean_squared_error, roc_auc_score
 from fedbench.core.data import TableSchema
 from fedbench.core.eval import Evaluator, LocalEvalContext
 from fedbench.core.eval.evalcontext import GlobalEvalContext
-from fedbench.util.metrics import fit_tabular_model, weighted_mean
+from fedbench.util.metrics import (
+    fit_tabular_model,
+    weighted_mean_metrics,
+)
 
 
 class TSTREvaluator(Evaluator):
@@ -98,16 +101,4 @@ class TSTREvaluator(Evaluator):
         self, stats: Iterable[tuple[Mapping[str, float], int]]
     ) -> dict[str, float]:
         keys = ("tstr_auc", "tstr_accuracy", "tstr_rmse")
-        if not stats:
-            return {key: math.nan for key in keys}
-
-        pairs: dict[str, list[tuple[float, int]]] = {key: [] for key in keys}
-
-        for metrics, n_test in stats:
-            for key in keys:
-                pairs[key].append((metrics[key], n_test))
-
-        return {
-            key: weighted_mean(pairs[key])  # nofmt
-            for key in keys
-        }
+        return weighted_mean_metrics(stats, keys)

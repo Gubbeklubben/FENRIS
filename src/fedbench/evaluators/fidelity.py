@@ -49,7 +49,7 @@ from fedbench.util.metrics import (
     get_numeric_columns,
     safe_nanmean,
     sanitize_numeric_df,
-    weighted_mean,
+    weighted_mean_metrics,
 )
 
 # ---------------------------------------------------------------------------
@@ -263,14 +263,11 @@ class DistributionSimilarityMetricsEvaluator(Evaluator):
             t_val = scipy.stats.ttest_ind(r, s, equal_var=False).statistic
             t_vals.append(abs(t_val))
 
-        return (
-            {
-                "ks_mean": safe_nanmean(ks_vals),
-                "wasserstein_mean": safe_nanmean(wasserstein_vals),
-                "t_stat_mean_abs": safe_nanmean(t_vals),
-            },
-            len(r_df),
-        )
+        return {
+            "ks_mean": safe_nanmean(ks_vals),
+            "wasserstein_mean": safe_nanmean(wasserstein_vals),
+            "t_stat_mean_abs": safe_nanmean(t_vals),
+        }, len(r_df)
 
     def global_evaluate(self, ctx: GlobalEvalContext) -> dict[str, float]:
         scores, _ = self._compute(ctx.holdout_df, ctx.synthetic_df, ctx.schema)
@@ -281,19 +278,10 @@ class DistributionSimilarityMetricsEvaluator(Evaluator):
 
     def aggregate(
         self,
-        stats: Iterable[tuple[dict[str, float], int]],
+        stats: Iterable[tuple[Mapping[str, float], int]],
     ) -> dict[str, float]:
-        keys = ["ks_mean", "wasserstein_mean", "t_stat_mean_abs"]
-        pairs: dict[str, list[tuple[float, int]]] = {k: [] for k in keys}
-        for scores, n in stats:
-            for k in keys:
-                v = scores.get(k, math.nan)
-                if not math.isnan(v) and n > 0:
-                    pairs[k].append((v, n))
-        return {
-            k: weighted_mean(pairs[k]) if pairs[k] else math.nan  # nofmt
-            for k in keys
-        }
+        keys = ("ks_mean", "wasserstein_mean", "t_stat_mean_abs")
+        return weighted_mean_metrics(stats, keys)
 
 
 # ---------------------------------------------------------------------------
