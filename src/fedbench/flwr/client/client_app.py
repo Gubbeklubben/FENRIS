@@ -73,8 +73,11 @@ def train(message: Message, flwr_context: Context) -> Message:
         )
         start_time = time.perf_counter_ns()
         reply = synthesizer.train(request, train_df)
-        local_train_seconds = (time.perf_counter_ns() - start_time) / 1e9
+        train_seconds = (time.perf_counter_ns() - start_time) / 1e9
 
+    ctx.framework_cache.metric_records.update(
+        {"metrics": MetricRecord({"prev-train-seconds": train_seconds})},
+    )
     rdict = ctx.serde.to_flwr(reply)
     return Message(content=rdict, reply_to=message)
 
