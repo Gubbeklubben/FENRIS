@@ -107,6 +107,9 @@ def evaluate(message: Message, flwr_context: Context) -> Message:
             reply_to=message,
         )
 
+    cached_metrics = ctx.framework_cache.metric_records.get("metrics", {})
+    local_train_seconds = cached_metrics.get("prev-train-seconds", math.nan)
+
     eval_ctx = LocalEvalContext(
         train_df=train_df,
         test_df=test_df,
@@ -115,7 +118,7 @@ def evaluate(message: Message, flwr_context: Context) -> Message:
         target_column=ctx.config.data.target_col,
         sensitive_columns=ctx.config.data.sensitive_cols,
         schema=ctx.dataset.schema,
-        local_train_seconds=math.nan,  # TODO: get from train()
+        local_train_seconds=local_train_seconds,
     )
 
     metrics: Extras = {}
