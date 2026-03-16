@@ -10,5 +10,5 @@ class Namespace(StrEnum):
     GLOBAL_INIT_ARTIFACTS = "global-init-artifacts"
     SYNTHESIZER = "synthesizer"
 
-    def create_view(self, rdict: RecordDict) -> RDictNamespaceView:
+    def view(self, rdict: RecordDict) -> RDictNamespaceView:
         return RDictNamespaceView(self.value, rdict)

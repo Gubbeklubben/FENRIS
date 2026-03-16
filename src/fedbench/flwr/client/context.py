@@ -1,10 +1,11 @@
+from collections.abc import Callable
 from dataclasses import dataclass
 from typing import cast
 
 from flwr.common import RecordDict
 
 from fedbench.config import Config
-from fedbench.core.algorithm import ComponentSpec, Synthesizer
+from fedbench.core.algorithm import Synthesizer
 from fedbench.core.data import PartitionedDataset
 from fedbench.core.data.schemas import infer_schema
 from fedbench.core.eval import EvaluationSuite
@@ -31,7 +32,7 @@ _dataset: PartitionedDataset | None = None
 class ClientContext:
     config: Config
     dataset: PartitionedDataset
-    synthesizer_spec: ComponentSpec[Synthesizer]
+    synthesizer_factory: Callable[[], Synthesizer]
     eval_suite: EvaluationSuite
     serde: FlwrSerde
     framework_cache: RDictNamespaceView
@@ -40,25 +41,25 @@ class ClientContext:
 
 
 def build_client_context(flwr_cache: RecordDict) -> ClientContext:
-    framework_cache = Namespace.FRAMEWORK.create_view(flwr_cache)
+    framework_cache = Namespace.FRAMEWORK.view(flwr_cache)
     config = _get_config(framework_cache)
     dataset = _get_dataset(config)
 
     algorithm = create_algorithm(config, build_algorithm_registry())
     eval_suite = create_evaluation_suite(config, build_evaluator_registries())
     serde = FlwrSerde(
-        object_serde=Pickle(config.disable_pickle),
+        object_serde=Pickle(disabled=config.disable_pickle),
         default_arrays_map=algorithm.synthesizer_spec.arrays_to_ml_framework_map,
     )
     return ClientContext(
         config,
         dataset,
-        algorithm.synthesizer_spec,
+        algorithm.synthesizer_spec.factory,
         eval_suite,
         serde,
         framework_cache,
-        Namespace.GLOBAL_INIT_ARTIFACTS.create_view(flwr_cache),
-        Namespace.SYNTHESIZER.create_view(flwr_cache),
+        Namespace.GLOBAL_INIT_ARTIFACTS.view(flwr_cache),
+        Namespace.SYNTHESIZER.view(flwr_cache),
     )
 
 
