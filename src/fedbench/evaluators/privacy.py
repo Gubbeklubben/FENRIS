@@ -457,6 +457,9 @@ class AIASupervisedAttackEvaluator(Evaluator):
         if schema.kind_of(sensitive_column) in ["binary", "categorical"]:
             y_syn = y_syn.astype(str)
             y_test = y_test.astype(str)
+            if y_syn.nunique() < 2:
+                return entry
+
             model = LogisticRegression(
                 max_iter=1000,
                 solver="lbfgs",
