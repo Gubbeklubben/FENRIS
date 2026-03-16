@@ -19,6 +19,7 @@ from fedbench.core.events import (
     ServerRequest,
 )
 from fedbench.core.update import Metrics, Update
+from fedbench.flwr.namespace import Namespace
 from fedbench.flwr.serde import FlwrSerde
 from fedbench.runtime.eventbus import EventBus
 from fedbench.util.metrics import count_rdict_bytes
@@ -168,7 +169,13 @@ class Strategy:
         return global_state
 
 
-def send_config(grid: Grid, config: Config) -> Iterable[Message]:
+def configure_clients(
+    config: Config,
+    artifacts: Update | None,
+    serde: FlwrSerde,
+    grid: Grid,
+) -> None:
+
     # Wait for clients to connect.
     # ref. flwr.serverapp.strategy.strategy_utils:sample_nodes
     client_ids = list(grid.get_node_ids())
@@ -176,31 +183,23 @@ def send_config(grid: Grid, config: Config) -> Iterable[Message]:
         time.sleep(1)
         client_ids = list(grid.get_node_ids())
 
-    messages = (
-        Message(
-            content=RecordDict({"config": ConfigRecord({"jsons": config.jsons()})}),
-            message_type="query.config",
-            dst_node_id=cid,
-        )
+    content = RecordDict()
+
+    framework_view = Namespace.FRAMEWORK.view(content)
+    artifacts_view = Namespace.GLOBAL_INIT_ARTIFACTS.view(content)
+
+    framework_view["config"] = ConfigRecord({"jsons": config.jsons()})
+
+    if artifacts is not None:
+        artifacts_view.update(serde.to_flwr(artifacts))
+
+    requests = (
+        Message(content=content, message_type="query.configure", dst_node_id=cid)
         for cid in client_ids
     )
-    return grid.send_and_receive(messages)
-
-
-def send_artifacts(
-    grid: Grid,
-    serde: FlwrSerde,
-    synthesizer_artifacts: Update | None,
-) -> Iterable[Message]:
-
-    artifacts = synthesizer_artifacts or Update()
-
-    messages = (
-        Message(
-            content=serde.to_flwr(artifacts),
-            message_type="query.artifacts",
-            dst_node_id=cid,
-        )
-        for cid in grid.get_node_ids()
-    )
-    return grid.send_and_receive(messages)
+    for reply in grid.send_and_receive(requests):
+        if reply.has_error():
+            raise RuntimeError(
+                f"Failed to configure client {reply.metadata.src_node_id}: "
+                f"{reply.error.reason}"
+            )

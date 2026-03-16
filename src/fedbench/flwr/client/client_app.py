@@ -22,17 +22,14 @@ def get_partition_id(flwr_context: Context) -> int:
     return cast(int, flwr_context.node_config["partition-id"])
 
 
-@app.query("config")
-def recv_config(message: Message, flwr_context: Context) -> Message:
-    cache = Namespace.FRAMEWORK.view(flwr_context.state)
-    cache.update(message.content)
-    return Message(content=RecordDict(), reply_to=message)
-
-
-@app.query("artifacts")
-def recv_artifacts(message: Message, flwr_context: Context) -> Message:
-    cache = Namespace.GLOBAL_INIT_ARTIFACTS.view(flwr_context.state)
-    cache.update(message.content)
+@app.query("configure")
+def configure(message: Message, flwr_context: Context) -> Message:
+    Namespace.FRAMEWORK.view(flwr_context.state).update(
+        Namespace.FRAMEWORK.view(message.content),
+    )
+    Namespace.GLOBAL_INIT_ARTIFACTS.view(flwr_context.state).update(
+        Namespace.GLOBAL_INIT_ARTIFACTS.view(message.content),
+    )
     return Message(content=RecordDict(), reply_to=message)
 
 
