@@ -351,11 +351,12 @@ class CategoricalTvMeanEvaluator(Evaluator):
         acc: dict[str, dict[str, dict[str, int]]] = {}
         for payload in stats:
             for col, sides in payload.items():
-                acc.setdefault(col, {})
-                for side in ("real", "syn"):
-                    acc[col].setdefault(side, {})
-                    for cat, cnt in sides[side].items():
-                        acc[col][side][cat] = acc[col][side].get(cat, 0) + int(cnt)
+                # Synthetic DF is identical on every client — record once only.
+                acc.setdefault(col, {"real": {}, "syn": dict(sides["syn"])})
+                # Real counts are additive: each client holds a disjoint partition.
+                for cat, cnt in sides["real"].items():
+                    acc[col]["real"].setdefault(cat, 0)
+                    acc[col]["real"][cat] += cnt
 
         if not acc:
             return {"categorical_tv_mean": math.nan}
