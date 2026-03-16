@@ -273,8 +273,8 @@ class DistributionSimilarityMetricsEvaluator(Evaluator):
         )
 
     def global_evaluate(self, ctx: GlobalEvalContext) -> dict[str, float]:
-        stats = self._compute(ctx.holdout_df, ctx.synthetic_df, ctx.schema)
-        return self.aggregate([stats])
+        scores, _ = self._compute(ctx.holdout_df, ctx.synthetic_df, ctx.schema)
+        return scores
 
     def local_evaluate(self, ctx: LocalEvalContext) -> tuple[dict[str, float], int]:
         return self._compute(ctx.train_df, ctx.synthetic_df, ctx.schema)
