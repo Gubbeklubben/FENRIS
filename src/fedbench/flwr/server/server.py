@@ -19,10 +19,8 @@ from fedbench.core.events import (
     ServerRequest,
 )
 from fedbench.core.update import Metrics, Update
-from fedbench.flwr.serde import (
-    FlwrDeserializer,
-    FlwrSerializer,
-)
+from fedbench.flwr.namespace import Namespace
+from fedbench.flwr.serde import FlwrSerde
 from fedbench.runtime.eventbus import EventBus
 from fedbench.util.metrics import count_rdict_bytes
 
@@ -32,20 +30,16 @@ class Strategy:
         self,
         seed: int,
         schema: TableSchema,
-        to_flwr: FlwrSerializer,
-        from_flwr: FlwrDeserializer,
+        serde: FlwrSerde,
         eventbus: EventBus,
         coordinator: Coordinator,
-        arrays_to_ml_framework_map: dict[str, str] | None,
     ) -> None:
 
         self._seed = seed
         self._schema = schema
-        self._to_flwr = to_flwr
-        self._from_flwr = from_flwr
+        self._serde = serde
         self._eventbus = eventbus
         self._coordinator = coordinator
-        self._arrays_map = arrays_to_ml_framework_map
         self._per_client_metrics: dict[int, Metrics] = {}
 
     def fed_init(self, grid: Grid) -> None:
@@ -66,7 +60,7 @@ class Strategy:
         requests = []
 
         for dst_id in grid.get_node_ids():
-            rdict = self._to_flwr(global_state)
+            rdict = self._serde.to_flwr(global_state)
             requests.append(
                 Message(content=rdict, message_type=msg_type, dst_node_id=dst_id)
             )
@@ -140,7 +134,7 @@ class Strategy:
 
             requests = []
             for dst_id, update in batch:
-                rdict = self._to_flwr(update)
+                rdict = self._serde.to_flwr(update)
                 requests.append(
                     Message(content=rdict, message_type=msg_type, dst_node_id=dst_id)
                 )
@@ -155,9 +149,8 @@ class Strategy:
             replies = []
             for reply in grid.send_and_receive(requests):
                 src_id = reply.metadata.src_node_id
-                replies.append(
-                    (src_id, self._from_flwr(reply.content, self._arrays_map))
-                )
+                replies.append((src_id, self._serde.from_flwr(reply.content)))
+
                 self._eventbus.emit(
                     ClientReply(
                         src_id,
@@ -176,7 +169,13 @@ class Strategy:
         return global_state
 
 
-def send_config(grid: Grid, config: Config) -> Iterable[Message]:
+def configure_clients(
+    config: Config,
+    artifacts: Update | None,
+    serde: FlwrSerde,
+    grid: Grid,
+) -> None:
+
     # Wait for clients to connect.
     # ref. flwr.serverapp.strategy.strategy_utils:sample_nodes
     client_ids = list(grid.get_node_ids())
@@ -184,29 +183,23 @@ def send_config(grid: Grid, config: Config) -> Iterable[Message]:
         time.sleep(1)
         client_ids = list(grid.get_node_ids())
 
-    messages = (
-        Message(
-            content=RecordDict({"config": ConfigRecord({"jsons": config.jsons()})}),
-            message_type="query.config",
-            dst_node_id=cid,
-        )
+    content = RecordDict()
+
+    framework_view = Namespace.FRAMEWORK.view(content)
+    artifacts_view = Namespace.GLOBAL_INIT_ARTIFACTS.view(content)
+
+    framework_view["config"] = ConfigRecord({"jsons": config.jsons()})
+
+    if artifacts is not None:
+        artifacts_view.update(serde.to_flwr(artifacts))
+
+    requests = (
+        Message(content=content, message_type="query.configure", dst_node_id=cid)
         for cid in client_ids
     )
-    return grid.send_and_receive(messages)
-
-
-def send_artifacts(
-    grid: Grid,
-    to_flwr: FlwrSerializer,
-    synthesizer_artifacts: Update | None,
-) -> Iterable[Message]:
-
-    artifacts = synthesizer_artifacts or Update()
-
-    messages = (
-        Message(
-            content=to_flwr(artifacts), message_type="query.artifacts", dst_node_id=cid
-        )
-        for cid in grid.get_node_ids()
-    )
-    return grid.send_and_receive(messages)
+    for reply in grid.send_and_receive(requests):
+        if reply.has_error():
+            raise RuntimeError(
+                f"Failed to configure client {reply.metadata.src_node_id}: "
+                f"{reply.error.reason}"
+            )

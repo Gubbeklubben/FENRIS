@@ -66,6 +66,12 @@ class FedHelloCoordinator(SingleStepCoordinator):
 class FedHelloSynthesizer(Synthesizer):
     def __init__(self, name: str) -> None:
         self._name = name
+        self._cache: Update | None = None
+
+    def attach_client_cache(self, cache: Update) -> None:
+        self._cache = cache
+        if "counters" not in self._cache.metrics:
+            self._cache.metrics["counters"] = {"train": 0, "sample": 0}
 
     def train(
         self,
@@ -73,7 +79,13 @@ class FedHelloSynthesizer(Synthesizer):
         data: pd.DataFrame,
     ) -> Update:
 
-        log_info(str(self), f"Hello from train, {self._name}!")
+        if self._cache is not None:
+            self._cache.metrics["counters"]["train"] += 1  # type: ignore[operator]
+            count = self._cache.metrics["counters"]["train"]
+        else:
+            count = None
+
+        log_info(str(self), f"Hello {count} from train, {self._name}!")
         return Update(arrays=request.arrays, objects={"objects": {"df": data}})
 
     def sample(
@@ -83,7 +95,13 @@ class FedHelloSynthesizer(Synthesizer):
         seed: int,
     ) -> pd.DataFrame:
 
-        log_info(str(self), f"Hello from sample, {self._name}!")
+        if self._cache is not None:
+            self._cache.metrics["counters"]["sample"] += 1  # type: ignore[operator]
+            count = self._cache.metrics["counters"]["sample"]
+        else:
+            count = None
+
+        log_info(str(self), f"Hello {count} from sample, {self._name}!")
         # noinspection PyUnnecessaryCast
         try:
             return cast(pd.DataFrame, request.objects["objects"]["df"])[:num_rows]
