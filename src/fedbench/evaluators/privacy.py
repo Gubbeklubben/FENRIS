@@ -41,7 +41,7 @@ AIASupervisedAttackEvaluator — **exact** federated aggregation (per
 import hashlib
 import math
 from dataclasses import dataclass
-from typing import Any, Iterable
+from typing import Any, Iterable, Mapping
 
 import numpy as np
 import pandas as pd
@@ -386,6 +386,14 @@ class MIANearestNeighborAttackEvaluator(Evaluator):
 # ---------------------------------------------------------------------------
 
 
+@dataclass
+class _AIAResult:
+    accuracy: float = math.nan
+    auc: float = math.nan
+    rmse: float = math.nan
+    n_test: int = 0
+
+
 class AIASupervisedAttackEvaluator(Evaluator):
     """Supervised attribute inference attack.
 
@@ -423,42 +431,38 @@ class AIASupervisedAttackEvaluator(Evaluator):
         sensitive_column: str,
         schema: Any,
         seed: int,
-    ) -> dict[str, float | int]:
+    ) -> _AIAResult:
         """Fit an attacker on syn_df and evaluate on (X_test, y_test).
 
-        Returns a dict with keys ``"accuracy"``, ``"auc"``, ``"rmse"``
-        (NaN for whichever metrics are not applicable to the column kind).
+        Returns an ``_AIAResult`` with accuracy/auc for classification or
+        rmse for regression (NaN for inapplicable metrics).
         """
 
-        entry: dict[str, float] = {
-            "accuracy": math.nan,
-            "auc": math.nan,
-            "rmse": math.nan,
-            "n_test": 0,
-        }
+        result = _AIAResult()
 
         qi = set(test_df.columns) - {sensitive_column}
         if target_column:
             qi -= {target_column}
         quasi_ids = sorted(qi)
+
         if (
             not quasi_ids
             or sensitive_column not in test_df.columns
             or sensitive_column not in syn_df.columns
         ):
-            return entry
+            return result
 
         X_test = test_df[quasi_ids]
         y_test = test_df[sensitive_column]
         X_syn = syn_df[quasi_ids]
         y_syn = syn_df[sensitive_column]
-        entry["n_test"] = len(test_df)
+        result.n_test = len(test_df)
 
         if schema.kind_of(sensitive_column) in ["binary", "categorical"]:
             y_syn = y_syn.astype(str)
             y_test = y_test.astype(str)
             if y_syn.nunique() < 2:
-                return entry
+                return result
 
             model = LogisticRegression(
                 max_iter=1000,
@@ -467,17 +471,17 @@ class AIASupervisedAttackEvaluator(Evaluator):
             )
             pipe = fit_tabular_model(X_syn, y_syn, model)
             y_pred = pipe.predict(X_test)
-            entry["accuracy"] = accuracy_score(y_test, y_pred)
+            result.accuracy = accuracy_score(y_test, y_pred)
             if len(np.unique(y_syn)) == 2:
                 y_proba = pipe.predict_proba(X_test)[:, 1]
-                entry["auc"] = roc_auc_score(y_test, y_proba)
+                result.auc = roc_auc_score(y_test, y_proba)
         else:
             model = Ridge(random_state=seed)
             pipe = fit_tabular_model(X_syn, y_syn, model)
             y_pred = pipe.predict(X_test)
-            entry["rmse"] = math.sqrt(mean_squared_error(y_test, y_pred))
+            result.rmse = math.sqrt(mean_squared_error(y_test, y_pred))
 
-        return entry
+        return result
 
     # noinspection PyMethodMayBeStatic
     def _compute(
@@ -488,8 +492,8 @@ class AIASupervisedAttackEvaluator(Evaluator):
         sensitive_columns: Iterable[str] | None,
         schema: Any,
         seed: int,
-    ) -> dict[str, dict[str, float | int]]:
-        payload: dict[str, dict[str, float | int]] = {}
+    ) -> dict[str, _AIAResult]:
+        payload: dict[str, _AIAResult] = {}
 
         for sensitive_column in sensitive_columns or []:
             key = to_snake_case(sensitive_column)
@@ -517,15 +521,13 @@ class AIASupervisedAttackEvaluator(Evaluator):
         metrics: dict[str, float] = {}
 
         for key, scores in results.items():
-            metrics[f"aia_accuracy.{key}"] = scores["accuracy"]
-            metrics[f"aia_auc.{key}"] = scores["auc"]
-            metrics[f"aia_rmse.{key}"] = scores["rmse"]
+            metrics[f"aia_accuracy.{key}"] = scores.accuracy
+            metrics[f"aia_auc.{key}"] = scores.auc
+            metrics[f"aia_rmse.{key}"] = scores.rmse
 
         return metrics or self._nan_result()
 
-    def local_evaluate(
-        self, ctx: LocalEvalContext
-    ) -> dict[str, dict[str, float | int]]:
+    def local_evaluate(self, ctx: LocalEvalContext) -> dict[str, _AIAResult]:
         return self._compute(
             ctx.test_df,
             ctx.synthetic_df,
@@ -537,19 +539,19 @@ class AIASupervisedAttackEvaluator(Evaluator):
 
     def aggregate(
         self,
-        stats: Iterable[dict[str, dict[str, float | int]]],
+        stats: Iterable[Mapping[str, _AIAResult]],
     ) -> dict[str, float]:
         acc: dict[str, list[tuple[float, int]]] = {}
 
         for payload in stats:
             for col_key, entry in payload.items():
-                n = int(entry.get("n_test", 0))
+                n = int(entry.n_test)
                 for metric in ("accuracy", "auc", "rmse"):
                     full_key = f"aia_{metric}.{col_key}"
                     acc.setdefault(full_key, [])
-                    v = entry.get(metric, math.nan)
-                    if not math.isnan(float(v)) and n > 0:
-                        acc[full_key].append((float(v), n))
+                    v = getattr(entry, metric)
+                    if not math.isnan(v) and n > 0:
+                        acc[full_key].append((v, n))
 
         if not acc:
             return self._nan_result()
