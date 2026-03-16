@@ -258,3 +258,30 @@ class TestCorrFroDiff:
         result = self.evaluator.global_evaluate(ctx)
 
         assert math.isnan(result["corr_fro_diff"])
+
+    def test_constant_column_in_syn_emits_nan_not_zero(self):
+        """
+        Two numeric columns where one is constant in syn but not in real.
+
+        With the old implementation, safe_corr filtered each DataFrame
+        independently.  The constant column survived in the real correlation
+        matrix but was dropped from the synthetic one.  The intersection then
+        reduced both matrices to 1x1 (identity minus identity = 0), and the
+        Frobenius norm was silently returned as 0.0 — a wrong answer, because
+        with only one column remaining there is no pairwise correlation
+        structure to compare.
+
+        The correct result is NaN: fewer than two non-constant columns survive
+        the joint filter, so the metric is undefined.
+        """
+        a = np.linspace(1, 10, 20)
+        real = pd.DataFrame({"a": a, "b": a * 2.0})    # b non-constant in real
+        syn  = pd.DataFrame({"a": a, "b": [5.0] * 20}) # b constant in syn
+
+        ctx = make_ctx(real, syn)
+        result = self.evaluator.global_evaluate(ctx)
+
+        assert math.isnan(result["corr_fro_diff"]), (
+            f"Expected NaN when one column is constant in syn, got "
+            f"{result['corr_fro_diff']!r}. "
+        )

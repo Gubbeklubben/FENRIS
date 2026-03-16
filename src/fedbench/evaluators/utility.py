@@ -17,12 +17,16 @@ from sklearn.metrics import accuracy_score, mean_squared_error, roc_auc_score
 from fedbench.core.data import TableSchema
 from fedbench.core.eval import Evaluator, LocalEvalContext
 from fedbench.core.eval.evalcontext import GlobalEvalContext
-from fedbench.util.metrics import fit_tabular_model, weighted_mean
+from fedbench.util.metrics import (
+    fit_tabular_model,
+    weighted_mean_metrics,
+)
 
 
 class TSTREvaluator(Evaluator):
-    @staticmethod
+    # noinspection PyMethodMayBeStatic
     def _compute(
+        self,
         D_test: pd.DataFrame,
         D_syn: pd.DataFrame,
         y_col: str | None,
@@ -48,6 +52,8 @@ class TSTREvaluator(Evaluator):
             return metrics
 
         if schema.kind_of(y_col) in ["binary", "categorical"]:
+            y_syn = y_syn.astype(str)
+            y_test = y_test.astype(str)
             if y_syn.nunique() < 2:
                 return metrics
 
@@ -82,28 +88,17 @@ class TSTREvaluator(Evaluator):
             seed=ctx.seed,
         )
 
-    def local_evaluate(self, ctx: LocalEvalContext) -> tuple[int, dict[str, float]]:
-        return len(ctx.test_df), self._compute(
+    def local_evaluate(self, ctx: LocalEvalContext) -> tuple[dict[str, float], int]:
+        return self._compute(
             D_test=ctx.test_df,
             D_syn=ctx.synthetic_df,
             y_col=ctx.target_column,
             schema=ctx.schema,
             seed=ctx.seed,
-        )
+        ), len(ctx.test_df)
 
-    @staticmethod
-    def aggregate(stats: Iterable[tuple[int, Mapping[str, float]]]) -> dict[str, float]:
-        keys = ["tstr_auc", "tstr_accuracy", "tstr_rmse"]
-        if not stats:
-            return {key: math.nan for key in keys}
-
-        pairs: dict[str, list[tuple[float, int]]] = {key: [] for key in keys}
-
-        for key in keys:
-            for n_test, metrics in stats:
-                pairs[key].append((metrics[key], n_test))
-
-        return {
-            key: weighted_mean(pairs[key])  # nofmt
-            for key in keys
-        }
+    def aggregate(
+        self, stats: Iterable[tuple[Mapping[str, float], int]]
+    ) -> dict[str, float]:
+        keys = ("tstr_auc", "tstr_accuracy", "tstr_rmse")
+        return weighted_mean_metrics(stats, keys)

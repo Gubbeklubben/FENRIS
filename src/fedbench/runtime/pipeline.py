@@ -122,7 +122,7 @@ def write_artifacts(ctx: RunContext) -> None:
     for name, metrics in pairs:
         with outputdir.joinpath(f"metrics.{name}.json").open("w") as f:
             clean_metrics = {
-                k: (None if isinstance(v, float) and math.isnan(v) else v)
+                k: (None if isinstance(v, float) and math.isnan(v) else float(v))
                 for k, v in metrics.items()
             }
             json.dump(clean_metrics, f, indent=4, allow_nan=False)

@@ -14,7 +14,7 @@ from dataclasses import dataclass
 import pytest
 
 from fedbench.core.encoder import FedbenchEncoder
-from fedbench.evaluators.fairness import PerGroupConfusion
+from fedbench.evaluators.fairness import _PerGroupConfusion
 
 
 def dumps(obj) -> str:
@@ -37,23 +37,23 @@ class TestFlatRoundTrip:
 
     def test_per_group_confusion_identity(self):
         """PerGroupConfusion survives a full encode/decode cycle."""
-        cm = PerGroupConfusion(tp=10, fp=3, tn=85, fn=2)
+        cm = _PerGroupConfusion(tp=10, fp=3, tn=85, fn=2)
         assert roundtrip(cm) == cm
 
     def test_default_values_preserved(self):
         """Zero-initialised PerGroupConfusion round-trips correctly."""
-        cm = PerGroupConfusion()
+        cm = _PerGroupConfusion()
         assert roundtrip(cm) == cm
 
     def test_encoded_contains_tag(self):
         """Encoded form must contain the __dataclass__ discriminator tag."""
-        cm = PerGroupConfusion(tp=1, fp=2, tn=3, fn=4)
+        cm = _PerGroupConfusion(tp=1, fp=2, tn=3, fn=4)
         raw = json.loads(dumps(cm))
-        assert raw["__dataclass__"] == "PerGroupConfusion"
+        assert raw["__dataclass__"] == "_PerGroupConfusion"
 
     def test_encoded_contains_all_fields(self):
         """All four fields must be present in the encoded dict."""
-        cm = PerGroupConfusion(tp=1, fp=2, tn=3, fn=4)
+        cm = _PerGroupConfusion(tp=1, fp=2, tn=3, fn=4)
         raw = json.loads(dumps(cm))
         assert raw["tp"] == 1
         assert raw["fp"] == 2
@@ -70,8 +70,8 @@ class TestNestedRoundTrip:
     def test_dict_of_per_group_confusion(self):
         """dict[str, PerGroupConfusion] round-trips correctly."""
         payload = {
-            "group_a": PerGroupConfusion(tp=10, fp=1, tn=80, fn=5),
-            "group_b": PerGroupConfusion(tp=20, fp=2, tn=70, fn=3),
+            "group_a": _PerGroupConfusion(tp=10, fp=1, tn=80, fn=5),
+            "group_b": _PerGroupConfusion(tp=20, fp=2, tn=70, fn=3),
         }
         result = roundtrip(payload)
         assert result == payload
@@ -85,8 +85,8 @@ class TestNestedRoundTrip:
         """
         payload = {
             "sensitive_col": {
-                "group_0": PerGroupConfusion(tp=5, fp=1, tn=40, fn=2),
-                "group_1": PerGroupConfusion(tp=8, fp=3, tn=35, fn=4),
+                "group_0": _PerGroupConfusion(tp=5, fp=1, tn=40, fn=2),
+                "group_1": _PerGroupConfusion(tp=8, fp=3, tn=35, fn=4),
             }
         }
         result = roundtrip(payload)
@@ -95,8 +95,8 @@ class TestNestedRoundTrip:
     def test_list_of_per_group_confusion(self):
         """list[PerGroupConfusion] round-trips correctly."""
         payload = [
-            PerGroupConfusion(tp=1, fp=0, tn=9, fn=0),
-            PerGroupConfusion(tp=2, fp=1, tn=7, fn=0),
+            _PerGroupConfusion(tp=1, fp=0, tn=9, fn=0),
+            _PerGroupConfusion(tp=2, fp=1, tn=7, fn=0),
         ]
         assert roundtrip(payload) == payload
 
