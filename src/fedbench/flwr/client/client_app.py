@@ -107,8 +107,11 @@ def evaluate(message: Message, flwr_context: Context) -> Message:
             reply_to=message,
         )
 
-    cached_metrics = ctx.framework_cache.metric_records.get("metrics", {})
-    local_train_seconds = cached_metrics.get("prev-train-seconds", math.nan)
+    cached_metrics = ctx.framework_cache.metric_records.get("metrics", MetricRecord())
+    local_train_seconds = cast(
+        float,
+        cached_metrics.get("prev-train-seconds", math.nan),
+    )
 
     eval_ctx = LocalEvalContext(
         train_df=train_df,
