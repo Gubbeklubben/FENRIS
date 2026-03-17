@@ -329,7 +329,10 @@ class FedTGANSynthesizer(Synthesizer):
 
         # Return updated Generator state (discriminator stays local)
         reply = Update()
-        reply.arrays["arrays"] = generator.state_dict()
+        reply.arrays["arrays"] = {
+            "generator": generator.state_dict(),
+            "discriminator": discriminator.state_dict()
+        }
         reply.metrics["metrics"] = {
             "loss-discriminator": train_loss_discriminator / num_batches if num_batches > 0 else 0.0,
             "loss-generator": train_loss_generator / num_batches if num_batches > 0 else 0.0,
