@@ -1,13 +1,20 @@
+from __future__ import annotations
+
 import json
 import math
 from collections.abc import Iterable
 from pathlib import Path
+from typing import TYPE_CHECKING
 
 from fedbench.core.algorithm import GlobalInitArtifacts
 from fedbench.core.data import PartitionedDataset
 from fedbench.core.data.schemas import infer_schema as _infer_schema
 from fedbench.core.eval import CentralizedEvalContext
 from fedbench.core.logger import log_info
+
+if TYPE_CHECKING:
+    from fedbench.core.update import Update
+
 from fedbench.runtime.command import Command
 from fedbench.runtime.component_factory import (
     create_algorithm,
@@ -114,22 +121,48 @@ def write_artifacts(ctx: RunContext) -> None:
     outputdir = Path(ctx.config.outputdir).joinpath(ctx.run_id)
     outputdir.mkdir(parents=True, exist_ok=False)
 
-    pairs = [
+    # Config snapshot
+    with outputdir.joinpath("config_snapshot.json").open("w") as f:
+        json.dump(json.loads(ctx.config.jsons()), f, indent=2)
+
+    # Metrics (with experiment metadata)
+    experiment = {
+        "experiment.seed": ctx.config.seed,
+        "experiment.num_rounds": ctx.config.num_rounds,
+        "experiment.num_clients": ctx.config.num_clients,
+        "experiment.generator_type": ctx.config.algorithm,
+        "experiment.metric_focus": None,
+        "experiment.aggregation_variant": None,
+        "experiment.model_scope": None,
+    }
+    for name, metrics in [
         ("federated", ctx.aggregated_metrics),
         ("centralized", ctx.centralized_metrics),
-    ]
-
-    for name, metrics in pairs:
+    ]:
+        clean = {
+            k: (None if isinstance(v, float) and math.isnan(v) else float(v))
+            for k, v in metrics.items()
+        }
         with outputdir.joinpath(f"metrics.{name}.json").open("w") as f:
-            clean_metrics = {
-                k: (None if isinstance(v, float) and math.isnan(v) else float(v))
-                for k, v in metrics.items()
-            }
-            json.dump(clean_metrics, f, indent=4, allow_nan=False)
+            json.dump({**experiment, **clean}, f, indent=2, allow_nan=False)
 
+    # Synthetic data
     ctx.synthetic_df.to_csv(outputdir.joinpath("synthetic.csv"), index=False)
 
+    # Model weights (no-op when torch not installed or no weights)
+    _save_model_weights(outputdir, ctx.aggregated_state)
+
     log_info(__name__, f"Benchmark artifacts written to {outputdir}.")
+
+
+def _save_model_weights(outputdir: Path, state: Update) -> None:
+    try:
+        import torch
+    except ImportError:
+        return
+    value = state.arrays.get("state")
+    if isinstance(value, dict):
+        torch.save(dict(value), outputdir / "final_synthesizer.pt")
 
 
 def pipeline() -> Iterable[Command]:
