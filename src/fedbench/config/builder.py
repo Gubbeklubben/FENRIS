@@ -1,3 +1,4 @@
+import csv
 import inspect
 from dataclasses import fields
 from pathlib import Path
@@ -22,6 +23,7 @@ def build_config(
     cfg = build_cli_dict(Config, cli_input)
 
     resolve_dataset_path(data_cfg)
+    validate_column_names(data_cfg)
     resolve_outputdir(cfg)
     resolve_run_categories(metrics_cfg)
 
@@ -50,6 +52,26 @@ def resolve_dataset_path(data_cfg: dict[str, Any]) -> None:
     if not path.exists():
         raise FileNotFoundError(f"Dataset {path} does not exist")
     data_cfg["dataset"] = str(path)
+
+
+def validate_column_names(data_cfg: dict[str, Any]) -> None:
+    """Fail fast if target_col or sensitive_cols reference non-existent columns."""
+    with open(data_cfg["dataset"]) as f:
+        header = next(csv.reader(f))
+
+    target = data_cfg.get("target_col")
+    if target is not None and target not in header:
+        raise ValueError(
+            f"--target-col '{target}' not found in dataset. "
+            f"Available columns: {header}"
+        )
+
+    for col in data_cfg.get("sensitive_cols", ()):
+        if col not in header:
+            raise ValueError(
+                f"--sensitive-cols: '{col}' not found in dataset. "
+                f"Available columns: {header}"
+            )
 
 
 def resolve_outputdir(cfg: dict[str, Any]) -> None:
