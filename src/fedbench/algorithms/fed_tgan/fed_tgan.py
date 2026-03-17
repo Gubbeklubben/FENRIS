@@ -1,10 +1,11 @@
 from collections.abc import Iterable
-from typing import Any, Callable
+from typing import Any, Callable, cast
 import functools
 
 import pandas as pd
 import numpy as np
 import torch
+from torch import Tensor
 from sklearn.preprocessing import LabelEncoder
 
 from fedbench.core.algorithm import (
@@ -17,6 +18,7 @@ from fedbench.core.algorithm import (
     synthesizer_spec,
     coordinator_spec,
 )
+from fedbench.core.logger import ELBOW, log_warning
 
 from fedbench.core.data import TableSchema
 from fedbench.core.update import Update
@@ -190,8 +192,43 @@ class FedTGANCoordinator(SingleStepCoordinator):
         self._preproc_extras = artifacts.extras["preproc-extras"]
 
     def aggregate_train(self, replies: Iterable[tuple[int, Update]]) -> None:
-        # TODO: Implement FedAvg aggregation for both generator and discriminator
-        pass
+        """Aggregate generator and discriminator models using FedAvg (weighted by num_samples)."""
+        if not replies:
+            raise ValueError("No replies, can not aggregate.")
+
+        num_samples: list[int] = []
+        state_dicts: list[dict[str, Tensor]] = []
+
+        for _, reply in replies:
+            # noinspection PyUnnecessaryCast
+            num_samples.append(cast(int, reply.metrics["metrics"]["num-samples"]))
+            # noinspection PyUnnecessaryCast
+            state_dicts.append(cast(dict[str, Tensor], reply.arrays["state"]))
+
+        total = sum(num_samples)
+        if total <= 0:
+            log_warning(str(self), f"Total number of samples: {total}")
+            log_warning("", f"\t{ELBOW} Skipping aggregation.")
+            return
+
+        weights = tuple(float(n) / total for n in num_samples)
+        keys = tuple(state_dicts[0].keys())
+        aggr_state: dict[str, Tensor] = {}
+
+        with torch.no_grad():
+            for key in keys:
+                result: Tensor | None = None
+
+                for state_dict, weight in zip(state_dicts, weights, strict=True):
+                    tensor = state_dict[key].detach().cpu()
+                    if result is None:
+                        result = tensor * weight
+                    else:
+                        result = result + tensor * weight
+
+                aggr_state[key] = result
+
+        self._state = aggr_state
 
     def _create_update(self) -> Update:
         """Create Update with the current global state and preprocessing artifacts."""
