@@ -22,7 +22,7 @@ class FedbenchEncoder(json.JSONEncoder):
                 return {
                     "__dataclass__": type(obj).__qualname__,
                     "__module__": type(obj).__module__,
-                    **dataclasses.asdict(obj),
+                    **{f.name: getattr(obj, f.name) for f in dataclasses.fields(obj)},
                 }
             return super().default(obj)
         except Exception as e:

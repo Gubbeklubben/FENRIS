@@ -1,20 +1,20 @@
 """Tests for FedbenchEncoder / FedbenchEncoder.decode.
 
 Covers:
-- Round-trip for a flat registered dataclass
-- Round-trip for a nested structure (dict[str, dict[str, PerGroupConfusion]])
-- Unknown dicts pass through decode unchanged
-- Unregistered dataclasses are not decoded (raw dict returned)
-- Non-dataclass values encode normally
+- Round-trip for flat and nested dataclasses
+- Round-trip for dicts and lists containing dataclasses
+- Correct __dataclass__ / __module__ tags in encoded form
+- Locally-defined dataclasses (not reachable as module attributes) decode to a plain dict
+- Unknown module tags pass through decode unchanged
+- Primitive values encode and decode normally
 """
 
 import json
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 
 import pytest
 
 from fedbench.core.encoder import FedbenchEncoder
-from fedbench.evaluators.fairness import _PerGroupConfusion
 
 
 def dumps(obj) -> str:
@@ -30,74 +30,83 @@ def roundtrip(obj):
 
 
 # ---------------------------------------------------------------------------
-# Flat dataclass
+# Module-level dataclasses used by TestNestedRoundTrip
 # ---------------------------------------------------------------------------
 
-class TestFlatRoundTrip:
+@dataclass(frozen=True)
+class _Inner:
+    a: int = 0
+    b: int = 0
 
-    def test_per_group_confusion_identity(self):
-        """PerGroupConfusion survives a full encode/decode cycle."""
-        cm = _PerGroupConfusion(tp=10, fp=3, tn=85, fn=2)
-        assert roundtrip(cm) == cm
+@dataclass(frozen=True)
+class _Outer:
+    x: _Inner = field(default_factory=_Inner)
+    y: str = ""
 
-    def test_default_values_preserved(self):
-        """Zero-initialised PerGroupConfusion round-trips correctly."""
-        cm = _PerGroupConfusion()
-        assert roundtrip(cm) == cm
+@dataclass
+class _OuterWithDictField:
+    children: dict = field(default_factory=dict)
 
-    def test_encoded_contains_tag(self):
-        """Encoded form must contain the __dataclass__ discriminator tag."""
-        cm = _PerGroupConfusion(tp=1, fp=2, tn=3, fn=4)
-        raw = json.loads(dumps(cm))
-        assert raw["__dataclass__"] == "_PerGroupConfusion"
+
+# ---------------------------------------------------------------------------
+# Encoding format
+# ---------------------------------------------------------------------------
+
+class TestEncodingFormat:
+
+    def test_encoded_contains_dataclass_tag(self):
+        raw = json.loads(dumps(_Inner(a=1, b=3)))
+        assert raw["__dataclass__"] == "_Inner"
+
+    def test_encoded_contains_module_tag(self):
+        raw = json.loads(dumps(_Inner(a=1, b=3)))
+        assert raw["__module__"] == "tests.test_encoder"
 
     def test_encoded_contains_all_fields(self):
-        """All four fields must be present in the encoded dict."""
-        cm = _PerGroupConfusion(tp=1, fp=2, tn=3, fn=4)
-        raw = json.loads(dumps(cm))
-        assert raw["tp"] == 1
-        assert raw["fp"] == 2
-        assert raw["tn"] == 3
-        assert raw["fn"] == 4
+        raw = json.loads(dumps(_Inner(a=1, b=3)))
+        assert raw["a"] == 1
+        assert raw["b"] == 3
 
 
 # ---------------------------------------------------------------------------
-# Nested structures
+# Round-trips
 # ---------------------------------------------------------------------------
 
-class TestNestedRoundTrip:
+class TestRoundTrip:
 
-    def test_dict_of_per_group_confusion(self):
-        """dict[str, PerGroupConfusion] round-trips correctly."""
-        payload = {
-            "group_a": _PerGroupConfusion(tp=10, fp=1, tn=80, fn=5),
-            "group_b": _PerGroupConfusion(tp=20, fp=2, tn=70, fn=3),
-        }
-        result = roundtrip(payload)
-        assert result == payload
+    def test_flat_dataclass(self):
+        assert roundtrip(_Inner(a=10, b=85)) == _Inner(a=10, b=85)
 
-    def test_nested_dict_of_per_group_confusion(self):
-        """dict[str, dict[str, PerGroupConfusion]] round-trips correctly.
+    def test_flat_dataclass_default_values(self):
+        assert roundtrip(_Inner()) == _Inner()
 
-        This is the actual payload shape emitted by FairnessEvaluator.local_evaluate.
-        object_hook is called bottom-up so inner PerGroupConfusion instances are
-        reconstructed before the outer dict is processed.
-        """
+    def test_dataclass_field(self):
+        """A dataclass whose field is itself a dataclass."""
+        assert roundtrip(_Outer(_Inner(1, 2), "test")) == _Outer(_Inner(1, 2), "test")
+
+    def test_dataclass_with_dict_field_of_dataclasses(self):
+        """A dataclass whose field is a dict mapping to dataclasses."""
+        payload = _OuterWithDictField(children={"a": _Inner(a=1, b=2)})
+        assert roundtrip(payload) == payload
+
+    def test_dict_of_dataclasses(self):
+        payload = {"group_a": _Inner(a=10, b=80),
+                   "group_b": _Inner(a=20, b=70)}
+        assert roundtrip(payload) == payload
+
+    def test_nested_dict_of_dataclasses(self):
+        """dict[str, dict[str, dataclass]]"""
         payload = {
             "sensitive_col": {
-                "group_0": _PerGroupConfusion(tp=5, fp=1, tn=40, fn=2),
-                "group_1": _PerGroupConfusion(tp=8, fp=3, tn=35, fn=4),
+                "group_0": _Inner(a=5, b=40),
+                "group_1": _Inner(a=8, b=35),
             }
         }
-        result = roundtrip(payload)
-        assert result == payload
+        assert roundtrip(payload) == payload
 
-    def test_list_of_per_group_confusion(self):
-        """list[PerGroupConfusion] round-trips correctly."""
-        payload = [
-            _PerGroupConfusion(tp=1, fp=0, tn=9, fn=0),
-            _PerGroupConfusion(tp=2, fp=1, tn=7, fn=0),
-        ]
+    def test_list_of_dataclasses(self):
+        payload = [_Inner(a=1, b=9),
+                   _Inner(a=2, b=7)]
         assert roundtrip(payload) == payload
 
 
@@ -107,26 +116,23 @@ class TestNestedRoundTrip:
 
 class TestPassThrough:
 
-    def test_plain_dict_unchanged(self):
-        """Dicts without __dataclass__ tag are returned unchanged."""
+    def test_plain_dict(self):
         payload = {"key": "value", "count": 42}
         assert roundtrip(payload) == payload
 
-    def test_unregistered_dataclass_returned_as_dict(self):
-        """Dataclasses not in the registry decode to a plain dict, not the class."""
-        @dataclass
-        class _Unregistered:
-            x: int = 0
-
-        raw = dumps(_Unregistered(x=7))
-        result = loads(raw)
-        # Decoded as a plain dict since _Unregistered is not registered
-        assert isinstance(result, dict)
-        assert result["x"] == 7
-
-    def test_primitive_values_unchanged(self):
-        """Ints, floats, strings, and lists pass through without modification."""
+    def test_primitives(self):
         assert roundtrip(42) == 42
         assert roundtrip(3.14) == pytest.approx(3.14)
         assert roundtrip("hello") == "hello"
         assert roundtrip([1, 2, 3]) == [1, 2, 3]
+
+    def test_locally_defined_dataclass_decodes_to_dict(self):
+        """A locally-defined dataclass is not reachable as a module attribute
+        on the decoding side, so decode falls back to a plain dict."""
+        @dataclass
+        class _Local:
+            x: int = 0
+
+        result = loads(dumps(_Local(x=7)))
+        assert isinstance(result, dict)
+        assert result["x"] == 7
