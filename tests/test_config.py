@@ -215,10 +215,10 @@ def test_static_defaults(tmp_path, builtin_algorithms, builtin_partitioners):
     assert config.metrics.early_stop is False
     assert config.metrics.stop_metric is None
     assert config.metrics.stop_mode is None
-    assert config.metrics.stop_epsilon is None
-    assert config.metrics.stop_patience is None
-    assert config.metrics.stop_min_rounds is None
-    assert config.metrics.stop_eval_every is None
+    assert config.metrics.stop_epsilon == 1e-3
+    assert config.metrics.stop_patience == 3
+    assert config.metrics.stop_min_rounds == 1
+    assert config.metrics.stop_eval_every == 1
     assert config.metrics.stop_synthetic_rows is None
 
     assert config.num_rounds == 3
