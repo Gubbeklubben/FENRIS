@@ -13,8 +13,9 @@ from fedbench.core.algorithm import (
     Synthesizer,
     Algorithm,
     ComponentSpec,
+    GlobalInitArtifacts,
     synthesizer_spec,
-    coordinator_spec
+    coordinator_spec,
 )
 
 from fedbench.core.data import TableSchema
@@ -38,18 +39,6 @@ def split_cat_num(schema: TableSchema) -> tuple[list[str], list[str]]:
         if c.kind in ("continuous", "integer")
     ]
     return cat_attrs, num_attrs
-
-
-def init_model(cfg: dict[str, Any]) -> tuple[Generator, Discriminator]:
-    generator = Generator(
-        latent_dim=cfg["latent_dim"],
-        output_dim=cfg["output_dim"]
-    )
-    discriminator = Discriminator(
-        input_dim=cfg["input_dim"]
-    )
-
-    return generator, discriminator
 
 
 class FedTGAN(Algorithm):
@@ -113,31 +102,10 @@ class FedTGAN(Algorithm):
     def synthesizer_spec(self) -> ComponentSpec[Synthesizer]:
         return synthesizer_spec(self._synth_factory, {"state": "torch"})
 
-
-class FedTGANCoordinator(SingleStepCoordinator):
-
-    def __init__(self) -> None:
-        self._cat_attrs: list[str] | None = None
-        self._num_attrs: list[str] | None = None
-        self._preproc_objects: dict[str, Any] | None = None
-        self._preproc_extras: dict[str, Any] | None = None
-        self._state: dict[str, torch.Tensor] | None = None
-
-    @property
-    def arrays_to_ml_framework_map(self) -> dict[str, str] | None:
-        return {"arrays": "torch"}
-
-    @property
-    def global_state(self) -> Update | None:
-        if self._state is None:
-            return None
-        return self._create_update()
-
-    def configure_fed_init(
-            self,
-            seed: int,
-            schema: TableSchema,
-            client_ids: Iterable[int]) -> Iterable[tuple[int, Update]]:
+    def global_init(
+        self, seed: int, schema: TableSchema, dataset: pd.DataFrame
+    ) -> GlobalInitArtifacts | None:
+        """Initialize preprocessing and models with access to full dataset and algorithm config."""
 
         np.random.seed(seed)
         torch.manual_seed(seed)
@@ -145,57 +113,29 @@ class FedTGANCoordinator(SingleStepCoordinator):
             torch.cuda.manual_seed(seed)
 
         # Split schema into categorical and numerical columns
-        self._cat_attrs, self._num_attrs = split_cat_num(schema)
+        cat_attrs, num_attrs = split_cat_num(schema)
 
-        # Send empty requests to all clients to collect vocabularies
-        return ((client_id, Update()) for client_id in client_ids)
+        # Build global vocabulary for categorical columns
+        vocab_classes: set[str] = set()
+        for col in cat_attrs:
+            unique_vals = dataset[col].astype(str).unique()
+            vocab_classes.update(unique_vals)
 
-    def aggregate_fed_init(self, replies: Iterable[tuple[int, Update]]) -> None:
-        # Collect vocabularies from all clients
-        global_vocab: dict[str, set[str]] = {col: set() for col in self._cat_attrs}
+        # Create label encoder with full vocabulary
+        vocab_sorted = sorted(vocab_classes)
+        label_encoder = LabelEncoder().fit(vocab_sorted)
 
-        for _, reply in replies:
-            if "vocab" in reply.extras:
-                client_vocab = reply.extras["vocab"]
-                for col, values in client_vocab.items():
-                    global_vocab[col].update(values)
-
-        # Create label encoders for each categorical column
-        label_encoders: dict[str, LabelEncoder] = {}
-        for col, values in global_vocab.items():
-            if values:  # Only create encoder if there are values
-                sorted_values = sorted(values)
-                label_encoders[col] = LabelEncoder().fit(sorted_values)
-
-        # Calculate dimensions for model initialization
-        n_cat_features = len(self._cat_attrs)
-        n_num_features = len(self._num_attrs)
+        # Calculate dimensions
+        n_cat_features = len(cat_attrs)
+        n_num_features = len(num_attrs)
         input_dim = output_dim = n_cat_features + n_num_features
 
-        # latent_dim is fixed at 64 (default value from algorithm)
-        # Could be made configurable through global_init if needed
-        latent_dim = 64
-
-        # Store preprocessing artifacts
-        self._preproc_objects = {
-            "label-encoders": label_encoders,
-            "num-scaler": None,  # Will be set during first training round if needed
-        }
-        self._preproc_extras = {
-            "cat-attrs": self._cat_attrs,
-            "num-attrs": self._num_attrs,
-            "input-dim": input_dim,
-            "output-dim": output_dim,
-            "latent-dim": latent_dim,
-        }
+        # Use the configured latent_dim from algorithm initialization
+        latent_dim = self._cfg["latent-dim"]
 
         # Initialize models with correct dimensions
-        cfg_with_dims = {
-            "input_dim": input_dim,
-            "output_dim": output_dim,
-            "latent_dim": latent_dim,
-        }
-        generator, discriminator = init_model(cfg_with_dims)
+        generator = Generator(latent_dim=latent_dim, output_dim=output_dim)
+        discriminator = Discriminator(input_dim=input_dim)
 
         # Pack both models into a single state_dict with prefixed keys
         packed_state: dict[str, torch.Tensor] = {}
@@ -204,21 +144,66 @@ class FedTGANCoordinator(SingleStepCoordinator):
         for k, v in discriminator.state_dict().items():
             packed_state[f"discriminator.{k}"] = v
 
-        self._state = packed_state
+        # Prepare artifacts for synthesizers
+        synth_artifacts = Update()
+        synth_artifacts.objects["preproc-objects"] = {
+            "label-encoders": {col: label_encoder for col in cat_attrs},
+            "num-scaler": None,
+        }
+        synth_artifacts.extras["preproc-extras"] = {
+            "cat-attrs": cat_attrs,
+            "num-attrs": num_attrs,
+            "input-dim": input_dim,
+            "output-dim": output_dim,
+            "latent-dim": latent_dim,
+        }
 
-    def aggregate_train(
-            self,
-            replies: Iterable[tuple[int, Update]]) -> None:
-        update = Update()
-        update.objects["my-state"] = self._state
+        # Coordinator receives both model state and preprocessing artifacts
+        # to pass preprocessing to synthesizers in each round
+        coord_artifacts = Update(arrays={"initial-state": packed_state})
+        coord_artifacts.objects["preproc-objects"] = synth_artifacts.objects["preproc-objects"]
+        coord_artifacts.extras["preproc-extras"] = synth_artifacts.extras["preproc-extras"]
+
+        return GlobalInitArtifacts(
+            coordinator=coord_artifacts,
+            synthesizer=synth_artifacts,
+        )
+
+
+class FedTGANCoordinator(SingleStepCoordinator):
+
+    def __init__(self) -> None:
+        self._state: dict[str, torch.Tensor] | None = None
+        self._preproc_objects: dict[str, Any] | None = None
+        self._preproc_extras: dict[str, Any] | None = None
+
+    @property
+    def global_state(self) -> Update | None:
+        if self._state is None:
+            return None
+        return self._create_update()
+
+    def attach_global_init_artifacts(self, artifacts: Update) -> None:
+        """Receive initial state and preprocessing artifacts from global_init."""
+        self._state = artifacts.arrays["initial-state"]
+        self._preproc_objects = artifacts.objects["preproc-objects"]
+        self._preproc_extras = artifacts.extras["preproc-extras"]
+
+    def aggregate_train(self, replies: Iterable[tuple[int, Update]]) -> None:
+        # TODO: Implement FedAvg aggregation for both generator and discriminator
+        pass
 
     def _create_update(self) -> Update:
         """Create Update with the current global state and preprocessing artifacts."""
-        return Update(
-            arrays={"state": self._state},
-            objects={"preproc-objects": self._preproc_objects},
-            extras={"preproc-extras": self._preproc_extras},
-        )
+        update = Update(arrays={"state": self._state})
+
+        # Include preprocessing artifacts if available
+        if self._preproc_objects is not None:
+            update.objects["preproc-objects"] = self._preproc_objects
+        if self._preproc_extras is not None:
+            update.extras["preproc-extras"] = self._preproc_extras
+
+        return update
 
 
 class FedTGANSynthesizer(Synthesizer):
@@ -239,31 +224,14 @@ class FedTGANSynthesizer(Synthesizer):
         self._local_epochs = local_epochs
         self._device = device
 
-    @property
-    def arrays_to_ml_framework_map(self) -> dict[str, str] | None:
-        return {"arrays": "torch"}
+        # Will be populated by attach_global_init_artifacts
+        self._preproc_objects: dict[str, Any] | None = None
+        self._preproc_extras: dict[str, Any] | None = None
 
-    def fed_init(
-            self,
-            request: Update,
-            seed: int,
-            schema: TableSchema,
-            data: pd.DataFrame) -> Update:
-        """Extract unique categorical values from local data and return to coordinator."""
-
-        cat_attrs, num_attrs = split_cat_num(schema)
-
-        # Collect unique categorical values from this client's data
-        vocab: dict[str, list[str]] = {}
-        for col in cat_attrs:
-            # Convert to string and get unique values
-            unique_vals = data[col].astype(str).unique().tolist()
-            vocab[col] = unique_vals
-
-        # Return vocabulary to coordinator
-        update = Update()
-        update.extras["vocab"] = vocab
-        return update
+    def attach_global_init_artifacts(self, artifacts: Update) -> None:
+        """Receive preprocessing artifacts from global_init."""
+        self._preproc_objects = artifacts.objects["preproc-objects"]
+        self._preproc_extras = artifacts.extras["preproc-extras"]
 
     def train(
             self,
