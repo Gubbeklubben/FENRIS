@@ -56,7 +56,6 @@ poetry run fedbench run fed_chaos <partitioner> <dataset> \
 | :---------- | :------ | :--------------- | :---------------------------------------------------------- |
 | `scenario`  | `str`   | `"crash"`        | The type of chaos to inject (see table below).              |
 | `point`     | `str`   | `"synth_train"`  | Where in the lifecycle to inject (see table below).         |
-| `intensity` | `float` | `1.0`            | Seconds for delay, MB for leak/large_payload. Ignored for other scenarios. |
 | `exception` | `str`   | `"RuntimeError"` | Exception class for `crash` scenario.                       |
 
 ### Injection points
@@ -72,61 +71,57 @@ poetry run fedbench run fed_chaos <partitioner> <dataset> \
 
 ### Scenarios
 
-| Scenario        | What it does                                                                                   |
-| :-------------- | :--------------------------------------------------------------------------------------------- |
-| `crash`         | Raises a configurable exception at the target point.                                           |
-| `delay`         | Blocks with `time.sleep(intensity)` seconds.                                                   |
-| `leak`          | Allocates `intensity` MB of memory that is never freed.                                        |
-| `corrupt`       | Returns `Update` with NaN/inf values, or `DataFrame` with wrong schema.                        |
-| `wrong_type`    | Returns an object of the wrong type (e.g., `str` instead of `Update`).                         |
-| `empty`         | Returns valid but logically empty objects (`Update()`, `DataFrame()`).                         |
-| `infinite_loop` | Coordinator yields forever, never finishing the training round (coord_train only).              |
-| `large_payload` | Allocates `intensity` MB of memory at the injection point, then raises `MemoryError`. |
+| Scenario     | What it does                                                                                   |
+| :----------- | :--------------------------------------------------------------------------------------------- |
+| `crash`      | Raises a configurable exception at the target point.                                           |
+| `corrupt`    | Returns `Update` with NaN/inf values, or `DataFrame` with wrong schema.                        |
+| `wrong_type` | Returns an object of the wrong type (e.g., `str` instead of `Update`).                         |
+| `empty`      | Returns valid but logically empty objects (`Update()`, `DataFrame()`).                         |
 
 ### Available exception types (for `crash` scenario)
 
-`RuntimeError`, `ValueError`, `TypeError`, `MemoryError`, `KeyboardInterrupt`, `SystemExit`,
-`StopIteration`, `OverflowError`, `ZeroDivisionError`, `NotImplementedError`, `OSError`
+`RuntimeError`, `ValueError`, `TypeError`, `MemoryError`,
+`OverflowError`, `ZeroDivisionError`, `NotImplementedError`, `OSError`
 
 ### Example commands
 
+All 24 scenario × point combinations (default `exception=RuntimeError` for `crash`):
+
 ```bash
-# Crash during client training with a RuntimeError
-poetry run fedbench run fed_chaos iid-partitioner datasets/heart_disease.csv \
-  --algorithm-kwargs "scenario=crash,point=synth_train"
+# crash
+poetry run fedbench run fed_chaos iid-partitioner datasets/heart_disease.csv --algorithm-kwargs "scenario=crash,point=global_init"
+poetry run fedbench run fed_chaos iid-partitioner datasets/heart_disease.csv --algorithm-kwargs "scenario=crash,point=coord_fed_init"
+poetry run fedbench run fed_chaos iid-partitioner datasets/heart_disease.csv --algorithm-kwargs "scenario=crash,point=coord_train"
+poetry run fedbench run fed_chaos iid-partitioner datasets/heart_disease.csv --algorithm-kwargs "scenario=crash,point=synth_fed_init"
+poetry run fedbench run fed_chaos iid-partitioner datasets/heart_disease.csv --algorithm-kwargs "scenario=crash,point=synth_train"
+poetry run fedbench run fed_chaos iid-partitioner datasets/heart_disease.csv --algorithm-kwargs "scenario=crash,point=synth_sample"
 
-# Crash with a specific exception type
-poetry run fedbench run fed_chaos iid-partitioner datasets/heart_disease.csv \
-  --algorithm-kwargs "scenario=crash,point=synth_train,exception=MemoryError"
+# corrupt
+poetry run fedbench run fed_chaos iid-partitioner datasets/heart_disease.csv --algorithm-kwargs "scenario=corrupt,point=global_init"
+poetry run fedbench run fed_chaos iid-partitioner datasets/heart_disease.csv --algorithm-kwargs "scenario=corrupt,point=coord_fed_init"
+poetry run fedbench run fed_chaos iid-partitioner datasets/heart_disease.csv --algorithm-kwargs "scenario=corrupt,point=coord_train"
+poetry run fedbench run fed_chaos iid-partitioner datasets/heart_disease.csv --algorithm-kwargs "scenario=corrupt,point=synth_fed_init"
+poetry run fedbench run fed_chaos iid-partitioner datasets/heart_disease.csv --algorithm-kwargs "scenario=corrupt,point=synth_train"
+poetry run fedbench run fed_chaos iid-partitioner datasets/heart_disease.csv --algorithm-kwargs "scenario=corrupt,point=synth_sample"
 
-# 30-second delay during sampling
-poetry run fedbench run fed_chaos iid-partitioner datasets/heart_disease.csv \
-  --algorithm-kwargs "scenario=delay,point=synth_sample,intensity=30"
+# wrong_type
+poetry run fedbench run fed_chaos iid-partitioner datasets/heart_disease.csv --algorithm-kwargs "scenario=wrong_type,point=global_init"
+poetry run fedbench run fed_chaos iid-partitioner datasets/heart_disease.csv --algorithm-kwargs "scenario=wrong_type,point=coord_fed_init"
+poetry run fedbench run fed_chaos iid-partitioner datasets/heart_disease.csv --algorithm-kwargs "scenario=wrong_type,point=coord_train"
+poetry run fedbench run fed_chaos iid-partitioner datasets/heart_disease.csv --algorithm-kwargs "scenario=wrong_type,point=synth_fed_init"
+poetry run fedbench run fed_chaos iid-partitioner datasets/heart_disease.csv --algorithm-kwargs "scenario=wrong_type,point=synth_train"
+poetry run fedbench run fed_chaos iid-partitioner datasets/heart_disease.csv --algorithm-kwargs "scenario=wrong_type,point=synth_sample"
 
-# Leak 100 MB during global_init
-poetry run fedbench run fed_chaos iid-partitioner datasets/heart_disease.csv \
-  --algorithm-kwargs "scenario=leak,point=global_init,intensity=100"
-
-# Return corrupt data from the synthesizer
-poetry run fedbench run fed_chaos iid-partitioner datasets/heart_disease.csv \
-  --algorithm-kwargs "scenario=corrupt,point=synth_sample"
-
-# Return wrong types to test type checking
-poetry run fedbench run fed_chaos iid-partitioner datasets/heart_disease.csv \
-  --algorithm-kwargs "scenario=wrong_type,point=synth_train"
-
-# Return empty results to test semantic validation
-poetry run fedbench run fed_chaos iid-partitioner datasets/heart_disease.csv \
-  --algorithm-kwargs "scenario=empty,point=synth_sample"
-
-# Infinite coordinator loop to test timeout handling
-poetry run fedbench run fed_chaos iid-partitioner datasets/heart_disease.csv \
-  --algorithm-kwargs "scenario=infinite_loop,point=coord_train"
-
-# Stress serialization with a 50 MB payload
-poetry run fedbench run fed_chaos iid-partitioner datasets/heart_disease.csv \
-  --algorithm-kwargs "scenario=large_payload,point=synth_train,intensity=50"
+# empty
+poetry run fedbench run fed_chaos iid-partitioner datasets/heart_disease.csv --algorithm-kwargs "scenario=empty,point=global_init"
+poetry run fedbench run fed_chaos iid-partitioner datasets/heart_disease.csv --algorithm-kwargs "scenario=empty,point=coord_fed_init"
+poetry run fedbench run fed_chaos iid-partitioner datasets/heart_disease.csv --algorithm-kwargs "scenario=empty,point=coord_train"
+poetry run fedbench run fed_chaos iid-partitioner datasets/heart_disease.csv --algorithm-kwargs "scenario=empty,point=synth_fed_init"
+poetry run fedbench run fed_chaos iid-partitioner datasets/heart_disease.csv --algorithm-kwargs "scenario=empty,point=synth_train"
+poetry run fedbench run fed_chaos iid-partitioner datasets/heart_disease.csv --algorithm-kwargs "scenario=empty,point=synth_sample"
 ```
+
+Override the exception type for `crash` by appending `,exception=X` — valid values: `RuntimeError`, `ValueError`, `TypeError`, `MemoryError`, `OverflowError`, `ZeroDivisionError`, `NotImplementedError`, `OSError`.
 
 ### Interpreting results
 

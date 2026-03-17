@@ -9,10 +9,9 @@ Usage:
         --algorithm-kwargs "scenario=crash,point=synth_train,exception=MemoryError"
 """
 
-import time
 from collections.abc import Iterable
 from dataclasses import dataclass
-from typing import Any, Generator
+from typing import Any
 
 import numpy as np
 import pandas as pd
@@ -36,14 +35,11 @@ from fedbench.core.update import Update
 _LOG_SRC = "fed_chaos"
 
 # Exception classes that can be raised via the `exception` parameter.
-_EXCEPTION_MAP: dict[str, type[BaseException]] = {
+_EXCEPTION_MAP: dict[str, type[Exception]] = {
     "RuntimeError": RuntimeError,
     "ValueError": ValueError,
     "TypeError": TypeError,
     "MemoryError": MemoryError,
-    "KeyboardInterrupt": KeyboardInterrupt,
-    "SystemExit": SystemExit,
-    "StopIteration": StopIteration,
     "OverflowError": OverflowError,
     "ZeroDivisionError": ZeroDivisionError,
     "NotImplementedError": NotImplementedError,
@@ -53,13 +49,9 @@ _EXCEPTION_MAP: dict[str, type[BaseException]] = {
 _VALID_SCENARIOS = frozenset(
     {
         "crash",
-        "delay",
-        "leak",
         "corrupt",
         "wrong_type",
         "empty",
-        "infinite_loop",
-        "large_payload",
     }
 )
 
@@ -81,7 +73,6 @@ class _ChaosConfig:
 
     scenario: str
     point: str
-    intensity: float
     exception: str
 
     def __post_init__(self) -> None:
@@ -102,26 +93,10 @@ class _ChaosConfig:
 
 # ── Scenario helpers ─────────────────────────────────────────────────
 
-# Persistent leak storage — intentionally never freed.
-_leak_store: list[bytearray] = []
-
 
 def _do_crash(config: _ChaosConfig, point: str) -> None:
     exc_cls = _EXCEPTION_MAP[config.exception]
     raise exc_cls(f"Chaos: {config.exception} at {point}")
-
-
-def _do_delay(config: _ChaosConfig, point: str) -> None:
-    seconds = config.intensity
-    log_warning(_LOG_SRC, f"Injecting {seconds}s delay at {point}")
-    time.sleep(seconds)
-
-
-def _do_leak(config: _ChaosConfig, point: str) -> None:
-    megabytes = config.intensity
-    nbytes = int(megabytes * 1024 * 1024)
-    log_warning(_LOG_SRC, f"Leaking {megabytes} MB at {point}")
-    _leak_store.append(bytearray(nbytes))
 
 
 def _do_corrupt_update(point: str) -> Update:
@@ -135,42 +110,6 @@ def _do_corrupt_update(point: str) -> Update:
     )
 
 
-def _do_corrupt_dataframe(
-    point: str,
-    num_rows: int,
-) -> DataFrame:
-    """Return a DataFrame with wrong schema and NaN values."""
-    log_warning(_LOG_SRC, f"Returning corrupt DataFrame at {point}")
-    return pd.DataFrame(
-        {
-            "WRONG_COL_1": [float("nan")] * num_rows,
-            "WRONG_COL_2": [float("inf")] * num_rows,
-            "WRONG_COL_3": ["not_a_number"] * num_rows,
-        }
-    )
-
-
-def _do_wrong_type_update(point: str) -> Any:
-    log_warning(_LOG_SRC, f"Returning wrong type (str) instead of Update at {point}")
-    return "THIS_IS_NOT_AN_UPDATE"
-
-
-def _do_wrong_type_dataframe(point: str) -> Any:
-    log_warning(
-        _LOG_SRC, f"Returning wrong type (dict) instead of DataFrame at {point}"
-    )
-    return {"THIS_IS": "NOT_A_DATAFRAME"}
-
-
-def _do_large_payload(config: _ChaosConfig, point: str) -> None:
-    megabytes = config.intensity
-    nbytes = int(megabytes * 1024 * 1024)
-    log_warning(_LOG_SRC, f"Allocating {megabytes} MB at {point}")
-    buf: NDArray[Any] = np.zeros(nbytes // 8, dtype=np.float64)  # 8 bytes per float64
-    buf[0]  # ensure the array is materialised before raising
-    raise MemoryError(f"Chaos: payload too large ({megabytes} MB) at {point}")
-
-
 # ── Coordinator ──────────────────────────────────────────────────────
 
 
@@ -180,7 +119,6 @@ class FedChaosCoordinator(SingleStepCoordinator):
     def __init__(self, config: _ChaosConfig) -> None:
         self._config = config
         self._state: Update = Update()
-        self._call_count = 0
 
     @property
     def global_state(self) -> Update:
@@ -209,7 +147,6 @@ class FedChaosCoordinator(SingleStepCoordinator):
 
     def aggregate_train(self, replies: Iterable[tuple[int, Update]]) -> None:
         log_info(_LOG_SRC, "FedChaosCoordinator.aggregate_train")
-        self._call_count += 1
 
         if self._config.point == "coord_train":
             result = self._trigger("coord_train")
@@ -225,34 +162,6 @@ class FedChaosCoordinator(SingleStepCoordinator):
             self._state = reply
             break
 
-    def train(
-        self,
-        client_ids: Iterable[int],
-    ) -> Generator[
-        Iterable[tuple[int, Update]],
-        Iterable[tuple[int, Update]],
-        None,
-    ]:
-        """Override train() directly for generator-level chaos."""
-        if (
-            self._config.scenario == "infinite_loop"
-            and self._config.point == "coord_train"
-        ):
-            log_warning(_LOG_SRC, "Entering infinite generator loop at coord_train")
-            round_num = 0
-            cids = list(client_ids)
-            while True:
-                round_num += 1
-                log_info(_LOG_SRC, f"Infinite loop: internal round {round_num}")
-                updates = [(cid, Update()) for cid in cids]
-                replies = yield updates
-                # Consume replies and loop forever.
-                for _cid, reply in replies:
-                    self._state = reply
-
-        # For all other scenarios, delegate to SingleStepCoordinator.
-        yield from super().train(client_ids)
-
     def _trigger(self, point: str) -> Any:
         """Dispatch to the configured chaos scenario."""
         scenario = self._config.scenario
@@ -260,10 +169,6 @@ class FedChaosCoordinator(SingleStepCoordinator):
 
         if scenario == "crash":
             _do_crash(self._config, point)
-        elif scenario == "delay":
-            _do_delay(self._config, point)
-        elif scenario == "leak":
-            _do_leak(self._config, point)
         elif scenario == "corrupt":
             return _do_corrupt_update(point)
         elif scenario == "wrong_type":
@@ -271,8 +176,6 @@ class FedChaosCoordinator(SingleStepCoordinator):
         elif scenario == "empty":
             self._state = Update()
             return Update()
-        elif scenario == "large_payload":
-            _do_large_payload(self._config, point)
         return None
 
 
@@ -284,7 +187,6 @@ class FedChaosSynthesizer(Synthesizer):
 
     def __init__(self, config: _ChaosConfig) -> None:
         self._config = config
-        self._call_count = 0
 
     def fed_init(
         self,
@@ -308,17 +210,13 @@ class FedChaosSynthesizer(Synthesizer):
         data: DataFrame,
     ) -> Update:
         log_info(_LOG_SRC, "FedChaosSynthesizer.train")
-        self._call_count += 1
 
         if self._config.point == "synth_train":
             result = self._trigger("synth_train")
             if result is not None:
                 return result  # type: ignore[no-any-return]
 
-        # Default passthrough: echo request back with a shape metric.
-        return Update(
-            metrics={"chaos": {"rows": len(data), "round": self._call_count}},
-        )
+        return Update()
 
     def sample(
         self,
@@ -344,18 +242,12 @@ class FedChaosSynthesizer(Synthesizer):
 
         if scenario == "crash":
             _do_crash(self._config, point)
-        elif scenario == "delay":
-            _do_delay(self._config, point)
-        elif scenario == "leak":
-            _do_leak(self._config, point)
         elif scenario == "corrupt":
             return _do_corrupt_update(point)
         elif scenario == "wrong_type":
-            return _do_wrong_type_update(point)
+            return "THIS_IS_NOT_AN_UPDATE"
         elif scenario == "empty":
             return Update()
-        elif scenario == "large_payload":
-            _do_large_payload(self._config, point)
         return None
 
     def _trigger_sample(self, point: str, num_rows: int, seed: int) -> Any:
@@ -365,18 +257,17 @@ class FedChaosSynthesizer(Synthesizer):
 
         if scenario == "crash":
             _do_crash(self._config, point)
-        elif scenario == "delay":
-            _do_delay(self._config, point)
-        elif scenario == "leak":
-            _do_leak(self._config, point)
         elif scenario == "corrupt":
-            return _do_corrupt_dataframe(point, num_rows)
+            return pd.DataFrame(
+                {
+                    "WRONG_COL_1": [float("nan")] * num_rows,
+                    "WRONG_COL_2": [float("inf")] * num_rows,
+                }
+            )
         elif scenario == "wrong_type":
-            return _do_wrong_type_dataframe(point)
+            return {"THIS_IS": "NOT_A_DATAFRAME"}
         elif scenario == "empty":
             return pd.DataFrame()
-        elif scenario == "large_payload":
-            _do_large_payload(self._config, point)
         return None
 
 
@@ -390,19 +281,16 @@ class FedChaos(Algorithm):
         self,
         scenario: str = "crash",
         point: str = "synth_train",
-        intensity: float = 1.0,
         exception: str = "RuntimeError",
     ) -> None:
         self._config = _ChaosConfig(
             scenario=scenario,
             point=point,
-            intensity=float(intensity),
             exception=exception,
         )
         log_info(
             _LOG_SRC,
-            f"Configured: scenario={scenario}, point={point}, "
-            f"intensity={intensity}, exception={exception}",
+            f"Configured: scenario={scenario}, point={point}, exception={exception}",
         )
         self._coord_factory = lambda: FedChaosCoordinator(self._config)
         self._synth_factory = lambda: FedChaosSynthesizer(self._config)
@@ -436,10 +324,6 @@ class FedChaos(Algorithm):
 
         if scenario == "crash":
             _do_crash(self._config, "global_init")
-        elif scenario == "delay":
-            _do_delay(self._config, "global_init")
-        elif scenario == "leak":
-            _do_leak(self._config, "global_init")
         elif scenario == "corrupt":
             corrupt = _do_corrupt_update("global_init")
             return GlobalInitArtifacts(coordinator=corrupt, synthesizer=corrupt)
@@ -448,7 +332,5 @@ class FedChaos(Algorithm):
             return "NOT_ARTIFACTS"  # type: ignore[return-value]
         elif scenario == "empty":
             return GlobalInitArtifacts(coordinator=Update(), synthesizer=Update())
-        elif scenario == "large_payload":
-            _do_large_payload(self._config, "global_init")
 
         return None
