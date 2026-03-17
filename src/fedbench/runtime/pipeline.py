@@ -77,13 +77,16 @@ def federated_train_eval_loop(ctx: RunContext) -> None:
     )
 
 
-def aggregate_per_client_metrics(ctx: RunContext) -> None:
-    ctx.aggregated_metrics = ctx.eval_suite.aggregate(ctx.per_client_metrics.values())
+def aggregate_federated_metrics(ctx: RunContext) -> None:
+    ctx.aggregated_metrics = {
+        **ctx.eval_suite.aggregate(ctx.per_client_metrics.values()),
+        **ctx.scalability_collector.get_metrics(),
+    }
 
 
 def global_sample(ctx: RunContext) -> None:
     synthesizer = create_synthesizer(
-        spec=ctx.algorithm.synthesizer_spec,
+        ctx.algorithm.synthesizer_spec.factory,
         artifacts=ctx.global_init_artifacts.synthesizer,
         client_cache=None,
     )
@@ -105,7 +108,6 @@ def global_evaluate(ctx: RunContext) -> None:
         seed=ctx.config.seed,
     )
     ctx.centralized_metrics = ctx.eval_suite.global_evaluate(eval_ctx)
-    pass
 
 
 def write_artifacts(ctx: RunContext) -> None:
@@ -120,7 +122,7 @@ def write_artifacts(ctx: RunContext) -> None:
     for name, metrics in pairs:
         with outputdir.joinpath(f"metrics.{name}.json").open("w") as f:
             clean_metrics = {
-                k: (None if isinstance(v, float) and math.isnan(v) else v)
+                k: (None if isinstance(v, float) and math.isnan(v) else float(v))
                 for k, v in metrics.items()
             }
             json.dump(clean_metrics, f, indent=4, allow_nan=False)
@@ -135,7 +137,7 @@ def pipeline() -> Iterable[Command]:
     yield load_dataset
     yield global_init
     yield federated_train_eval_loop
-    yield aggregate_per_client_metrics
+    yield aggregate_federated_metrics
     yield global_sample
     yield global_evaluate
     yield write_artifacts

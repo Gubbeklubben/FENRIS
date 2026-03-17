@@ -131,6 +131,10 @@ class FlwrDelegatePartitioner(Partitioner):
         return cast(int, self._flwr_partitioner.num_partitions)
 
     def set_dataset(self, df: DataFrame) -> None:
+        # Dataset.from_pandas preserves the DataFrame index as '__index_level_0__'
+        # when the index is non-default (e.g. after train_test_split with shuffle=True).
+        # Resetting the index before conversion prevents this column from leaking
+        # into partition DataFrames and corrupting column selection downstream.
         self._flwr_partitioner.dataset = Dataset.from_pandas(df.reset_index(drop=True))
 
     def load_partition(

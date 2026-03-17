@@ -20,6 +20,7 @@ class EvalContext(ABC):
 class LocalEvalContext(EvalContext):
     train_df: pd.DataFrame
     test_df: pd.DataFrame
+    local_train_seconds: float
 
 
 @dataclass(frozen=True)
