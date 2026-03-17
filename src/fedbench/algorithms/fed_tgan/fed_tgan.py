@@ -1,12 +1,22 @@
 from collections.abc import Iterable
-from typing import Any
+from typing import Any, Callable
+import functools
 
 import pandas as pd
 import numpy as np
 import torch
 from sklearn.preprocessing import LabelEncoder
 
-from fedbench.core.algorithm import Coordinator, SingleStepCoordinator, Synthesizer, Algorithm
+from fedbench.core.algorithm import (
+    Coordinator,
+    SingleStepCoordinator,
+    Synthesizer,
+    Algorithm,
+    ComponentSpec,
+    synthesizer_spec,
+    coordinator_spec
+)
+
 from fedbench.core.data import TableSchema
 from fedbench.core.update import Update
 
@@ -82,11 +92,26 @@ class FedTGAN(Algorithm):
             ),
         }
 
-    def create_coordinator(self) -> Coordinator:
-        return FedTGANCoordinator(self._cfg)
+        # Create factory functions for coordinator and synthesizer
+        self._synth_factory: Callable[[], Synthesizer] = functools.partial(
+            FedTGANSynthesizer,
+            batch_size=batch_size,
+            max_batches=max_batches,
+            learning_rate=learning_rate,
+            latent_dim=latent_dim,
+            local_epochs=local_epochs,
+            device=self._cfg["device"],
+        )
 
-    def create_synthesizer(self) -> Synthesizer:
-        return FedTGANSynthesizer(self._cfg)
+    @property
+    def coordinator_spec(self) -> ComponentSpec[Coordinator]:
+        return coordinator_spec(
+            FedTGANCoordinator, {"initial-state": "torch", "state": "torch"}
+        )
+
+    @property
+    def synthesizer_spec(self) -> ComponentSpec[Synthesizer]:
+        return synthesizer_spec(self._synth_factory, {"state": "torch"})
 
 
 class FedTGANCoordinator(SingleStepCoordinator):
@@ -190,10 +215,21 @@ class FedTGANCoordinator(SingleStepCoordinator):
 
 class FedTGANSynthesizer(Synthesizer):
 
-    def __init__(self, cfg: dict[str, Any]) -> None:
-        self._cfg = cfg
-        self._max_batches = cfg["max-batches"]
-        self._device = cfg["device"]
+    def __init__(
+            self,
+            batch_size: int,
+            max_batches: int,
+            learning_rate: float,
+            latent_dim: int,
+            local_epochs: int,
+            device: torch.device,
+    ) -> None:
+        self._batch_size = batch_size
+        self._max_batches = max_batches
+        self._learning_rate = learning_rate
+        self._latent_dim = latent_dim
+        self._local_epochs = local_epochs
+        self._device = device
 
     @property
     def arrays_to_ml_framework_map(self) -> dict[str, str] | None:
@@ -262,13 +298,13 @@ class FedTGANSynthesizer(Synthesizer):
         dataset = torch.utils.data.TensorDataset(torch.from_numpy(X))
         dataloader = torch.utils.data.DataLoader(
             dataset,
-            batch_size=self._cfg["batch-size"],
+            batch_size=self._batch_size,
             shuffle=True
         )
 
         # Initialize models
         generator = Generator(
-            latent_dim=self._cfg["latent-dim"],
+            latent_dim=self._latent_dim,
             output_dim=output_dim
         )
         discriminator = Discriminator(input_dim=input_dim)
@@ -282,21 +318,20 @@ class FedTGANSynthesizer(Synthesizer):
         discriminator.to(self._device)
 
         # Create optimizers
-        lr = self._cfg["learning-rate"]
-        optimizer_generator = torch.optim.SGD(generator.parameters(), lr=lr, momentum=0.9)
-        optimizer_discriminator = torch.optim.SGD(discriminator.parameters(), lr=lr, momentum=0.9)
+        optimizer_generator = torch.optim.SGD(generator.parameters(), lr=self._learning_rate, momentum=0.9)
+        optimizer_discriminator = torch.optim.SGD(discriminator.parameters(), lr=self._learning_rate, momentum=0.9)
 
         train_loss_discriminator = 0.0
         train_loss_generator = 0.0
         num_batches = 0
 
         # Training loop
-        for _ in range(self._cfg["local-epochs"]):
+        for _ in range(self._local_epochs):
             for (real_data_batch,) in dataloader:
                 real_data = real_data_batch.to(self._device)
 
                 # Generate synthetic data
-                noise = torch.randn(real_data.size(0), self._cfg["latent-dim"], device=self._device)
+                noise = torch.randn(real_data.size(0), self._latent_dim, device=self._device)
                 fake_data = generator(noise)
 
                 # Train discriminator on combined data
@@ -309,7 +344,7 @@ class FedTGANSynthesizer(Synthesizer):
                 )
 
                 # Train the generator
-                noise_g = torch.randn(real_data.size(0), self._cfg["latent-dim"], device=self._device)
+                noise_g = torch.randn(real_data.size(0), self._latent_dim, device=self._device)
                 train_loss_generator += generator_step(
                     generator,
                     discriminator,
