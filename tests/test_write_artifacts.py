@@ -7,10 +7,19 @@ from unittest.mock import patch
 
 import numpy as np
 import pandas as pd
+import pytest
 
 from fedbench.config.config import Config, DataConfig
 from fedbench.core.update import Update
 from fedbench.runtime.pipeline import _save_model_weights, write_artifacts
+
+try:
+    import torch
+    _has_torch = True
+except ImportError:
+    _has_torch = False
+
+_requires_torch = pytest.mark.skipif(not _has_torch, reason="torch not installed")
 
 
 def _make_config(tmp_path: Path) -> Config:
@@ -114,9 +123,8 @@ def test_synthetic_csv_written(tmp_path: Path) -> None:
 # --- model weight saving ---------------------------------------------------
 
 
+@_requires_torch
 def test_save_synthesizer_weights(tmp_path: Path) -> None:
-    import torch
-
     state_dict = {"layer.weight": torch.tensor([1.0, 2.0])}
     state = Update(arrays={"state": state_dict})
 
@@ -143,10 +151,9 @@ def test_ndarray_state_not_saved_as_pt(tmp_path: Path) -> None:
     assert not (tmp_path / "final_synthesizer.pt").exists()
 
 
+@_requires_torch
 def test_save_weights_no_torch(tmp_path: Path) -> None:
     """When torch is not importable, _save_model_weights is a no-op."""
-    import torch
-
     state_dict = {"layer.weight": torch.tensor([1.0])}
     state = Update(arrays={"state": state_dict})
 
