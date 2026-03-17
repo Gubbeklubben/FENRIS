@@ -95,7 +95,7 @@ class FedTGAN(Algorithm):
     def global_init(
         self, seed: int, schema: TableSchema, dataset: pd.DataFrame
     ) -> GlobalInitArtifacts | None:
-        """Initialize preprocessing and models with access to full dataset and algorithm config."""
+        """Initialize preproc and models with access to full dataset and config."""
 
         np.random.seed(seed)
         torch.manual_seed(seed)
@@ -183,7 +183,7 @@ class FedTGANCoordinator(SingleStepCoordinator):
         self._preproc_extras = artifacts.extras["preproc-extras"]
 
     def aggregate_train(self, replies: Iterable[tuple[int, Update]]) -> None:
-        """Aggregate generator and discriminator models using FedAvg (weighted by num_samples)."""
+        """Aggregate generator, discriminator using FedAvg weighted by num_samples."""
         if not replies:
             raise ValueError("No replies, can not aggregate.")
 
@@ -263,7 +263,7 @@ class FedTGANSynthesizer(Synthesizer):
         self._preproc_extras = artifacts.extras["preproc-extras"]
 
     def train(self, request: Update, data: pd.DataFrame) -> Update:
-        """Train Generator and Discriminator on local data using alternating GAN training."""
+        """Train Generator and Discriminator on local data, alternating GAN training."""
 
         # Extract preprocessing artifacts and model states from request
         # noinspection PyUnnecessaryCast
@@ -445,7 +445,7 @@ class FedTGANSynthesizer(Synthesizer):
             noise = torch.randn(num_rows, latent_dim, device=self._device)
             synthetic_data = generator(noise).cpu().numpy()
 
-        # Reverse preprocessing: decode categorical features and extract numerical features
+        # Reverse preproc: decode categorical features and extract numerical features
         decoded_data = {}
         n_cat_features = len(cat_attrs)
 

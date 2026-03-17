@@ -18,24 +18,20 @@ def generator_step(
     noise = noise.to(device)
     criterion = nn.BCELoss().to(
         device
-    )  # calc performance using Binary Cross Entropy Loss - common for binary classification such as real VS fake
+    )  # calc performance using Binary Cross Entropy Loss
 
     optimizer.zero_grad()  # reset gradients of optimizer
 
     fake_data = generator(noise)
-    out_fake = discriminator(
-        fake_data
-    ).view(
+    out_fake = discriminator(fake_data).view(
         -1
-    )  # discriminator gives a tensor of probabilities indicating how likely the discriminator considers each sample to be real
+    )  # discriminator gives a tensor of probabilities
 
     # generator wants D(fake) -> 1
     y = torch.ones(
         out_fake.size(0), device=device
-    )  # tensor of ones of same length as out_fake, represents target values for out_fake for comparison
-    loss = criterion(
-        out_fake, y
-    )  # compare y VS out_fake using specified loss function (loss - how far is output from target val)
+    )  # tensor of ones of same length as out_fake, target values for comparison
+    loss = criterion(out_fake, y)  # compare y VS out_fake using specified loss function
 
     loss.backward()  # compute gradients using result from loss calc
     optimizer.step()  # update weights of synthesizer based on computed gradients
