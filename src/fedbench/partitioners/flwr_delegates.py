@@ -144,9 +144,11 @@ class FlwrDelegatePartitioner(Partitioner):
         seed: int,
         test_size: float,
     ) -> DataFrame:
+
+        # noinspection PyUnnecessaryCast
         return cast(
             DataFrame,
             self._flwr_partitioner.load_partition(partition_id)
             .train_test_split(test_size=test_size, seed=seed)[split]
-            .with_format("pandas")[:],
+            .to_pandas(),  # makes a copy; mutations will not affect underlying dataset
         )
