@@ -13,5 +13,3 @@ class Discriminator(nn.Module):
         x = F.relu(self.fc1(x))
         x = F.relu(self.fc2(x))
         return torch.sigmoid(self.fc3(x))  # Probability of being real
-
-    # TODO might need get_embeddings and embed functions, depending on the rest of the structure

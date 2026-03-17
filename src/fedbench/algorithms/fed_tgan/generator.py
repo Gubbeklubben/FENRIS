@@ -12,5 +12,3 @@ class Generator(nn.Module):
         z = F.relu(self.fc1(z))
         z = F.relu(self.fc2(z))
         return self.fc3(z)  # Output synthetic tabular data
-
-    # TODO might need get_embeddings and embed functions, depending on the rest of the structure
