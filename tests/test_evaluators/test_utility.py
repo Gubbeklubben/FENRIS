@@ -35,7 +35,7 @@ class TestTSTRGuards:
         """No target_column set → all three keys present as nan (NaN contract §7.1.2)."""
         df = pd.DataFrame({"x": [1.0, 2.0], "y": [0, 1]})
         ctx = make_ctx(df, df.copy(), target_column=None)
-        result = self.evaluator.evaluate(ctx)
+        result = self.evaluator.global_evaluate(ctx)
 
         assert set(result.keys()) == self.EXPECTED_KEYS
         assert all(math.isnan(v) for v in result.values())
@@ -45,7 +45,7 @@ class TestTSTRGuards:
         df = pd.DataFrame({"x": [1.0, 2.0, 3.0], "target": [0, 0, 0]})
         schema = make_schema(("x", "continuous"), ("target", "binary"))
         ctx = make_ctx(df, df.copy(), target_column="target", schema=schema)
-        result = self.evaluator.evaluate(ctx)
+        result = self.evaluator.global_evaluate(ctx)
 
         assert set(result.keys()) == self.EXPECTED_KEYS
         assert all(math.isnan(v) for v in result.values())
@@ -57,7 +57,7 @@ class TestTSTRGuards:
         df = pd.DataFrame({"x": rng.normal(0, 1, n), "target": rng.integers(0, 2, n)})
         schema = make_schema(("x", "continuous"), ("target", "binary"))
         ctx = make_ctx(df, df.copy(), target_column="target", schema=schema)
-        result = self.evaluator.evaluate(ctx)
+        result = self.evaluator.global_evaluate(ctx)
 
         assert set(result.keys()) == self.EXPECTED_KEYS
 
@@ -90,7 +90,7 @@ class TestTSTRBinary:
             target_column="target",
             schema=schema,
         )
-        result = self.evaluator.evaluate(ctx)
+        result = self.evaluator.global_evaluate(ctx)
 
         assert "tstr_auc" in result
         assert result["tstr_auc"] > 0.85
@@ -110,7 +110,7 @@ class TestTSTRBinary:
             target_column="target",
             schema=schema,
         )
-        result = self.evaluator.evaluate(ctx)
+        result = self.evaluator.global_evaluate(ctx)
 
         assert 0.35 < result["tstr_auc"] < 0.65
 
@@ -118,7 +118,7 @@ class TestTSTRBinary:
         """Binary path: tstr_auc computed; tstr_accuracy and tstr_rmse are nan."""
         df, schema = separable_data
         ctx = make_ctx(df, df.copy(), target_column="target", schema=schema)
-        result = self.evaluator.evaluate(ctx)
+        result = self.evaluator.global_evaluate(ctx)
 
         assert "tstr_auc" in result
         assert math.isnan(result["tstr_accuracy"])
@@ -144,7 +144,7 @@ class TestTSTRCategorical:
         schema = make_schema(("x", "continuous"), ("target", "categorical"))
 
         ctx = make_ctx(df, df.copy(), target_column="target", schema=schema)
-        result = self.evaluator.evaluate(ctx)
+        result = self.evaluator.global_evaluate(ctx)
 
         assert "tstr_accuracy" in result
         assert math.isnan(result["tstr_auc"])
@@ -169,10 +169,11 @@ class TestTSTRRegression:
         schema = make_schema(("x", "continuous"), ("target", "continuous"))
 
         ctx = make_ctx(df, df.copy(), target_column="target", schema=schema)
-        result = self.evaluator.evaluate(ctx)
+        result = self.evaluator.global_evaluate(ctx)
 
         assert "tstr_rmse" in result
         assert result["tstr_rmse"] < 0.1
+
 
     def test_regression_emits_rmse_key(self):
         """Continuous target → rmse computed; auc and accuracy are nan."""
@@ -185,8 +186,98 @@ class TestTSTRRegression:
         schema = make_schema(("x", "continuous"), ("target", "continuous"))
 
         ctx = make_ctx(df, df.copy(), target_column="target", schema=schema)
-        result = self.evaluator.evaluate(ctx)
+        result = self.evaluator.global_evaluate(ctx)
 
         assert "tstr_rmse" in result
         assert math.isnan(result["tstr_auc"])
         assert math.isnan(result["tstr_accuracy"])
+
+
+# ===================================================================
+# Label type coercion
+# ===================================================================
+
+
+class TestTSTRLabelCoercion:
+    """Regression tests for label type coercion in classification paths.
+
+    Synthetic data often has string-encoded numeric labels (e.g. "0.0", "1.0"
+    from a CSV generator) while real data has float labels.  Without explicit
+    coercion to str on both sides, sklearn's accuracy_score either raises
+    TypeError or silently returns 0.0 (depending on version) because the
+    string predictions from the model never equal the float ground-truth labels.
+
+    These tests use perfectly separable data so that a correct implementation
+    returns accuracy == 1.0, making a silent wrong result of 0.0 unmistakable.
+    Removing the ``y_syn.astype(str)`` / ``y_test.astype(str)`` calls in
+    ``TSTREvaluator._compute`` will cause these tests to fail.
+    """
+
+    evaluator = TSTREvaluator()
+
+    def _make_separable(self, n_classes: int, rng: np.random.Generator):
+        """Return (X, y_str, y_float) with perfectly separated classes.
+
+        Labels in y_str use the same representation that float.astype(str)
+        produces ("0.0", "1.0", ...) — matching what the evaluator sees when
+        synthetic labels are string-encoded floats.
+        """
+        rows_per_class = 20
+        x_vals = np.concatenate([
+            rng.normal(i * 10, 0.1, rows_per_class) for i in range(n_classes)
+        ])
+        y_float = pd.Series(np.repeat(
+            np.arange(n_classes, dtype=float), rows_per_class
+        ))
+        y_str = y_float.astype(str)  # "0.0", "1.0", ...
+        X = pd.DataFrame({"x": x_vals})
+        return X, y_str, y_float
+
+    def test_multiclass_string_labels_in_syn_correct_accuracy(self):
+        """Multiclass: syn has string labels, real has float labels.
+
+        With coercion: accuracy == 1.0 (perfect predictor on separable data).
+        Without coercion: accuracy == 0.0 (every prediction is wrong because
+        str "0.0" != float 0.0) or TypeError on older sklearn.
+        """
+        rng = np.random.default_rng(0)
+        X, y_str, y_float = self._make_separable(n_classes=3, rng=rng)
+
+        syn_df = X.copy()
+        syn_df["target"] = y_str    # string labels in synthetic
+
+        real_df = X.copy()
+        real_df["target"] = y_float  # float labels in real data
+
+        schema = make_schema(("x", "continuous"), ("target", "categorical"))
+        ctx = make_ctx(real_df, syn_df, target_column="target", schema=schema)
+        result = self.evaluator.global_evaluate(ctx)
+
+        assert result["tstr_accuracy"] == pytest.approx(1.0), (
+            f"Expected accuracy 1.0 on separable data; got {result['tstr_accuracy']}. "
+        )
+
+    def test_binary_string_labels_in_syn_correct_auc(self):
+        """Binary: syn has string labels, real has float labels.
+
+        AUC is unaffected by the str/float mismatch (roc_auc_score receives
+        float y_test and float y_proba regardless), so this test verifies the
+        binary path still produces a valid high AUC — not that it would break
+        without coercion, but that coercion does not accidentally break it.
+        """
+        rng = np.random.default_rng(0)
+        X, y_str, y_float = self._make_separable(n_classes=2, rng=rng)
+
+        syn_df = X.copy()
+        syn_df["target"] = y_str
+
+        real_df = X.copy()
+        real_df["target"] = y_float
+
+        schema = make_schema(("x", "continuous"), ("target", "binary"))
+        ctx = make_ctx(real_df, syn_df, target_column="target", schema=schema)
+        result = self.evaluator.global_evaluate(ctx)
+
+        assert result["tstr_auc"] > 0.95, (
+            f"Expected high AUC on separable data; got {result['tstr_auc']}."
+        )

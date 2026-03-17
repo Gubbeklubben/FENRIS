@@ -46,7 +46,7 @@ class TestMomentReduction:
 
     def test_identical_data_gives_zero(self):
         ctx = make_ctx(NUMERIC_DF, NUMERIC_DF.copy())
-        result = self.evaluator.evaluate(ctx)
+        result = self.evaluator.global_evaluate(ctx)
 
         assert result["mean_abs_diff"] == pytest.approx(0.0, abs=1e-9)
         assert result["std_abs_diff"] == pytest.approx(0.0, abs=1e-9)
@@ -56,7 +56,7 @@ class TestMomentReduction:
         shift = 5.0
         syn = NUMERIC_DF + shift
         ctx = make_ctx(NUMERIC_DF, syn)
-        result = self.evaluator.evaluate(ctx)
+        result = self.evaluator.global_evaluate(ctx)
 
         assert result["mean_abs_diff"] == pytest.approx(shift, abs=1e-6)
         assert result["std_abs_diff"] == pytest.approx(0.0, abs=1e-6)
@@ -65,7 +65,7 @@ class TestMomentReduction:
         """Doubling values naturally inflates the std of each column."""
         syn = NUMERIC_DF * 2.0
         ctx = make_ctx(NUMERIC_DF, syn)
-        result = self.evaluator.evaluate(ctx)
+        result = self.evaluator.global_evaluate(ctx)
 
         assert result["std_abs_diff"] > 0.0
 
@@ -74,7 +74,7 @@ class TestMomentReduction:
         real = pd.DataFrame({"x": [1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0, 9.0, 10.0, 11.0, 12.0]})
         syn = pd.DataFrame({"x": [4.0, 5.0, 6.0, 7.0, 8.0, 9.0, 10.0, 11.0, 12.0, 13.0, 14.0, 15.0]})
         ctx = make_ctx(real, syn)
-        result = self.evaluator.evaluate(ctx)
+        result = self.evaluator.global_evaluate(ctx)
 
         assert result["mean_abs_diff"] == pytest.approx(3.0, abs=1e-9)
         assert result["std_abs_diff"] == pytest.approx(0.0, abs=1e-9)
@@ -82,7 +82,7 @@ class TestMomentReduction:
     def test_no_numeric_columns_emits_nan_keys(self):
         """No numeric columns → both keys present but nan (NaN contract §7.1.2)."""
         ctx = make_ctx(CATEGORICAL_DF, CATEGORICAL_DF.copy())
-        result = self.evaluator.evaluate(ctx)
+        result = self.evaluator.global_evaluate(ctx)
 
         assert math.isnan(result["mean_abs_diff"])
         assert math.isnan(result["std_abs_diff"])
@@ -90,7 +90,7 @@ class TestMomentReduction:
     def test_returns_both_keys(self):
         """Sanity-check that both expected keys are present in the output."""
         ctx = make_ctx(NUMERIC_DF, NUMERIC_DF.copy())
-        result = self.evaluator.evaluate(ctx)
+        result = self.evaluator.global_evaluate(ctx)
 
         assert "mean_abs_diff" in result
         assert "std_abs_diff" in result
@@ -108,7 +108,7 @@ class TestDistributionSimilarity:
     def test_identical_data_gives_zero(self):
         """Perfect replication → all distribution-similarity metrics = 0."""
         ctx = make_ctx(NUMERIC_DF, NUMERIC_DF.copy())
-        result = self.evaluator.evaluate(ctx)
+        result = self.evaluator.global_evaluate(ctx)
 
         assert result["ks_mean"] == pytest.approx(0.0, abs=1e-9)
         assert result["wasserstein_mean"] == pytest.approx(0.0, abs=1e-9)
@@ -119,7 +119,7 @@ class TestDistributionSimilarity:
         real = pd.DataFrame({"x": np.arange(100, dtype=float)})
         syn = pd.DataFrame({"x": np.arange(100, dtype=float) + 1.0})
         ctx = make_ctx(real, syn)
-        result = self.evaluator.evaluate(ctx)
+        result = self.evaluator.global_evaluate(ctx)
 
         assert result["wasserstein_mean"] == pytest.approx(1.0, abs=1e-9)
 
@@ -129,14 +129,14 @@ class TestDistributionSimilarity:
         real = pd.DataFrame({"x": rng.normal(0, 1, 500)})
         syn = pd.DataFrame({"x": rng.normal(100, 1, 500)})
         ctx = make_ctx(real, syn)
-        result = self.evaluator.evaluate(ctx)
+        result = self.evaluator.global_evaluate(ctx)
 
         assert result["ks_mean"] > 0.99
 
     def test_no_numeric_columns_emits_nan_keys(self):
         """No numeric columns → all keys present but nan (NaN contract §7.1.2)."""
         ctx = make_ctx(CATEGORICAL_DF, CATEGORICAL_DF.copy())
-        result = self.evaluator.evaluate(ctx)
+        result = self.evaluator.global_evaluate(ctx)
 
         assert math.isnan(result["ks_mean"])
         assert math.isnan(result["wasserstein_mean"])
@@ -145,7 +145,7 @@ class TestDistributionSimilarity:
     def test_returns_all_keys(self):
         """Sanity-check that all three expected keys are present."""
         ctx = make_ctx(NUMERIC_DF, NUMERIC_DF * 1.1)
-        result = self.evaluator.evaluate(ctx)
+        result = self.evaluator.global_evaluate(ctx)
 
         assert "ks_mean" in result
         assert "wasserstein_mean" in result
@@ -164,7 +164,7 @@ class TestCategoricalTvMean:
     def test_identical_categories_gives_zero(self):
         """Identical category distributions → TV distance = 0."""
         ctx = make_ctx(CATEGORICAL_DF, CATEGORICAL_DF.copy())
-        result = self.evaluator.evaluate(ctx)
+        result = self.evaluator.global_evaluate(ctx)
 
         assert result["categorical_tv_mean"] == pytest.approx(0.0, abs=1e-9)
 
@@ -175,7 +175,7 @@ class TestCategoricalTvMean:
         syn = pd.DataFrame({"cat": ["B"] * n})
         schema = make_schema(("cat", "categorical"))
         ctx = make_ctx(real, syn, schema=schema)
-        result = self.evaluator.evaluate(ctx)
+        result = self.evaluator.global_evaluate(ctx)
 
         assert result["categorical_tv_mean"] == pytest.approx(1.0, abs=1e-9)
 
@@ -189,14 +189,14 @@ class TestCategoricalTvMean:
         syn = pd.DataFrame({"cat": ["A", "A", "A", "A"]})
         schema = make_schema(("cat", "categorical"))
         ctx = make_ctx(real, syn, schema=schema)
-        result = self.evaluator.evaluate(ctx)
+        result = self.evaluator.global_evaluate(ctx)
 
         assert result["categorical_tv_mean"] == pytest.approx(0.5, abs=1e-9)
 
     def test_no_categorical_columns_emits_nan_key(self):
         """No categorical columns → key present but nan (NaN contract §7.1.2)."""
         ctx = make_ctx(NUMERIC_DF, NUMERIC_DF.copy())
-        result = self.evaluator.evaluate(ctx)
+        result = self.evaluator.global_evaluate(ctx)
 
         assert math.isnan(result["categorical_tv_mean"])
 
@@ -206,7 +206,7 @@ class TestCategoricalTvMean:
         syn = pd.DataFrame({"cat": ["A", None, "B", None]})
         schema = make_schema(("cat", "categorical"))
         ctx = make_ctx(real, syn, schema=schema)
-        result = self.evaluator.evaluate(ctx)
+        result = self.evaluator.global_evaluate(ctx)
 
         assert result["categorical_tv_mean"] == pytest.approx(0.0, abs=1e-9)
 
@@ -223,7 +223,7 @@ class TestCorrFroDiff:
     def test_identical_data_gives_zero(self):
         """Perfect replication → Frobenius norm of the diff matrix = 0."""
         ctx = make_ctx(NUMERIC_DF, NUMERIC_DF.copy())
-        result = self.evaluator.evaluate(ctx)
+        result = self.evaluator.global_evaluate(ctx)
 
         assert result["corr_fro_diff"] == pytest.approx(0.0, abs=1e-9)
 
@@ -232,7 +232,7 @@ class TestCorrFroDiff:
         real = pd.DataFrame({"x": [1.0, 2.0, 3.0]})
         syn = pd.DataFrame({"x": [4.0, 5.0, 6.0]})
         ctx = make_ctx(real, syn)
-        result = self.evaluator.evaluate(ctx)
+        result = self.evaluator.global_evaluate(ctx)
 
         assert math.isnan(result["corr_fro_diff"])
 
@@ -247,7 +247,7 @@ class TestCorrFroDiff:
         real = pd.DataFrame({"a": a, "b": a})
         syn = pd.DataFrame({"a": a, "b": -a})
         ctx = make_ctx(real, syn)
-        result = self.evaluator.evaluate(ctx)
+        result = self.evaluator.global_evaluate(ctx)
 
         expected = 2 * math.sqrt(2)
         assert result["corr_fro_diff"] == pytest.approx(expected, abs=1e-6)
@@ -255,6 +255,33 @@ class TestCorrFroDiff:
     def test_only_categorical_emits_nan_key(self):
         """No numeric columns → key present but nan (NaN contract §7.1.2)."""
         ctx = make_ctx(CATEGORICAL_DF, CATEGORICAL_DF.copy())
-        result = self.evaluator.evaluate(ctx)
+        result = self.evaluator.global_evaluate(ctx)
 
         assert math.isnan(result["corr_fro_diff"])
+
+    def test_constant_column_in_syn_emits_nan_not_zero(self):
+        """
+        Two numeric columns where one is constant in syn but not in real.
+
+        With the old implementation, safe_corr filtered each DataFrame
+        independently.  The constant column survived in the real correlation
+        matrix but was dropped from the synthetic one.  The intersection then
+        reduced both matrices to 1x1 (identity minus identity = 0), and the
+        Frobenius norm was silently returned as 0.0 — a wrong answer, because
+        with only one column remaining there is no pairwise correlation
+        structure to compare.
+
+        The correct result is NaN: fewer than two non-constant columns survive
+        the joint filter, so the metric is undefined.
+        """
+        a = np.linspace(1, 10, 20)
+        real = pd.DataFrame({"a": a, "b": a * 2.0})    # b non-constant in real
+        syn  = pd.DataFrame({"a": a, "b": [5.0] * 20}) # b constant in syn
+
+        ctx = make_ctx(real, syn)
+        result = self.evaluator.global_evaluate(ctx)
+
+        assert math.isnan(result["corr_fro_diff"]), (
+            f"Expected NaN when one column is constant in syn, got "
+            f"{result['corr_fro_diff']!r}. "
+        )

@@ -64,7 +64,6 @@ class MLP(nn.Module):  # type: ignore[misc]
             raise ValueError(f"Unknown activation function: {activation}")
 
     def init_layers(self, layer_dimensions: Sequence[int]) -> list[nn.Linear]:
-
         layers = []
         for i in range(len(layer_dimensions) - 1):
             linear_layer = init_linear_layer(
@@ -88,11 +87,11 @@ class MLPSynthesizer(nn.Module):  # type: ignore[misc]
     def __init__(
         self,
         d_in: int,
+        n_cat_tokens: int,
+        n_cat_emb: int,
         hidden_layers: Sequence[int],
-        activation: str = "lrelu",
+        activation: str,
         dim_t: int = 64,
-        n_cat_tokens: int | None = None,
-        n_cat_emb: int | None = None,
         embedding: Tensor | None = None,
         embedding_learned: bool = True,
         n_classes: int | None = None,
@@ -102,14 +101,12 @@ class MLPSynthesizer(nn.Module):  # type: ignore[misc]
 
         Args:
             d_in (int): dimensionality of the input data
+            n_cat_tokens (int, optional): Number of total categorical tokens.
+            n_cat_emb (int, optional): Dim of categorical embeddings.
             hidden_layers (list): list of the neurons in every hidden layer
             activation (str, optional): activation function. Defaults to 'lrelu'.
             dim_t (int, optional): Dimensionality of the intermediate layer for
                 connecting embeddings. Defaults to 64.
-            n_cat_tokens (int, optional): Number of total categorical tokens.
-                Defaults to None.
-            n_cat_emb (int, optional): Dim of categorical embeddings.
-                Defaults to None.
             embedding (tensor, optional): Provide if learned embeddings are given.
                 Defaults to None.
             embedding_learned (bool, optional): Flag whether embeddings need to be

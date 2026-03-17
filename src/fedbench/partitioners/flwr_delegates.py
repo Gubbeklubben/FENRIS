@@ -22,7 +22,11 @@ class FlwrDelegatePartitioner(Partitioner):
         return cast(int, self._flwr_partitioner.num_partitions)
 
     def set_dataset(self, df: DataFrame) -> None:
-        self._flwr_partitioner.dataset = Dataset.from_pandas(df)
+        # Dataset.from_pandas preserves the DataFrame index as '__index_level_0__'
+        # when the index is non-default (e.g. after train_test_split with shuffle=True).
+        # Resetting the index before conversion prevents this column from leaking
+        # into partition DataFrames and corrupting column selection downstream.
+        self._flwr_partitioner.dataset = Dataset.from_pandas(df.reset_index(drop=True))
 
     def load_partition(
         self,
@@ -32,9 +36,10 @@ class FlwrDelegatePartitioner(Partitioner):
         test_size: float,
     ) -> DataFrame:
 
+        # noinspection PyUnnecessaryCast
         return cast(
             DataFrame,
             self._flwr_partitioner.load_partition(partition_id)
             .train_test_split(test_size=test_size, seed=seed)[split]
-            .with_format("pandas")[:],
+            .to_pandas(),  # makes a copy; mutations will not affect underlying dataset
         )

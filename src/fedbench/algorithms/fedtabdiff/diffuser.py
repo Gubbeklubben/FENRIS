@@ -13,10 +13,10 @@ from torch import Tensor
 class Diffuser:
     def __init__(
         self,
+        device: str,
         total_steps: int,
         beta_start: float,
         beta_end: float,
-        device: str,
         scheduler: str,
     ):
 
