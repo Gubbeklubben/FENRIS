@@ -1,59 +1,49 @@
+import functools
 from collections.abc import Iterable
 from typing import Any, Callable, cast
-import functools
 
-import pandas as pd
 import numpy as np
+import pandas as pd
 import torch
-from torch import Tensor
 from sklearn.preprocessing import LabelEncoder
+from torch import Tensor
 
+from fedbench.algorithms.fed_tgan.discriminator import Discriminator
+from fedbench.algorithms.fed_tgan.generator import Generator
+from fedbench.algorithms.fed_tgan.training import discriminator_step, generator_step
 from fedbench.core.algorithm import (
-    Coordinator,
-    SingleStepCoordinator,
-    Synthesizer,
     Algorithm,
     ComponentSpec,
+    Coordinator,
     GlobalInitArtifacts,
-    synthesizer_spec,
+    SingleStepCoordinator,
+    Synthesizer,
     coordinator_spec,
+    synthesizer_spec,
 )
-from fedbench.core.logger import ELBOW, log_warning
-
 from fedbench.core.data import TableSchema
+from fedbench.core.logger import ELBOW, log_warning
 from fedbench.core.update import Update
-
-from fedbench.algorithms.fed_tgan.generator import Generator
-from fedbench.algorithms.fed_tgan.discriminator import Discriminator
-from fedbench.algorithms.fed_tgan.training import generator_step, discriminator_step
 
 
 def split_cat_num(schema: TableSchema) -> tuple[list[str], list[str]]:
     """Split schema into categorical and numerical column names."""
-    cat_attrs = [
-        c.name
-        for c in schema.columns
-        if c.kind in ("categorical", "binary")
-    ]
-    num_attrs = [
-        c.name
-        for c in schema.columns
-        if c.kind in ("continuous", "integer")
-    ]
+    cat_attrs = [c.name for c in schema.columns if c.kind in ("categorical", "binary")]
+    num_attrs = [c.name for c in schema.columns if c.kind in ("continuous", "integer")]
     return cat_attrs, num_attrs
 
 
 class FedTGAN(Algorithm):
     def __init__(
-            self,
-            batch_size: int = 32,
-            max_batches: int = 100,
-            learning_rate: float = 1e-2,
-            fraction_evaluate: float = 0.5,
-            num_server_rounds: int = 3,
-            local_epochs: int = 3,
-            latent_dim: int = 64,
-        ):
+        self,
+        batch_size: int = 32,
+        max_batches: int = 100,
+        learning_rate: float = 1e-2,
+        fraction_evaluate: float = 0.5,
+        num_server_rounds: int = 3,
+        local_epochs: int = 3,
+        latent_dim: int = 64,
+    ):
 
         if batch_size < 1:
             raise ValueError("Expecting batch_size >= 1.")
@@ -78,9 +68,7 @@ class FedTGAN(Algorithm):
             "num-server-rounds": num_server_rounds,
             "local-epochs": local_epochs,
             "latent-dim": latent_dim,
-            "device": torch.device(
-                "cuda" if torch.cuda.is_available() else "cpu"
-            ),
+            "device": torch.device("cuda" if torch.cuda.is_available() else "cpu"),
         }
 
         # Create factory function for synthesizer
@@ -163,8 +151,12 @@ class FedTGAN(Algorithm):
         # Coordinator receives both model state and preprocessing artifacts
         # to pass preprocessing to synthesizers in each round
         coord_artifacts = Update(arrays={"initial-state": packed_state})
-        coord_artifacts.objects["preproc-objects"] = synth_artifacts.objects["preproc-objects"]
-        coord_artifacts.extras["preproc-extras"] = synth_artifacts.extras["preproc-extras"]
+        coord_artifacts.objects["preproc-objects"] = synth_artifacts.objects[
+            "preproc-objects"
+        ]
+        coord_artifacts.extras["preproc-extras"] = synth_artifacts.extras[
+            "preproc-extras"
+        ]
 
         return GlobalInitArtifacts(
             coordinator=coord_artifacts,
@@ -173,7 +165,6 @@ class FedTGAN(Algorithm):
 
 
 class FedTGANCoordinator(SingleStepCoordinator):
-
     def __init__(self) -> None:
         self._state: dict[str, torch.Tensor] | None = None
         self._preproc_objects: dict[str, Any] | None = None
@@ -244,15 +235,14 @@ class FedTGANCoordinator(SingleStepCoordinator):
 
 
 class FedTGANSynthesizer(Synthesizer):
-
     def __init__(
-            self,
-            batch_size: int,
-            max_batches: int,
-            learning_rate: float,
-            latent_dim: int,
-            local_epochs: int,
-            device: torch.device,
+        self,
+        batch_size: int,
+        max_batches: int,
+        learning_rate: float,
+        latent_dim: int,
+        local_epochs: int,
+        device: torch.device,
     ) -> None:
         self._batch_size = batch_size
         self._max_batches = max_batches
@@ -270,10 +260,7 @@ class FedTGANSynthesizer(Synthesizer):
         self._preproc_objects = artifacts.objects["preproc-objects"]
         self._preproc_extras = artifacts.extras["preproc-extras"]
 
-    def train(
-            self,
-            request: Update,
-            data: pd.DataFrame) -> Update:
+    def train(self, request: Update, data: pd.DataFrame) -> Update:
         """Train Generator and Discriminator on local data using alternating GAN training."""
 
         # Extract preprocessing artifacts and model states from request
@@ -288,8 +275,16 @@ class FedTGANSynthesizer(Synthesizer):
         label_encoders = preproc_objects["label-encoders"]
 
         # Unpack generator and discriminator state_dicts from packed state
-        generator_state = {k.removeprefix("generator."): v for k, v in packed_state.items() if k.startswith("generator.")}
-        discriminator_state = {k.removeprefix("discriminator."): v for k, v in packed_state.items() if k.startswith("discriminator.")}
+        generator_state = {
+            k.removeprefix("generator."): v
+            for k, v in packed_state.items()
+            if k.startswith("generator.")
+        }
+        discriminator_state = {
+            k.removeprefix("discriminator."): v
+            for k, v in packed_state.items()
+            if k.startswith("discriminator.")
+        }
 
         # Preprocess data: label-encode categoricals, concatenate with numericals
         processed_data = []
@@ -314,16 +309,11 @@ class FedTGANSynthesizer(Synthesizer):
         # Convert to torch tensor and create DataLoader
         dataset = torch.utils.data.TensorDataset(torch.from_numpy(X))
         dataloader = torch.utils.data.DataLoader(
-            dataset,
-            batch_size=self._batch_size,
-            shuffle=True
+            dataset, batch_size=self._batch_size, shuffle=True
         )
 
         # Initialize models
-        generator = Generator(
-            latent_dim=self._latent_dim,
-            output_dim=output_dim
-        )
+        generator = Generator(latent_dim=self._latent_dim, output_dim=output_dim)
         discriminator = Discriminator(input_dim=input_dim)
 
         # Load weights from request
@@ -335,8 +325,12 @@ class FedTGANSynthesizer(Synthesizer):
         discriminator.to(self._device)
 
         # Create optimizers
-        optimizer_generator = torch.optim.SGD(generator.parameters(), lr=self._learning_rate, momentum=0.9)
-        optimizer_discriminator = torch.optim.SGD(discriminator.parameters(), lr=self._learning_rate, momentum=0.9)
+        optimizer_generator = torch.optim.SGD(
+            generator.parameters(), lr=self._learning_rate, momentum=0.9
+        )
+        optimizer_discriminator = torch.optim.SGD(
+            discriminator.parameters(), lr=self._learning_rate, momentum=0.9
+        )
 
         train_loss_discriminator = 0.0
         train_loss_generator = 0.0
@@ -348,7 +342,9 @@ class FedTGANSynthesizer(Synthesizer):
                 real_data = real_data_batch.to(self._device)
 
                 # Generate synthetic data
-                noise = torch.randn(real_data.size(0), self._latent_dim, device=self._device)
+                noise = torch.randn(
+                    real_data.size(0), self._latent_dim, device=self._device
+                )
                 fake_data = generator(noise)
 
                 # Train discriminator on combined data
@@ -357,17 +353,15 @@ class FedTGANSynthesizer(Synthesizer):
                     real_data,
                     fake_data.detach(),
                     optimizer_discriminator,
-                    self._device
+                    self._device,
                 )
 
                 # Train the generator
-                noise_g = torch.randn(real_data.size(0), self._latent_dim, device=self._device)
+                noise_g = torch.randn(
+                    real_data.size(0), self._latent_dim, device=self._device
+                )
                 train_loss_generator += generator_step(
-                    generator,
-                    discriminator,
-                    noise_g,
-                    optimizer_generator,
-                    self._device
+                    generator, discriminator, noise_g, optimizer_generator, self._device
                 )
 
                 num_batches += 1
@@ -390,18 +384,18 @@ class FedTGANSynthesizer(Synthesizer):
         reply = Update()
         reply.arrays["state"] = packed_state
         reply.metrics["metrics"] = {
-            "loss-discriminator": train_loss_discriminator / num_batches if num_batches > 0 else 0.0,
-            "loss-generator": train_loss_generator / num_batches if num_batches > 0 else 0.0,
+            "loss-discriminator": train_loss_discriminator / num_batches
+            if num_batches > 0
+            else 0.0,
+            "loss-generator": train_loss_generator / num_batches
+            if num_batches > 0
+            else 0.0,
             "num-samples": len(dataset),
         }
 
         return reply
 
-    def sample(
-            self,
-            request: Update,
-            num_rows: int,
-            seed: int) -> pd.DataFrame:
+    def sample(self, request: Update, num_rows: int, seed: int) -> pd.DataFrame:
         """Generate synthetic data using the trained generator."""
 
         # Set random seed for reproducibility
@@ -450,12 +444,12 @@ class FedTGANSynthesizer(Synthesizer):
                 encoded_values = np.round(synthetic_data[:, i]).astype(int)
                 # Clip to valid range
                 encoded_values = np.clip(
-                    encoded_values,
-                    0,
-                    len(label_encoders[col].classes_) - 1
+                    encoded_values, 0, len(label_encoders[col].classes_) - 1
                 )
                 # Inverse transform to get original categorical values
-                decoded_data[col] = label_encoders[col].inverse_transform(encoded_values)
+                decoded_data[col] = label_encoders[col].inverse_transform(
+                    encoded_values
+                )
 
         # Extract numerical columns (no scaling applied currently)
         for i, col in enumerate(num_attrs):
