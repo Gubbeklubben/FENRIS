@@ -58,7 +58,9 @@ def test_dirichlet_partitioner():
     p = FlwrDelegatePartitioner.with_dirichlet_partitioner(
         num_partitions=5, partition_by="label", alpha=0.5
     )
-    p.set_dataset(make_dummy_dataset(n=1000))  # increased to avoid min_partition_size warnings
+    p.set_dataset(
+        make_dummy_dataset(n=1000)
+    )  # increased to avoid min_partition_size warnings
     assert_valid_partition(p, 5)
 
     partition_sizes = [
@@ -98,6 +100,7 @@ def test_shard_partitioner():
     assert any(count < 3 for count in label_counts), (
         "Shard partitioner should produce partitions with fewer than all labels"
     )
+
 
 def test_continuous_partitioner():
     p = FlwrDelegatePartitioner.with_continuous_partitioner(
