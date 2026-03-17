@@ -4,7 +4,14 @@ import torch
 import torch.nn as nn
 
 
-def generator_step(generator, discriminator, noise, optimizer, device) -> float:
+def generator_step(
+        generator: nn.Module,
+        discriminator: nn.Module,
+        noise: torch.Tensor,
+        optimizer: torch.optim.Optimizer,
+        device: torch.device
+) -> float:
+
     """One generator update step. Returns loss."""
     generator.train()  # allow for gradient calculation
     discriminator.eval()  # prevent from updating weights
@@ -37,7 +44,14 @@ def generator_step(generator, discriminator, noise, optimizer, device) -> float:
     return float(loss.item())
 
 
-def discriminator_step(discriminator, real_data, fake_data, optimizer, device) -> float:
+def discriminator_step(
+        discriminator: nn.Module,
+        real_data: torch.Tensor,
+        fake_data: torch.Tensor,
+        optimizer: torch.optim.Optimizer,
+        device: torch.device
+) -> float:
+
     """One discriminator update step in (real, fake). Return loss."""
     discriminator.train()  # train mode, allow for gradient calculation
 

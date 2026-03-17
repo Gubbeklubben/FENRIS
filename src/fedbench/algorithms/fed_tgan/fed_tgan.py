@@ -178,7 +178,7 @@ class FedTGANCoordinator(SingleStepCoordinator):
 
     def attach_global_init_artifacts(self, artifacts: Update) -> None:
         """Receive initial state and preprocessing artifacts from global_init."""
-        self._state = artifacts.arrays["initial-state"]
+        self._state = cast(dict[str, Tensor], artifacts.arrays["initial-state"])
         self._preproc_objects = artifacts.objects["preproc-objects"]
         self._preproc_extras = artifacts.extras["preproc-extras"]
 
@@ -223,7 +223,9 @@ class FedTGANCoordinator(SingleStepCoordinator):
 
     def _create_update(self) -> Update:
         """Create Update with the current global state and preprocessing artifacts."""
-        update = Update(arrays={"state": self._state})
+        # _state is guaranteed non-None when this is called from global_state property
+        state = cast(dict[str, Tensor], self._state)
+        update = Update(arrays={"state": state})
 
         # Include preprocessing artifacts if available
         if self._preproc_objects is not None:
@@ -264,25 +266,30 @@ class FedTGANSynthesizer(Synthesizer):
         """Train Generator and Discriminator on local data using alternating GAN training."""
 
         # Extract preprocessing artifacts and model states from request
-        packed_state = request.arrays["state"]
+        # noinspection PyUnnecessaryCast
+        received_state = cast(dict[str, Tensor], request.arrays["state"])
         preproc_objects = request.objects["preproc-objects"]
         preproc_extras = request.extras["preproc-extras"]
 
-        cat_attrs = preproc_extras["cat-attrs"]
-        num_attrs = preproc_extras["num-attrs"]
-        input_dim = preproc_extras["input-dim"]
-        output_dim = preproc_extras["output-dim"]
+        # noinspection PyUnnecessaryCast
+        cat_attrs = cast(list[str], preproc_extras["cat-attrs"])
+        # noinspection PyUnnecessaryCast
+        num_attrs = cast(list[str], preproc_extras["num-attrs"])
+        # noinspection PyUnnecessaryCast
+        input_dim = cast(int, preproc_extras["input-dim"])
+        # noinspection PyUnnecessaryCast
+        output_dim = cast(int, preproc_extras["output-dim"])
         label_encoders = preproc_objects["label-encoders"]
 
-        # Unpack generator and discriminator state_dicts from packed state
+        # Unpack generator and discriminator state_dicts from received state
         generator_state = {
             k.removeprefix("generator."): v
-            for k, v in packed_state.items()
+            for k, v in received_state.items()
             if k.startswith("generator.")
         }
         discriminator_state = {
             k.removeprefix("discriminator."): v
-            for k, v in packed_state.items()
+            for k, v in received_state.items()
             if k.startswith("discriminator.")
         }
 
@@ -405,14 +412,19 @@ class FedTGANSynthesizer(Synthesizer):
             torch.cuda.manual_seed(seed)
 
         # Extract model state and preprocessing artifacts from request
-        packed_state = request.arrays["state"]
+        # noinspection PyUnnecessaryCast
+        packed_state = cast(dict[str, Tensor], request.arrays["state"])
         preproc_objects = request.objects["preproc-objects"]
         preproc_extras = request.extras["preproc-extras"]
 
-        cat_attrs = preproc_extras["cat-attrs"]
-        num_attrs = preproc_extras["num-attrs"]
-        output_dim = preproc_extras["output-dim"]
-        latent_dim = preproc_extras["latent-dim"]
+        # noinspection PyUnnecessaryCast
+        cat_attrs = cast(list[str], preproc_extras["cat-attrs"])
+        # noinspection PyUnnecessaryCast
+        num_attrs = cast(list[str], preproc_extras["num-attrs"])
+        # noinspection PyUnnecessaryCast
+        output_dim = cast(int, preproc_extras["output-dim"])
+        # noinspection PyUnnecessaryCast
+        latent_dim = cast(int, preproc_extras["latent-dim"])
         label_encoders = preproc_objects["label-encoders"]
 
         # Unpack generator state (only need generator for sampling)
