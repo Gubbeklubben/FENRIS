@@ -92,7 +92,7 @@ class FedTGAN(Algorithm):
             ),
         }
 
-        # Create factory functions for coordinator and synthesizer
+        # Create factory function for synthesizer
         self._synth_factory: Callable[[], Synthesizer] = functools.partial(
             FedTGANSynthesizer,
             batch_size=batch_size,
@@ -116,13 +116,12 @@ class FedTGAN(Algorithm):
 
 class FedTGANCoordinator(SingleStepCoordinator):
 
-    def __init__(self, cfg: dict[str, Any]) -> None:
-        self._cfg: dict[str, Any] = cfg
+    def __init__(self) -> None:
         self._cat_attrs: list[str] | None = None
         self._num_attrs: list[str] | None = None
         self._preproc_objects: dict[str, Any] | None = None
         self._preproc_extras: dict[str, Any] | None = None
-        self._state: dict[str, Any] | None = None
+        self._state: dict[str, torch.Tensor] | None = None
 
     @property
     def arrays_to_ml_framework_map(self) -> dict[str, str] | None:
@@ -173,6 +172,10 @@ class FedTGANCoordinator(SingleStepCoordinator):
         n_num_features = len(self._num_attrs)
         input_dim = output_dim = n_cat_features + n_num_features
 
+        # latent_dim is fixed at 64 (default value from algorithm)
+        # Could be made configurable through global_init if needed
+        latent_dim = 64
+
         # Store preprocessing artifacts
         self._preproc_objects = {
             "label-encoders": label_encoders,
@@ -183,20 +186,25 @@ class FedTGANCoordinator(SingleStepCoordinator):
             "num-attrs": self._num_attrs,
             "input-dim": input_dim,
             "output-dim": output_dim,
+            "latent-dim": latent_dim,
         }
 
         # Initialize models with correct dimensions
-        cfg_with_dims = self._cfg | {
+        cfg_with_dims = {
             "input_dim": input_dim,
             "output_dim": output_dim,
-            "latent_dim": self._cfg["latent-dim"],
+            "latent_dim": latent_dim,
         }
         generator, discriminator = init_model(cfg_with_dims)
 
-        self._state = {
-            "generator": generator.state_dict(),
-            "discriminator": discriminator.state_dict(),
-        }
+        # Pack both models into a single state_dict with prefixed keys
+        packed_state: dict[str, torch.Tensor] = {}
+        for k, v in generator.state_dict().items():
+            packed_state[f"generator.{k}"] = v
+        for k, v in discriminator.state_dict().items():
+            packed_state[f"discriminator.{k}"] = v
+
+        self._state = packed_state
 
     def aggregate_train(
             self,
@@ -207,7 +215,7 @@ class FedTGANCoordinator(SingleStepCoordinator):
     def _create_update(self) -> Update:
         """Create Update with the current global state and preprocessing artifacts."""
         return Update(
-            arrays={"arrays": self._state},
+            arrays={"state": self._state},
             objects={"preproc-objects": self._preproc_objects},
             extras={"preproc-extras": self._preproc_extras},
         )
@@ -264,7 +272,7 @@ class FedTGANSynthesizer(Synthesizer):
         """Train Generator and Discriminator on local data using alternating GAN training."""
 
         # Extract preprocessing artifacts and model states from request
-        arrays = request.arrays["arrays"]
+        packed_state = request.arrays["state"]
         preproc_objects = request.objects["preproc-objects"]
         preproc_extras = request.extras["preproc-extras"]
 
@@ -273,6 +281,10 @@ class FedTGANSynthesizer(Synthesizer):
         input_dim = preproc_extras["input-dim"]
         output_dim = preproc_extras["output-dim"]
         label_encoders = preproc_objects["label-encoders"]
+
+        # Unpack generator and discriminator state_dicts from packed state
+        generator_state = {k.removeprefix("generator."): v for k, v in packed_state.items() if k.startswith("generator.")}
+        discriminator_state = {k.removeprefix("discriminator."): v for k, v in packed_state.items() if k.startswith("discriminator.")}
 
         # Preprocess data: label-encode categoricals, concatenate with numericals
         processed_data = []
@@ -310,8 +322,8 @@ class FedTGANSynthesizer(Synthesizer):
         discriminator = Discriminator(input_dim=input_dim)
 
         # Load weights from request
-        generator.load_state_dict(arrays["generator"])
-        discriminator.load_state_dict(arrays["discriminator"])
+        generator.load_state_dict(generator_state)
+        discriminator.load_state_dict(discriminator_state)
 
         # Move to device
         generator.to(self._device)
@@ -362,12 +374,16 @@ class FedTGANSynthesizer(Synthesizer):
             if num_batches >= self._max_batches:
                 break
 
-        # Return updated Generator state (discriminator stays local)
+        # Pack both models into a single state_dict with prefixed keys
+        packed_state: dict[str, torch.Tensor] = {}
+        for k, v in generator.state_dict().items():
+            packed_state[f"generator.{k}"] = v
+        for k, v in discriminator.state_dict().items():
+            packed_state[f"discriminator.{k}"] = v
+
+        # Return update with both models
         reply = Update()
-        reply.arrays["arrays"] = {
-            "generator": generator.state_dict(),
-            "discriminator": discriminator.state_dict()
-        }
+        reply.arrays["state"] = packed_state
         reply.metrics["metrics"] = {
             "loss-discriminator": train_loss_discriminator / num_batches if num_batches > 0 else 0.0,
             "loss-generator": train_loss_generator / num_batches if num_batches > 0 else 0.0,
