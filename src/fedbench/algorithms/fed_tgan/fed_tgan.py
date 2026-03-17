@@ -402,5 +402,63 @@ class FedTGANSynthesizer(Synthesizer):
             request: Update,
             num_rows: int,
             seed: int) -> pd.DataFrame:
-        # TODO: Implement sampling
-        raise NotImplementedError("Sampling not yet implemented")
+        """Generate synthetic data using the trained generator."""
+
+        # Set random seed for reproducibility
+        np.random.seed(seed)
+        torch.manual_seed(seed)
+        if torch.cuda.is_available():
+            torch.cuda.manual_seed(seed)
+
+        # Extract model state and preprocessing artifacts from request
+        packed_state = request.arrays["state"]
+        preproc_objects = request.objects["preproc-objects"]
+        preproc_extras = request.extras["preproc-extras"]
+
+        cat_attrs = preproc_extras["cat-attrs"]
+        num_attrs = preproc_extras["num-attrs"]
+        output_dim = preproc_extras["output-dim"]
+        latent_dim = preproc_extras["latent-dim"]
+        label_encoders = preproc_objects["label-encoders"]
+
+        # Unpack generator state (only need generator for sampling)
+        generator_state = {
+            k.removeprefix("generator."): v
+            for k, v in packed_state.items()
+            if k.startswith("generator.")
+        }
+
+        # Initialize and load generator
+        generator = Generator(latent_dim=latent_dim, output_dim=output_dim)
+        generator.load_state_dict(generator_state)
+        generator.to(self._device)
+        generator.eval()
+
+        # Generate synthetic data
+        with torch.no_grad():
+            noise = torch.randn(num_rows, latent_dim, device=self._device)
+            synthetic_data = generator(noise).cpu().numpy()
+
+        # Reverse preprocessing: decode categorical features and extract numerical features
+        decoded_data = {}
+        n_cat_features = len(cat_attrs)
+
+        # Decode categorical columns
+        for i, col in enumerate(cat_attrs):
+            if col in label_encoders:
+                # Round to nearest integer for categorical encoding
+                encoded_values = np.round(synthetic_data[:, i]).astype(int)
+                # Clip to valid range
+                encoded_values = np.clip(
+                    encoded_values,
+                    0,
+                    len(label_encoders[col].classes_) - 1
+                )
+                # Inverse transform to get original categorical values
+                decoded_data[col] = label_encoders[col].inverse_transform(encoded_values)
+
+        # Extract numerical columns (no scaling applied currently)
+        for i, col in enumerate(num_attrs):
+            decoded_data[col] = synthetic_data[:, n_cat_features + i]
+
+        return pd.DataFrame(decoded_data)
