@@ -62,8 +62,7 @@ def validate_column_names(data_cfg: dict[str, Any]) -> None:
     target = data_cfg.get("target_col")
     if target is not None and target not in header:
         raise ValueError(
-            f"--target-col '{target}' not found in dataset. "
-            f"Available columns: {header}"
+            f"--target-col '{target}' not found in dataset. Available columns: {header}"
         )
 
     for col in data_cfg.get("sensitive_cols", ()):
