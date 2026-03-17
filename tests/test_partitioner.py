@@ -22,11 +22,24 @@ def test_linear_partitioner():
     p.set_dataset(make_dummy_dataset())
     assert_valid_partition(p, 5)
 
+    # Partition sizes should increase with partition id
+    sizes = [
+        len(p.load_partition(i, split="train", seed=42, test_size=0.2))
+        for i in range(5)
+    ]
+    assert sizes == sorted(sizes), "Linear partition sizes should be increasing"
+
 
 def test_square_partitioner():
     p = FlwrDelegatePartitioner.with_square_partitioner(num_partitions=5)
     p.set_dataset(make_dummy_dataset(n=1000))
     assert_valid_partition(p, 5)
+
+    sizes = [
+        len(p.load_partition(i, split="train", seed=42, test_size=0.2))
+        for i in range(5)
+    ]
+    assert sizes == sorted(sizes), "Square partition sizes should be increasing"
 
 
 def test_exponential_partitioner():
@@ -34,15 +47,20 @@ def test_exponential_partitioner():
     p.set_dataset(make_dummy_dataset(n=1000))
     assert_valid_partition(p, 5)
 
+    sizes = [
+        len(p.load_partition(i, split="train", seed=42, test_size=0.2))
+        for i in range(5)
+    ]
+    assert sizes == sorted(sizes), "Exponential partition sizes should be increasing"
+
 
 def test_dirichlet_partitioner():
     p = FlwrDelegatePartitioner.with_dirichlet_partitioner(
         num_partitions=5, partition_by="label", alpha=0.5
     )
-    p.set_dataset(make_dummy_dataset())
+    p.set_dataset(make_dummy_dataset(n=1000))  # increased to avoid min_partition_size warnings
     assert_valid_partition(p, 5)
 
-    # Dirichlet should produce non-uniform partition sizes
     partition_sizes = [
         len(p.load_partition(i, split="train", seed=42, test_size=0.2))
         for i in range(5)
@@ -72,6 +90,14 @@ def test_shard_partitioner():
     p.set_dataset(make_dummy_dataset())
     assert_valid_partition(p, 5)
 
+    # Shard partitioner should produce label-skewed partitions
+    label_counts = [
+        p.load_partition(i, split="train", seed=42, test_size=0.2)["label"].nunique()
+        for i in range(5)
+    ]
+    assert any(count < 3 for count in label_counts), (
+        "Shard partitioner should produce partitions with fewer than all labels"
+    )
 
 def test_continuous_partitioner():
     p = FlwrDelegatePartitioner.with_continuous_partitioner(
