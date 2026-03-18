@@ -29,14 +29,14 @@ Minimal example pipeline run:
 
 ```bash
 poetry run fedbench run \
-  fed_hello iid-partitioner datasets/breast_cancer.csv
+  fed_hello iid_partitioner datasets/breast_cancer.csv
 ```
 
 Example pipeline run with FedTabDiff:
 
 ```bash
 poetry run fedbench run \
-  fed_tab_diff iid-partitioner datasets/breast_cancer.csv \
+  fed_tab_diff iid_partitioner datasets/breast_cancer.csv \
   --algorithm-kwargs "\
     batch_size=128, \
     max_batches=10, \

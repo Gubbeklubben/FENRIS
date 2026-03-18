@@ -41,7 +41,7 @@ def minimal_valid_cfg(tmp_path: Path, **overrides):
     base = {
         "dataset": str(dataset),
         "algorithm": "fed_hello",
-        "partitioner": "iid-partitioner",
+        "partitioner": "iid_partitioner",
     }
     base.update(overrides)
     return base
