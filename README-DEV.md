@@ -9,9 +9,19 @@ If this still does not achieve desired results, it is also possible to disable f
 by wrapping them in `# fmt: off` and `# fmt: on` comments. 
 
 ```bash
-poetry run ruff format src
-poetry run ruff check src --fix
+poetry run ruff format src tests
+poetry run ruff check src tests --fix
 ```
+
+## Pre-commit hooks
+
+To run ruff automatically before every commit, install the hooks once after cloning:
+
+```bash
+poetry run pre-commit install
+```
+
+To bypass the hooks in an emergency: `git commit --no-verify`
 
 ## Type checking
 

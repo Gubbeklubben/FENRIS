@@ -1,5 +1,4 @@
 import pandas as pd
-from datasets import Dataset
 from pandas import DataFrame
 
 from fedbench.partitioners.flwr_delegates import FlwrDelegatePartitioner
@@ -109,7 +108,7 @@ def test_continuous_partitioner():
     p.set_dataset(make_dummy_dataset())
     assert_valid_partition(p, 5)
 
-    # Higher strictness should produce partitions concentrated around different value ranges
+    # Higher strictness → partitions concentrated around different value ranges
     partition_means = [
         p.load_partition(i, split="train", seed=42, test_size=0.2)["value"].mean()
         for i in range(5)

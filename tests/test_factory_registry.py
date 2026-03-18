@@ -34,8 +34,7 @@ def product_registry() -> FactoryRegistry[Product]:
 @pytest.fixture
 def abstract_product_registry() -> FactoryRegistry[AbstractProduct]:
     return FactoryRegistry(
-        group=f"{__name__}.abstract_product",
-        product_cls=AbstractProduct
+        group=f"{__name__}.abstract_product", product_cls=AbstractProduct
     )
 
 

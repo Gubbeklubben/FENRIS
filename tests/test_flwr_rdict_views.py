@@ -1,8 +1,7 @@
-
 from collections.abc import MutableMapping
 
 import pytest
-from flwr.common import RecordDict, MetricRecord, ConfigRecord
+from flwr.common import ConfigRecord, MetricRecord, RecordDict
 
 # noinspection PyProtectedMember
 from fedbench.flwr.rdict import RDictNamespaceView, _NamespaceView

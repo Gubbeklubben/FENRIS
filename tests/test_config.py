@@ -22,17 +22,18 @@ def builtin_algorithms():
     register_builtin_algorithms(registry)
     return registry
 
+
 @pytest.fixture
 def builtin_partitioners():
     registry = FactoryRegistry(
-        group=f"{__package__}.partitioners",
-        product_cls=Partitioner
+        group=f"{__package__}.partitioners", product_cls=Partitioner
     )
     register_builtin_partitioners(registry)
     return registry
 
 
 # --- helpers ---------------------------------------------------------------
+
 
 def minimal_valid_cfg(tmp_path: Path, **overrides):
     dataset = tmp_path / "data.csv"
@@ -46,7 +47,9 @@ def minimal_valid_cfg(tmp_path: Path, **overrides):
     base.update(overrides)
     return base
 
+
 # --- minimal config builder validation ------------------------------------
+
 
 def test_minimal_config(tmp_path, builtin_algorithms, builtin_partitioners):
     cfg_dict = minimal_valid_cfg(tmp_path)
@@ -60,8 +63,10 @@ def test_minimal_config(tmp_path, builtin_algorithms, builtin_partitioners):
 
 # --- dataset path validation ----------------------------------------------
 
+
 def test_dataset_is_directory_raises(
-        tmp_path, builtin_algorithms, builtin_partitioners):
+    tmp_path, builtin_algorithms, builtin_partitioners
+):
 
     cfg = minimal_valid_cfg(tmp_path)
     cfg["dataset"] = str(tmp_path)
@@ -71,7 +76,8 @@ def test_dataset_is_directory_raises(
 
 
 def test_dataset_does_not_exist_raises(
-        tmp_path, builtin_algorithms, builtin_partitioners):
+    tmp_path, builtin_algorithms, builtin_partitioners
+):
 
     cfg = minimal_valid_cfg(tmp_path)
     cfg["dataset"] = str(tmp_path / "missing.csv")
@@ -84,7 +90,8 @@ def test_dataset_does_not_exist_raises(
 
 
 def test_unsupported_category_raises(
-        tmp_path, builtin_algorithms, builtin_partitioners):
+    tmp_path, builtin_algorithms, builtin_partitioners
+):
 
     cfg = minimal_valid_cfg(
         tmp_path,
@@ -101,7 +108,8 @@ def test_unsupported_category_raises(
 
 @pytest.mark.parametrize("num_rounds", [0, -5])
 def test_invalid_num_rounds_raises(
-        tmp_path, num_rounds, builtin_algorithms, builtin_partitioners):
+    tmp_path, num_rounds, builtin_algorithms, builtin_partitioners
+):
 
     cfg = minimal_valid_cfg(tmp_path, num_rounds=num_rounds)
 
@@ -111,7 +119,8 @@ def test_invalid_num_rounds_raises(
 
 @pytest.mark.parametrize("test_size", [0, 1, -0.1, 1.5])
 def test_invalid_test_size_raises(
-        tmp_path, test_size, builtin_algorithms, builtin_partitioners):
+    tmp_path, test_size, builtin_algorithms, builtin_partitioners
+):
 
     cfg = minimal_valid_cfg(tmp_path, test_size=test_size)
 
@@ -120,7 +129,8 @@ def test_invalid_test_size_raises(
 
 
 def test_invalid_num_synthetic_rows_raises(
-        tmp_path, builtin_algorithms, builtin_partitioners):
+    tmp_path, builtin_algorithms, builtin_partitioners
+):
 
     cfg = minimal_valid_cfg(tmp_path, num_synthetic_rows=0)
 
@@ -130,8 +140,10 @@ def test_invalid_num_synthetic_rows_raises(
 
 # --- outputdir behavior ----------------------------------------------------
 
+
 def test_default_outputdir_is_cwd_out(
-        tmp_path, monkeypatch, builtin_algorithms, builtin_partitioners):
+    tmp_path, monkeypatch, builtin_algorithms, builtin_partitioners
+):
 
     monkeypatch.chdir(tmp_path)
     cfg = minimal_valid_cfg(tmp_path)
@@ -141,7 +153,8 @@ def test_default_outputdir_is_cwd_out(
 
 
 def test_custom_outputdir_is_resolved(
-        tmp_path, builtin_algorithms, builtin_partitioners):
+    tmp_path, builtin_algorithms, builtin_partitioners
+):
 
     out = tmp_path / "results"
     cfg = minimal_valid_cfg(tmp_path, outputdir=str(out))
@@ -152,8 +165,10 @@ def test_custom_outputdir_is_resolved(
 
 # --- positive sanity checks ------------------------------------------------
 
+
 def test_valid_utility_category_with_target_col(
-        tmp_path, builtin_algorithms, builtin_partitioners):
+    tmp_path, builtin_algorithms, builtin_partitioners
+):
 
     cfg = minimal_valid_cfg(
         tmp_path,
@@ -166,7 +181,8 @@ def test_valid_utility_category_with_target_col(
 
 
 def test_unregistered_partitioner_raises(
-        tmp_path, builtin_algorithms, builtin_partitioners):
+    tmp_path, builtin_algorithms, builtin_partitioners
+):
 
     cfg = minimal_valid_cfg(
         tmp_path,
@@ -177,7 +193,8 @@ def test_unregistered_partitioner_raises(
 
 
 def test_unregistered_algorithm_raises(
-        tmp_path, builtin_algorithms, builtin_partitioners):
+    tmp_path, builtin_algorithms, builtin_partitioners
+):
 
     cfg = minimal_valid_cfg(
         tmp_path,
@@ -195,7 +212,7 @@ def test_static_defaults(tmp_path, builtin_algorithms, builtin_partitioners):
     assert config.data.sensitive_cols == ()
 
     assert config.metrics.run_categories == tuple(Category)
-    assert config.metrics.early_stop == False
+    assert config.metrics.early_stop is False
     assert config.metrics.stop_metric is None
     assert config.metrics.stop_mode is None
     assert config.metrics.stop_epsilon is None
@@ -208,14 +225,13 @@ def test_static_defaults(tmp_path, builtin_algorithms, builtin_partitioners):
     assert config.test_size == 0.2
     assert config.seed == 42
     assert config.num_synthetic_rows is None
-    assert config.disable_pickle == False
+    assert config.disable_pickle is False
 
 
 # --- column name validation ------------------------------------------------
 
 
-def test_invalid_target_col_raises(
-        tmp_path, builtin_algorithms, builtin_partitioners):
+def test_invalid_target_col_raises(tmp_path, builtin_algorithms, builtin_partitioners):
 
     cfg = minimal_valid_cfg(tmp_path, target_col="nonexistent")
 
@@ -224,7 +240,8 @@ def test_invalid_target_col_raises(
 
 
 def test_invalid_sensitive_col_raises(
-        tmp_path, builtin_algorithms, builtin_partitioners):
+    tmp_path, builtin_algorithms, builtin_partitioners
+):
 
     cfg = minimal_valid_cfg(tmp_path, sensitive_cols=("nonexistent",))
 
@@ -232,8 +249,7 @@ def test_invalid_sensitive_col_raises(
         build_config(cfg, builtin_algorithms, builtin_partitioners)
 
 
-def test_valid_target_col_passes(
-        tmp_path, builtin_algorithms, builtin_partitioners):
+def test_valid_target_col_passes(tmp_path, builtin_algorithms, builtin_partitioners):
 
     cfg = minimal_valid_cfg(tmp_path, target_col="a")
     config = build_config(cfg, builtin_algorithms, builtin_partitioners)
@@ -241,15 +257,15 @@ def test_valid_target_col_passes(
 
 
 def test_valid_sensitive_cols_passes(
-        tmp_path, builtin_algorithms, builtin_partitioners):
+    tmp_path, builtin_algorithms, builtin_partitioners
+):
 
     cfg = minimal_valid_cfg(tmp_path, sensitive_cols=("a", "b"))
     config = build_config(cfg, builtin_algorithms, builtin_partitioners)
     assert config.data.sensitive_cols == ("a", "b")
 
 
-def test_omitted_columns_no_error(
-        tmp_path, builtin_algorithms, builtin_partitioners):
+def test_omitted_columns_no_error(tmp_path, builtin_algorithms, builtin_partitioners):
     """Omitting target_col and sensitive_cols is valid (NaN-degradation path)."""
     cfg = minimal_valid_cfg(tmp_path)
     config = build_config(cfg, builtin_algorithms, builtin_partitioners)
@@ -258,6 +274,7 @@ def test_omitted_columns_no_error(
 
 
 # --- coerce tests ----------------------------------------------------------
+
 
 def test_coerce_bool_true_variants():
     """Test coercion of various truthy boolean strings"""
@@ -312,6 +329,7 @@ def test_coerce_str():
 
 # --- is_optional tests -----------------------------------------------------
 
+
 def test_is_optional_with_optional_type():
     """Test is_optional returns True for Optional[T]"""
     annotation = Optional[str]
@@ -350,8 +368,10 @@ def test_is_optional_with_optional_list():
 
 # --- parse_for_function tests ----------------------------------------------
 
+
 def test_parse_for_function_with_no_parameters():
     """Test parsing a function with no parameters"""
+
     def dummy_func():
         pass
 
@@ -361,6 +381,7 @@ def test_parse_for_function_with_no_parameters():
 
 def test_parse_for_function_with_required_parameter():
     """Test parsing required parameters"""
+
     def dummy_func(required_param: str):
         pass
 
@@ -370,6 +391,7 @@ def test_parse_for_function_with_required_parameter():
 
 def test_parse_for_function_missing_required_parameter_raises():
     """Test that missing required parameter raises TypeError"""
+
     def dummy_func(required_param: str):
         pass
 
@@ -379,6 +401,7 @@ def test_parse_for_function_missing_required_parameter_raises():
 
 def test_parse_for_function_with_default_parameter():
     """Test parsing function with default parameters"""
+
     def dummy_func(param_with_default: str = "default_value"):
         pass
 
@@ -388,6 +411,7 @@ def test_parse_for_function_with_default_parameter():
 
 def test_parse_for_function_overrides_default():
     """Test that provided parameters override defaults"""
+
     def dummy_func(param: str = "default"):
         pass
 
@@ -397,6 +421,7 @@ def test_parse_for_function_overrides_default():
 
 def test_parse_for_function_with_optional_type_annotation():
     """Test parsing optional type annotations"""
+
     def dummy_func(optional_param: Optional[str]):
         pass
 
@@ -407,15 +432,20 @@ def test_parse_for_function_with_optional_type_annotation():
 
 def test_parse_for_function_unknown_parameter_raises():
     """Test that unknown parameters raise TypeError"""
+
     def dummy_func(known_param: str):
         pass
 
-    with pytest.raises(TypeError):
-        parse_for_function(dummy_func, {"known_param": "value", "unknown_param": "value"})
+    with pytest.raises(TypeError, match="Unknown parameters"):
+        parse_for_function(
+            dummy_func,
+            {"known_param": "value", "unknown_param": "value"},
+        )
 
 
 def test_parse_for_function_coerces_types():
     """Test that parameters are coerced to correct types"""
+
     def dummy_func(num: int, enabled: bool, items: list[int]):
         pass
 
@@ -425,7 +455,7 @@ def test_parse_for_function_coerces_types():
             "num": "42",
             "enabled": "true",
             "items": "[1, 2, 3]",
-        }
+        },
     )
 
     assert result["num"] == 42
@@ -435,6 +465,7 @@ def test_parse_for_function_coerces_types():
 
 def test_parse_for_function_multiple_parameters_mixed():
     """Test parsing mix of required, optional, and default parameters"""
+
     def dummy_func(
         required: str,
         with_default: int = 10,
@@ -443,8 +474,7 @@ def test_parse_for_function_multiple_parameters_mixed():
         pass
 
     result = parse_for_function(
-        dummy_func,
-        {"required": "test_value", "with_default": "20"}
+        dummy_func, {"required": "test_value", "with_default": "20"}
     )
 
     assert result["required"] == "test_value"
@@ -453,6 +483,7 @@ def test_parse_for_function_multiple_parameters_mixed():
 
 
 # --- additional coerce edge cases --------------------------------------------------
+
 
 def test_coerce_int_invalid_raises():
     """Test that invalid integer strings raise ValueError"""
@@ -484,7 +515,13 @@ def test_coerce_nested_structures():
 
 # --- dataset path expansion tests --------------------------------------------------
 
-def test_dataset_path_expanduser(tmp_path, monkeypatch, builtin_algorithms, builtin_partitioners):
+
+def test_dataset_path_expanduser(
+    tmp_path,
+    monkeypatch,
+    builtin_algorithms,
+    builtin_partitioners,
+):
     """Test that dataset paths with ~ are expanded"""
     # Create a dataset file
     dataset = tmp_path / "data.csv"
@@ -503,7 +540,12 @@ def test_dataset_path_expanduser(tmp_path, monkeypatch, builtin_algorithms, buil
     assert not config.data.dataset.startswith("~")
 
 
-def test_outputdir_path_expanduser(tmp_path, monkeypatch, builtin_algorithms, builtin_partitioners):
+def test_outputdir_path_expanduser(
+    tmp_path,
+    monkeypatch,
+    builtin_algorithms,
+    builtin_partitioners,
+):
     """Test that outputdir paths are expanded and resolved"""
     dataset = tmp_path / "data.csv"
     dataset.write_text("a,b\n1,2\n")
@@ -520,7 +562,12 @@ def test_outputdir_path_expanduser(tmp_path, monkeypatch, builtin_algorithms, bu
 
 # --- categories parsing tests --------------------------------------------------
 
-def test_categories_all_defaults_to_all_enum_members(tmp_path, builtin_algorithms, builtin_partitioners):
+
+def test_categories_all_defaults_to_all_enum_members(
+    tmp_path,
+    builtin_algorithms,
+    builtin_partitioners,
+):
     """Test that no categories specified defaults to all Category enum members"""
     cfg = minimal_valid_cfg(tmp_path)
     # Don't specify run_categories
@@ -545,7 +592,11 @@ def test_single_category_parsing(tmp_path, builtin_algorithms, builtin_partition
     assert config.metrics.run_categories == (Category.PRIVACY,)
 
 
-def test_multiple_categories_parsing(tmp_path, builtin_algorithms, builtin_partitioners):
+def test_multiple_categories_parsing(
+    tmp_path,
+    builtin_algorithms,
+    builtin_partitioners,
+):
     """Test parsing multiple categories"""
     cfg = minimal_valid_cfg(
         tmp_path,
@@ -559,7 +610,8 @@ def test_multiple_categories_parsing(tmp_path, builtin_algorithms, builtin_parti
     assert Category.PRIVACY in config.metrics.run_categories
 
 
-# --- algorithm and partitioner kwargs parsing tests --------------------------------------------------
+# --- algorithm and partitioner kwargs parsing tests ----------------------
+
 
 def test_algorithm_kwargs_empty(tmp_path, builtin_algorithms, builtin_partitioners):
     """Test that empty algorithm_kwargs defaults to empty dict"""
@@ -570,7 +622,11 @@ def test_algorithm_kwargs_empty(tmp_path, builtin_algorithms, builtin_partitione
     assert config.algorithm_kwargs == {}
 
 
-def test_partitioner_kwargs_preserved(tmp_path, builtin_algorithms, builtin_partitioners):
+def test_partitioner_kwargs_preserved(
+    tmp_path,
+    builtin_algorithms,
+    builtin_partitioners,
+):
     """Test that partitioner_kwargs are preserved"""
     cfg = minimal_valid_cfg(tmp_path, num_clients=5)
 
@@ -580,10 +636,12 @@ def test_partitioner_kwargs_preserved(tmp_path, builtin_algorithms, builtin_part
     assert config.data.partitioner_kwargs["num_partitions"] == 5
 
 
-# --- parse_for_function with complex scenarios --------------------------------------------------
+# --- parse_for_function with complex scenarios -------------------
+
 
 def test_parse_for_function_all_optional_with_union():
     """Test parsing when all parameters are optional with Union types"""
+
     def dummy_func(
         param1: Optional[str] = None,
         param2: Optional[int] = None,
@@ -596,6 +654,7 @@ def test_parse_for_function_all_optional_with_union():
 
 def test_parse_for_function_partial_parameters():
     """Test parsing when only some of multiple parameters are provided"""
+
     def dummy_func(
         param1: str,
         param2: str = "default",
@@ -612,6 +671,7 @@ def test_parse_for_function_partial_parameters():
 
 def test_parse_for_function_with_tuple_coercion():
     """Test coercion of tuple parameters"""
+
     def dummy_func(items: tuple[int]):
         pass
 
@@ -622,8 +682,10 @@ def test_parse_for_function_with_tuple_coercion():
 
 # --- parse_for_function untyped parameter tests ---------------------------
 
+
 def test_parse_for_function_untyped_param_passes_raw_string():
     """Untyped required param provided in raw → passed through as-is."""
+
     def dummy_func(x):
         pass
 
@@ -634,6 +696,7 @@ def test_parse_for_function_untyped_param_passes_raw_string():
 
 def test_parse_for_function_untyped_param_with_default_passes_raw_string():
     """Untyped param with default provided in raw → passed through as-is."""
+
     def dummy_func(x=10):
         pass
 
@@ -644,6 +707,7 @@ def test_parse_for_function_untyped_param_with_default_passes_raw_string():
 
 def test_parse_for_function_untyped_missing_required_still_raises():
     """Untyped required param not in raw → still raises TypeError."""
+
     def dummy_func(x):
         pass
 
@@ -653,7 +717,12 @@ def test_parse_for_function_untyped_missing_required_still_raises():
 
 # --- validation tests --------------------------------------------------
 
-def test_validate_partitioner_not_in_registry(tmp_path, builtin_algorithms, builtin_partitioners):
+
+def test_validate_partitioner_not_in_registry(
+    tmp_path,
+    builtin_algorithms,
+    builtin_partitioners,
+):
     """Test that unregistered partitioner raises ValueError"""
     cfg = minimal_valid_cfg(
         tmp_path,

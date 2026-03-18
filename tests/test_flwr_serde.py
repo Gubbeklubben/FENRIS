@@ -3,7 +3,7 @@ from collections.abc import Callable
 
 import numpy as np
 import pytest
-from flwr.common import RecordDict, ArrayRecord, ConfigRecord, MetricRecord
+from flwr.common import ArrayRecord, ConfigRecord, MetricRecord, RecordDict
 
 from fedbench.core.update import Update
 from fedbench.flwr.rdict import RDictNamespaceView
@@ -12,10 +12,12 @@ from fedbench.flwr.serde import FlwrSerde, Pickle
 _RNG = np.random.default_rng(42)
 
 
-@pytest.fixture(params=[
-    pytest.param(False, id="pickle"),
-    pytest.param(True, id="disable_pickle"),
-])
+@pytest.fixture(
+    params=[
+        pytest.param(False, id="pickle"),
+        pytest.param(True, id="disable_pickle"),
+    ]
+)
 def serde(request) -> FlwrSerde:
     return FlwrSerde(object_serde=Pickle(disabled=request.param))
 
@@ -24,6 +26,7 @@ def serde(request) -> FlwrSerde:
 def make_random_ndarrays() -> Callable[[], list[np.ndarray]]:
     def factory():
         return list(_RNG.random((10, 10)) for _ in range(3))
+
     return factory
 
 
@@ -45,7 +48,7 @@ def test_to_flwr_single_array_group(serde, make_random_ndarrays) -> None:
         assert np.array_equal(arr, retrieved[idx]), "Arrays not equal"
 
 
-def test_from_flwr_single_array_group(serde,make_random_ndarrays) -> None:
+def test_from_flwr_single_array_group(serde, make_random_ndarrays) -> None:
     orig = make_random_ndarrays()
     rdict = RecordDict({"test-arrays": ArrayRecord(orig)})
     update = serde.from_flwr(rdict)
@@ -75,10 +78,12 @@ def test_to_flwr_multiple_array_groups(serde, make_random_ndarrays) -> None:
 def test_from_flwr_multiple_array_groups(serde, make_random_ndarrays) -> None:
     orig1 = make_random_ndarrays()
     orig2 = make_random_ndarrays()
-    rdict = RecordDict({
+    rdict = RecordDict(
+        {
             "test-arrays1": ArrayRecord(orig1),
             "test-arrays2": ArrayRecord(orig2),
-        })
+        }
+    )
     update = serde.from_flwr(rdict)
     retrieved1 = update.arrays["test-arrays1"]
     retrieved2 = update.arrays["test-arrays2"]
@@ -113,7 +118,7 @@ class PickleMe:
         self.desire = "I desperately want to be pickled!"
         self.some_dict = {
             "k": {"kk": {"kkk": 123}},
-            "other_k": {"other_kk": {"other_kkk": 321}}
+            "other_k": {"other_kk": {"other_kkk": 321}},
         }
 
 
