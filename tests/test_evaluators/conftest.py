@@ -110,6 +110,7 @@ def make_local_ctx(
         seed=seed,
         target_column=target_column,
         sensitive_columns=sensitive_columns,
+        local_train_seconds=math.nan
     )
 
 

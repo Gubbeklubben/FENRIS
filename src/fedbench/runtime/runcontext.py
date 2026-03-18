@@ -11,6 +11,7 @@ from fedbench.core.data import PartitionedDataset, Partitioner
 from fedbench.core.eval import EvaluationSuite
 from fedbench.core.update import Update
 from fedbench.runtime.eventbus import EventBus
+from fedbench.runtime.scalability_collector import ScalabilityCollector
 
 
 class _RunCtxField[T]:
@@ -75,10 +76,18 @@ class RunContext:
     synthetic_df          = _RunCtxField[DataFrame]()
     # fmt: on
 
-    def __init__(self, run_id: str, config: Config, eventbus: EventBus) -> None:
+    def __init__(
+        self,
+        run_id: str,
+        config: Config,
+        eventbus: EventBus,
+        scalability_collector: ScalabilityCollector,
+    ) -> None:
+
         self._run_id = run_id
         self._config = config
         self._eventbus = eventbus
+        self._scalability_collector = scalability_collector
 
     def __repr__(self) -> str:
         return f"<{self.__class__.__name__}>"
@@ -94,3 +103,7 @@ class RunContext:
     @property
     def eventbus(self) -> EventBus:
         return self._eventbus
+
+    @property
+    def scalability_collector(self) -> ScalabilityCollector:
+        return self._scalability_collector

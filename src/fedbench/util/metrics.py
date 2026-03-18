@@ -1,9 +1,9 @@
-import hashlib
 import math
-from typing import Any, Iterable, Literal
+from typing import Iterable, Literal, Mapping
 
 import numpy as np
 import pandas as pd
+from flwr.common import RecordDict
 from sklearn.base import BaseEstimator
 from sklearn.compose import ColumnTransformer
 from sklearn.impute import SimpleImputer
@@ -16,7 +16,23 @@ type TaskType = Literal[
     "binary_classification", "multiclass_classification", "regression"
 ]
 
-NAN_TOKEN = "__NaN__"
+
+def count_rdict_bytes(rdict: RecordDict) -> int:
+    """
+    Count the uncompressed model-parameter payload bytes in a RecordDict.
+
+    Counts only array_records (which carry both real tensors and
+    pickle-serialized objects). Excludes metric_records and config_records,
+    which carry only scalar values and JSON strings, not model parameters.
+
+    Each Array.data is the raw bytes as stored; shape[0] equals len(data)
+    for both numpy arrays (raw buffer) and pickle objects (uint8 encoding).
+    """
+    total = 0
+    for record in rdict.array_records.values():
+        for arr in record.values():
+            total += len(arr.data)
+    return total
 
 
 def make_tabular_preprocessor(df: pd.DataFrame) -> ColumnTransformer:
@@ -114,11 +130,6 @@ def sanitize_numeric_df(
     return clean
 
 
-def to_numeric_series(series: pd.Series) -> pd.Series:
-    """Coerce to numeric and drop NaNs, returning a clean pd.Series."""
-    return pd.Series(pd.to_numeric(series, errors="coerce")).dropna()
-
-
 def safe_nanmean(values: Iterable[float]) -> float:
     """Like ``np.nanmean`` but returns ``nan`` silently for all-NaN inputs.
 
@@ -135,53 +146,34 @@ def weighted_mean(pairs: Iterable[tuple[float, int]]) -> float:
     """Weighted mean of (value, weight) pairs, NaN-safe."""
     num, den = 0.0, 0
     for v, w in pairs:
-        if v == v and w > 0:  # v==v is NaN-safe
+        if w > 0 and not math.isnan(v):
             num += float(v) * int(w)
             den += int(w)
-    return math.nan if den == 0 else num / den
+    return num / den if den > 0 else math.nan
 
 
-def nanptp(sequence: np.ndarray) -> float:
-    """Like np.ptp but ignores NaNs and returns NaN if all values are NaN."""
-    if np.all(np.isnan(sequence)):
-        return math.nan
-    return float(np.nanmax(sequence)) - float(np.nanmin(sequence))
+def weighted_mean_metrics(
+    stats: Iterable[tuple[Mapping[str, float], int]],
+    keys: Iterable[str],
+) -> dict[str, float]:
+    """Weighted mean over ``(metrics_dict, weight)`` pairs for each key.
 
+    A multi-key generalization of :func:`weighted_mean`. For each key in
+    ``keys``, extracts the per-pair value and computes its row-count-weighted
+    mean. Returns ``{key: nan}`` for all keys if ``stats`` is empty.
+    """
+    keys = list(keys)
+    stats = list(stats)
+    if not stats:
+        return {key: math.nan for key in keys}
 
-def get_quasi_identifiers(
-    all_columns: set[str],
-    sensitive_column: str,
-    target_column: str | None,
-) -> list[str]:
-    qi = set(all_columns) - {sensitive_column}
-    if target_column:
-        qi -= {target_column}
-    return sorted(qi)
+    acc: dict[str, list[tuple[float, int]]] = {key: [] for key in keys}
 
+    for metrics, n in stats:
+        for key in keys:
+            acc[key].append((metrics[key], n))
 
-def canonical_value(val: Any) -> str:
-    """Deterministic string representation for a value."""
-    if pd.isna(val):
-        return NAN_TOKEN
-    # explicit bool handling before int (bool is a subclass of int)
-    if isinstance(val, (bool, np.bool_)):
-        return str(int(val))
-    if isinstance(val, (np.floating, float)):
-        return f"{float(val):.8f}"
-    if isinstance(val, (np.integer, int)):
-        return str(int(val))
-    if isinstance(val, str):
-        return val.strip()
-    return str(val)
-
-
-def canonical_row_hash(df: pd.DataFrame) -> pd.Series:
-    df = df.copy()
-    df = df[df.columns.sort_values()]
-
-    def hash_row(row: pd.Series) -> str:
-        canonical = [canonical_value(v) for v in row.values]
-        joined = "|".join(canonical)
-        return hashlib.md5(joined.encode("utf-8")).hexdigest()
-
-    return df.apply(hash_row, axis=1)
+    return {
+        key: weighted_mean(pairs)  # nofmt
+        for key, pairs in acc.items()
+    }

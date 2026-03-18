@@ -38,9 +38,10 @@ AIASupervisedAttackEvaluator — **exact** federated aggregation (per
   all clients run the same attacker.
 """
 
+import hashlib
 import math
 from dataclasses import dataclass
-from typing import Any, Iterable
+from typing import Any, Iterable, Mapping
 
 import numpy as np
 import pandas as pd
@@ -52,22 +53,23 @@ from fedbench.core.eval import Evaluator, LocalEvalContext
 from fedbench.core.eval.evalcontext import CentralizedEvalContext, GlobalEvalContext
 from fedbench.core.logger import log_debug
 from fedbench.util.metrics import (
-    canonical_row_hash,
     fit_tabular_model,
     get_numeric_columns,
-    get_quasi_identifiers,
     sanitize_numeric_df,
     weighted_mean,
 )
 from fedbench.util.parsing import to_snake_case
 
-MAX_MIA_SYNTHETIC = 5000
-DEFAULT_MIA_K = 1000
-
-
 # ---------------------------------------------------------------------------
 # Direct overlap evaluator
 # ---------------------------------------------------------------------------
+
+
+@dataclass(frozen=True)
+class _DirectOverlapResult:
+    exact_matches: int
+    partial_matches: dict[str, int]
+    n_syn: int
 
 
 class DirectOverlapDiagnosticEvaluator(Evaluator):
@@ -84,7 +86,7 @@ class DirectOverlapDiagnosticEvaluator(Evaluator):
 
     * ``"exact_matches"``   — int, number of synthetic rows whose hash
       appears in the client's training-row hash set.
-    * ``"partial_matches"`` — ``dict[int, int]`` mapping k → match count
+    * ``"partial_matches"`` — ``dict[str, int]`` mapping str(k) → match count
       for k ∈ {1, 2, 3}.
     * ``"n_syn"``           — int, total number of synthetic rows evaluated.
 
@@ -95,8 +97,8 @@ class DirectOverlapDiagnosticEvaluator(Evaluator):
     (same synthetic DF broadcast to all), so any client's value is used.
     """
 
-    @staticmethod
-    def _nan_result() -> dict[str, float]:
+    # noinspection PyMethodMayBeStatic
+    def _nan_result(self) -> dict[str, float]:
         return {
             "exact_row_match_rate_train": math.nan,
             "exact_row_match_any": math.nan,
@@ -105,6 +107,38 @@ class DirectOverlapDiagnosticEvaluator(Evaluator):
             "partial_match_rate_top3": math.nan,
             "partial_match_any": math.nan,
         }
+
+    # noinspection PyMethodMayBeStatic
+    def _canonical_value(self, val: Any) -> str:
+        """Deterministic string representation for a value."""
+        if pd.isna(val):
+            return "__NaN__"
+        # explicit bool handling before int (bool is a subclass of int)
+        if isinstance(val, (bool, np.bool_)):
+            return str(int(val))
+        if isinstance(val, (np.floating, float)):
+            return f"{float(val):.8f}"
+        if isinstance(val, (np.integer, int)):
+            return str(int(val))
+        if isinstance(val, str):
+            return val.strip()
+        return str(val)
+
+    def _canonical_row_hash(self, df: pd.DataFrame) -> pd.Series:
+        df = df.copy()
+        df = df[df.columns.sort_values()]
+
+        def hash_row(row: pd.Series) -> str:
+            canonical = [self._canonical_value(v) for v in row.values]
+            joined = "|".join(canonical)
+            return hashlib.md5(joined.encode("utf-8")).hexdigest()
+
+        return df.apply(hash_row, axis=1)
+
+    def _count_matches(self, ctx: LocalEvalContext, cols: Iterable[str]) -> int:
+        H_train = set(self._canonical_row_hash(ctx.train_df[cols]))
+        H_syn = self._canonical_row_hash(ctx.synthetic_df[cols])
+        return int(sum(h in H_train for h in H_syn))
 
     def global_evaluate(self, ctx: GlobalEvalContext) -> dict[str, float]:
         """Overlap must be checked against client training records (federated mode).
@@ -121,15 +155,11 @@ class DirectOverlapDiagnosticEvaluator(Evaluator):
         )
         return self._nan_result()
 
-    def local_evaluate(self, ctx: LocalEvalContext) -> dict[str, Any] | None:
+    def local_evaluate(self, ctx: LocalEvalContext) -> _DirectOverlapResult | None:
         """Compute exact and partial match counts between train_df and syn_df."""
         common = sorted(set(ctx.train_df.columns) & set(ctx.synthetic_df.columns))
         if not common:
             return None
-
-        H_train = set(canonical_row_hash(ctx.train_df[common]))
-        H_syn = canonical_row_hash(ctx.synthetic_df[common])
-        exact_matches = int(sum(h in H_train for h in H_syn))
 
         excluded = set(ctx.sensitive_columns or [])
         if ctx.target_column:
@@ -142,33 +172,34 @@ class DirectOverlapDiagnosticEvaluator(Evaluator):
             reverse=True,
         )
 
-        partial_matches: dict[int, int] = {}
-        for k in (1, 2, 3):
-            cols = ranked[:k]
-            Ht = set(canonical_row_hash(ctx.train_df[cols]))
-            Hs = canonical_row_hash(ctx.synthetic_df[cols])
-            partial_matches[k] = int(sum(h in Ht for h in Hs))
-
-        return {
-            "exact_matches": exact_matches,
-            "partial_matches": partial_matches,
-            "n_syn": len(H_syn),
+        exact_matches = self._count_matches(ctx, common)
+        partial_matches = {
+            str(k): self._count_matches(ctx, ranked[:k])  # nofmt
+            for k in (1, 2, 3)
         }
 
-    @staticmethod
-    def aggregate(stats: Iterable[dict[str, Any] | None]) -> dict[str, float]:
+        return _DirectOverlapResult(
+            exact_matches=exact_matches,
+            partial_matches=partial_matches,
+            n_syn=len(ctx.synthetic_df),
+        )
+
+    def aggregate(
+        self,
+        stats: Iterable[_DirectOverlapResult | None],
+    ) -> dict[str, float]:
         valid = [s for s in stats if s]
         if not valid:
-            return DirectOverlapDiagnosticEvaluator._nan_result()
+            return self._nan_result()
 
         # n_syn is identical across clients (same synthetic DF)
-        n_syn = valid[0]["n_syn"]
+        n_syn = valid[0].n_syn
         if not n_syn:
-            return DirectOverlapDiagnosticEvaluator._nan_result()
+            return self._nan_result()
 
-        exact_rate = sum(s["exact_matches"] for s in valid) / n_syn
+        exact_rate = sum(s.exact_matches for s in valid) / n_syn
         partial_rates = {
-            k: sum(s["partial_matches"].get(k, 0) for s in valid) / n_syn
+            k: sum(s.partial_matches[str(k)] for s in valid) / n_syn  # nofmt
             for k in (1, 2, 3)
         }
 
@@ -185,6 +216,14 @@ class DirectOverlapDiagnosticEvaluator(Evaluator):
 # ---------------------------------------------------------------------------
 # MIA — nearest-neighbour attack
 # ---------------------------------------------------------------------------
+
+
+@dataclass(frozen=True)
+class _MIAResult:
+    mia_auc: float
+    mia_accuracy: float
+    mia_advantage: float
+    K: int
 
 
 class MIANearestNeighborAttackEvaluator(Evaluator):
@@ -210,23 +249,18 @@ class MIANearestNeighborAttackEvaluator(Evaluator):
     reference guide §15.3.2).
     """
 
-    @dataclass(frozen=True)
-    class MIAResult:
-        mia_auc: float
-        mia_accuracy: float
-        mia_advantage: float
-        K: int
+    DEFAULT_MIA_K = 1000
 
-    @staticmethod
     def _compute(
+        self,
         train_df: pd.DataFrame,
         test_df: pd.DataFrame,
         syn_df: pd.DataFrame,
         schema: TableSchema,
         seed: int,
-    ) -> MIAResult:
+    ) -> _MIAResult:
         """Core NN-MIA logic shared by centralized and federated paths."""
-        nan_result = MIANearestNeighborAttackEvaluator.MIAResult(
+        nan_result = _MIAResult(
             mia_auc=math.nan,
             mia_accuracy=math.nan,
             mia_advantage=math.nan,
@@ -247,7 +281,7 @@ class MIANearestNeighborAttackEvaluator(Evaluator):
         if members_pool.empty or nonmembers_pool.empty or sx.empty:
             return nan_result
 
-        K = min(DEFAULT_MIA_K, len(members_pool), len(nonmembers_pool))
+        K = min(self.DEFAULT_MIA_K, len(members_pool), len(nonmembers_pool))
         if K == 0:
             return nan_result
 
@@ -277,7 +311,7 @@ class MIANearestNeighborAttackEvaluator(Evaluator):
         scores = np.where(np.isfinite(scores), scores, finite.min())
 
         threshold = np.median(scores)
-        return MIANearestNeighborAttackEvaluator.MIAResult(
+        return _MIAResult(
             K=K,
             mia_auc=roc_auc_score(y, scores),
             mia_accuracy=accuracy_score(y, scores > threshold),
@@ -331,16 +365,10 @@ class MIANearestNeighborAttackEvaluator(Evaluator):
         )
         return result.mia_auc, result.K
 
-    @staticmethod
-    def aggregate(stats: Iterable[tuple[float, int]]) -> dict[str, float]:
+    def aggregate(self, stats: Iterable[tuple[float, int]]) -> dict[str, float]:
         """Weighted-mean AUC across clients (approximate federated proxy)."""
-        pairs: list[tuple[float, int]] = [
-            (auc, n)  # nofmt
-            for auc, n in stats
-            if not math.isnan(auc) and n > 0
-        ]
         return {
-            "mia_auc": weighted_mean(pairs),
+            "mia_auc": weighted_mean(stats),
             # accuracy and advantage cannot be meaningfully aggregated
             # across clients without pooling raw scores
             "mia_accuracy": math.nan,
@@ -351,6 +379,14 @@ class MIANearestNeighborAttackEvaluator(Evaluator):
 # ---------------------------------------------------------------------------
 # AIA — supervised attribute inference attack, shared scoring helper
 # ---------------------------------------------------------------------------
+
+
+@dataclass
+class _AIAResult:
+    accuracy: float = math.nan
+    auc: float = math.nan
+    rmse: float = math.nan
+    n_test: int = 0
 
 
 class AIASupervisedAttackEvaluator(Evaluator):
@@ -373,81 +409,91 @@ class AIASupervisedAttackEvaluator(Evaluator):
     Weighted mean per metric key, weighted by ``n_test``.
     """
 
-    @staticmethod
+    # noinspection PyMethodMayBeStatic
+    def _nan_result(self) -> dict[str, float]:
+        return {
+            "aia_accuracy": math.nan,
+            "aia_auc": math.nan,
+            "aia_rmse": math.nan,
+        }
+
+    # noinspection PyMethodMayBeStatic
     def _compute_column(
+        self,
         test_df: pd.DataFrame,
         syn_df: pd.DataFrame,
         target_column: str | None,
         sensitive_column: str,
         schema: Any,
         seed: int,
-    ) -> dict[str, float | int]:
+    ) -> _AIAResult:
         """Fit an attacker on syn_df and evaluate on (X_test, y_test).
 
-        Returns a dict with keys ``"accuracy"``, ``"auc"``, ``"rmse"``
-        (NaN for whichever metrics are not applicable to the column kind).
+        Returns an ``_AIAResult`` with accuracy/auc for classification or
+        rmse for regression (NaN for inapplicable metrics).
         """
 
-        entry: dict[str, float] = {
-            "accuracy": math.nan,
-            "auc": math.nan,
-            "rmse": math.nan,
-            "n_test": 0,
-        }
+        result = _AIAResult()
 
-        all_columns = set(test_df.columns)
-        quasi_ids = get_quasi_identifiers(all_columns, sensitive_column, target_column)
+        qi = set(test_df.columns) - {sensitive_column}
+        if target_column:
+            qi -= {target_column}
+        quasi_ids = sorted(qi)
+
         if (
             not quasi_ids
             or sensitive_column not in test_df.columns
             or sensitive_column not in syn_df.columns
         ):
-            return entry
+            return result
 
         X_test = test_df[quasi_ids]
         y_test = test_df[sensitive_column]
         X_syn = syn_df[quasi_ids]
         y_syn = syn_df[sensitive_column]
-        entry["n_test"] = len(test_df)
+        result.n_test = len(test_df)
 
-        try:
-            if schema.kind_of(sensitive_column) in ["binary", "categorical"]:
-                model = LogisticRegression(
-                    max_iter=1000,
-                    solver="lbfgs",
-                    random_state=seed,
-                )
-                pipe = fit_tabular_model(X_syn, y_syn, model)
-                y_pred = pipe.predict(X_test)
-                entry["accuracy"] = accuracy_score(y_test, y_pred)
-                if len(np.unique(y_syn)) == 2:
-                    y_proba = pipe.predict_proba(X_test)[:, 1]
-                    entry["auc"] = roc_auc_score(y_test, y_proba)
-            else:
-                model = Ridge(random_state=seed)
-                pipe = fit_tabular_model(X_syn, y_syn, model)
-                y_pred = pipe.predict(X_test)
-                entry["rmse"] = math.sqrt(mean_squared_error(y_test, y_pred))
-        except Exception:
-            pass  # leave values as nan
+        if schema.kind_of(sensitive_column) in ["binary", "categorical"]:
+            y_syn = y_syn.astype(str)
+            y_test = y_test.astype(str)
+            if y_syn.nunique() < 2:
+                return result
 
-        return entry
+            model = LogisticRegression(
+                max_iter=1000,
+                solver="lbfgs",
+                random_state=seed,
+            )
+            pipe = fit_tabular_model(X_syn, y_syn, model)
+            y_pred = pipe.predict(X_test)
+            result.accuracy = accuracy_score(y_test, y_pred)
+            if len(np.unique(y_syn)) == 2:
+                y_proba = pipe.predict_proba(X_test)[:, 1]
+                result.auc = roc_auc_score(y_test, y_proba)
+        else:
+            model = Ridge(random_state=seed)
+            pipe = fit_tabular_model(X_syn, y_syn, model)
+            y_pred = pipe.predict(X_test)
+            result.rmse = math.sqrt(mean_squared_error(y_test, y_pred))
 
-    @staticmethod
+        return result
+
+    # noinspection PyMethodMayBeStatic
     def _compute(
+        self,
         test_df: pd.DataFrame,
         syn_df: pd.DataFrame,
         target_column: str | None,
         sensitive_columns: Iterable[str] | None,
         schema: Any,
         seed: int,
-    ) -> dict[str, dict[str, float | int]]:
-        payload: dict[str, dict[str, float | int]] = {}
+    ) -> dict[str, _AIAResult]:
+        payload: dict[str, _AIAResult] = {}
 
         for sensitive_column in sensitive_columns or []:
             key = to_snake_case(sensitive_column)
 
-            payload[key] = AIASupervisedAttackEvaluator._compute_column(
+            payload[key] = self._compute_column(
                 test_df,
                 syn_df,
                 target_column,
@@ -459,12 +505,6 @@ class AIASupervisedAttackEvaluator(Evaluator):
         return payload
 
     def global_evaluate(self, ctx: GlobalEvalContext) -> dict[str, float]:
-        nan_result = {
-            "aia_accuracy": math.nan,
-            "aia_auc": math.nan,
-            "aia_rmse": math.nan,
-        }
-
         results = self._compute(
             ctx.holdout_df,
             ctx.synthetic_df,
@@ -476,15 +516,13 @@ class AIASupervisedAttackEvaluator(Evaluator):
         metrics: dict[str, float] = {}
 
         for key, scores in results.items():
-            metrics[f"aia_accuracy.{key}"] = scores["accuracy"]
-            metrics[f"aia_auc.{key}"] = scores["auc"]
-            metrics[f"aia_rmse.{key}"] = scores["rmse"]
+            metrics[f"aia_accuracy.{key}"] = scores.accuracy
+            metrics[f"aia_auc.{key}"] = scores.auc
+            metrics[f"aia_rmse.{key}"] = scores.rmse
 
-        return metrics or nan_result
+        return metrics or self._nan_result()
 
-    def local_evaluate(
-        self, ctx: LocalEvalContext
-    ) -> dict[str, dict[str, float | int]]:
+    def local_evaluate(self, ctx: LocalEvalContext) -> dict[str, _AIAResult]:
         return self._compute(
             ctx.test_df,
             ctx.synthetic_df,
@@ -494,28 +532,22 @@ class AIASupervisedAttackEvaluator(Evaluator):
             ctx.seed,
         )
 
-    @staticmethod
     def aggregate(
-        stats: Iterable[dict[str, dict[str, float | int]]],
+        self,
+        stats: Iterable[Mapping[str, _AIAResult]],
     ) -> dict[str, float]:
         acc: dict[str, list[tuple[float, int]]] = {}
 
         for payload in stats:
             for col_key, entry in payload.items():
-                n = int(entry.get("n_test", 0))
+                n = int(entry.n_test)
                 for metric in ("accuracy", "auc", "rmse"):
+                    v = getattr(entry, metric)
                     full_key = f"aia_{metric}.{col_key}"
-                    acc.setdefault(full_key, [])
-                    v = entry.get(metric, math.nan)
-                    if not math.isnan(float(v)) and n > 0:
-                        acc[full_key].append((float(v), n))
+                    acc.setdefault(full_key, []).append((v, n))
 
         if not acc:
-            return {
-                "aia_accuracy": math.nan,
-                "aia_auc": math.nan,
-                "aia_rmse": math.nan,
-            }
+            return self._nan_result()
 
         return {
             key: weighted_mean(pairs)  # nofmt

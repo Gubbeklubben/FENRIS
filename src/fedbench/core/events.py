@@ -62,13 +62,13 @@ class FedInitCompleted(Event):
 
 
 @dataclass(frozen=True)
-class TrainingStarted(Event):
+class RoundStarted(Event):
     current: int
     total: int
 
 
 @dataclass(frozen=True)
-class TrainingCompleted(Event):
+class RoundCompleted(Event):
     current: int
     total: int
 
@@ -77,9 +77,11 @@ class TrainingCompleted(Event):
 class ServerRequest(Event):
     client_id: int
     msg_type: str
+    byte_count: int
 
 
 @dataclass(frozen=True)
 class ClientReply(Event):
     client_id: int
     msg_type: str
+    byte_count: int

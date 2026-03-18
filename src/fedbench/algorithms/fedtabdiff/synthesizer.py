@@ -149,7 +149,7 @@ class FedTabDiffSynthesizer(Synthesizer):
             # collect rec error losses
             total_losses.append(train_losses.detach().cpu().numpy())
 
-            if idx >= self._max_batches:
+            if idx + 1 >= self._max_batches:
                 break
 
         # average of rec errors
@@ -165,6 +165,9 @@ class FedTabDiffSynthesizer(Synthesizer):
         return reply
 
     def sample(self, request: Update, num_rows: int, seed: int) -> DataFrame:
+        torch.manual_seed(seed)
+        if torch.cuda.is_available():
+            torch.cuda.manual_seed(seed)
         log_info(str(self), "Start sampling...")
 
         state_dict = request.arrays["state"]

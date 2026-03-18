@@ -33,7 +33,8 @@ Federated aggregation notes
 from __future__ import annotations
 
 import math
-from typing import Any, Iterable
+from dataclasses import dataclass
+from typing import Iterable, Mapping
 
 import numpy as np
 import pandas as pd
@@ -48,13 +49,19 @@ from fedbench.util.metrics import (
     get_numeric_columns,
     safe_nanmean,
     sanitize_numeric_df,
-    to_numeric_series,
-    weighted_mean,
+    weighted_mean_metrics,
 )
 
 # ---------------------------------------------------------------------------
 # Moment metrics  (mean / std)
 # ---------------------------------------------------------------------------
+
+
+@dataclass(frozen=True)
+class _MomentReductionResult:
+    mean: float
+    sumsq_dev: float
+    n: int
 
 
 class MomentReductionMetricsEvaluator(Evaluator):
@@ -87,6 +94,21 @@ class MomentReductionMetricsEvaluator(Evaluator):
     |Δstd| over columns.
     """
 
+    # noinspection PyMethodMayBeStatic
+    def _to_numeric_series(self, series: pd.Series) -> pd.Series:
+        """Coerce to numeric and drop NaNs, returning a clean pd.Series."""
+        return pd.Series(pd.to_numeric(series, errors="coerce")).dropna()
+
+    def _compute(self, df: pd.DataFrame, col: str) -> _MomentReductionResult:
+        series = self._to_numeric_series(df[col])
+        n = len(series)
+        mean = series.mean() if n > 0 else math.nan
+        return _MomentReductionResult(
+            mean=float(mean),
+            sumsq_dev=float(((series - mean) ** 2).sum()) if n > 0 else 0.0,
+            n=n,
+        )
+
     def global_evaluate(self, ctx: GlobalEvalContext) -> dict[str, float]:
         nan_result = {
             "mean_abs_diff": math.nan,
@@ -99,8 +121,8 @@ class MomentReductionMetricsEvaluator(Evaluator):
 
         mean_abs_diffs, std_abs_diffs = [], []
         for col in numeric_columns:
-            r = to_numeric_series(ctx.holdout_df[col])
-            s = to_numeric_series(ctx.synthetic_df[col])
+            r = self._to_numeric_series(ctx.holdout_df[col])
+            s = self._to_numeric_series(ctx.synthetic_df[col])
             if len(r) == 0 or len(s) == 0:
                 continue
             mean_abs_diffs.append(abs(r.mean() - s.mean()))
@@ -114,82 +136,58 @@ class MomentReductionMetricsEvaluator(Evaluator):
 
     def local_evaluate(
         self, ctx: LocalEvalContext
-    ) -> dict[str, dict[str, dict[str, float | int]]]:
+    ) -> dict[str, dict[str, _MomentReductionResult]]:
         numeric_columns = get_numeric_columns(ctx.train_df, ctx.schema)
-        payload: dict[str, dict[str, dict[str, float | int]]] = {}
+        payload: dict[str, dict[str, _MomentReductionResult]] = {}
         for col in numeric_columns:
-            r = to_numeric_series(ctx.train_df[col])
-            s = to_numeric_series(ctx.synthetic_df[col])
-            r_n, s_n = len(r), len(s)
-            r_mean = float(r.mean()) if r_n > 0 else math.nan
-            s_mean = float(s.mean()) if s_n > 0 else math.nan
             payload[col] = {
-                "real": {
-                    "mean": r_mean,
-                    "sumsq_dev": float(((r - r_mean) ** 2).sum()) if r_n > 0 else 0.0,
-                    "n": float(r_n),
-                },
-                "syn": {
-                    "mean": s_mean,
-                    "sumsq_dev": float(((s - s_mean) ** 2).sum()) if s_n > 0 else 0.0,
-                    "n": float(s_n),
-                },
+                "real": self._compute(ctx.train_df, col),
+                "syn": self._compute(ctx.synthetic_df, col),
             }
         return payload
 
-    @staticmethod
     def aggregate(
-        stats: Iterable[dict[str, dict[str, dict[str, float | int]]]],
+        self,
+        stats: Iterable[Mapping[str, Mapping[str, _MomentReductionResult]]],
     ) -> dict[str, float]:
-        real_acc: dict[str, dict[str, float | int]] = {}
-        syn_stats: dict[
-            str, dict[str, float | int]
-        ] = {}  # from first client that has data
+        real_acc: dict[str, _MomentReductionResult] = {}
+        syn_stats: dict[str, _MomentReductionResult] = {}
 
         for payload in stats:
             for col, rec in payload.items():
                 # Synthetic side: record once per column (identical across clients)
                 syn = rec["syn"]
-                if col not in syn_stats and syn["n"] > 0:
-                    syn_stats[col] = syn.copy()
+                if col not in syn_stats and syn.n > 0:
+                    syn_stats[col] = syn
 
                 # Accumulate real side via Chan's parallel algorithm
                 real = rec["real"]
-                if real["n"] <= 0:
+                if real.n <= 0:
                     continue
 
                 if col not in real_acc:
-                    real_acc[col] = real.copy()
+                    real_acc[col] = real
                     continue
 
                 a, b = real_acc[col], real
-                n_a, n_b = a["n"], b["n"]
-                n_c = n_a + n_b
-                delta = b["mean"] - a["mean"]
+                n = a.n + b.n
+                delta = b.mean - a.mean
 
-                # fmt: off
-                real_acc[col] = {
-                    "mean": (
-                        n_a * a["mean"]
-                        + n_b * b["mean"]
-                    ) / n_c,
-                    "sumsq_dev":
-                        a["sumsq_dev"] + b["sumsq_dev"]
-                        + delta ** 2 * n_a * n_b / n_c,
-                    "n": n_c,
-                }
-                # fmt: on
+                real_acc[col] = _MomentReductionResult(
+                    mean=(a.n * a.mean + b.n * b.mean) / n,
+                    sumsq_dev=a.sumsq_dev + b.sumsq_dev + delta**2 * a.n * b.n / n,
+                    n=n,
+                )
 
         mean_abs_diffs, std_abs_diffs = [], []
         for col, r in real_acc.items():
             s = syn_stats.get(col)
             if s is None:
                 continue
-            mean_abs_diffs.append(abs(r["mean"] - s["mean"]))
-            r_n, s_n = int(r["n"]), int(s["n"])
-            if r_n >= 2 and s_n >= 2:
-                r_std = math.sqrt(max(r["sumsq_dev"] / (r_n - 1), 0.0))
-                s_std = math.sqrt(max(s["sumsq_dev"] / (s_n - 1), 0.0))
+            mean_abs_diffs.append(abs(r.mean - s.mean))
+            if r.n >= 2 and s.n >= 2:
+                r_std = math.sqrt(max(r.sumsq_dev / (r.n - 1), 0.0))
+                s_std = math.sqrt(max(s.sumsq_dev / (s.n - 1), 0.0))
                 std_abs_diffs.append(abs(r_std - s_std))
 
         return {
@@ -226,8 +224,9 @@ class DistributionSimilarityMetricsEvaluator(Evaluator):
     and ``n_rows`` is the number of real rows used on this client.
     """
 
-    @staticmethod
+    # noinspection PyMethodMayBeStatic
     def _compute(
+        self,
         real_df: pd.DataFrame,
         syn_df: pd.DataFrame,
         schema: TableSchema,
@@ -264,35 +263,25 @@ class DistributionSimilarityMetricsEvaluator(Evaluator):
             t_val = scipy.stats.ttest_ind(r, s, equal_var=False).statistic
             t_vals.append(abs(t_val))
 
-        return (
-            {
-                "ks_mean": safe_nanmean(ks_vals),
-                "wasserstein_mean": safe_nanmean(wasserstein_vals),
-                "t_stat_mean_abs": safe_nanmean(t_vals),
-            },
-            len(r_df),
-        )
+        return {
+            "ks_mean": safe_nanmean(ks_vals),
+            "wasserstein_mean": safe_nanmean(wasserstein_vals),
+            "t_stat_mean_abs": safe_nanmean(t_vals),
+        }, len(r_df)
 
     def global_evaluate(self, ctx: GlobalEvalContext) -> dict[str, float]:
-        stats = self._compute(ctx.holdout_df, ctx.synthetic_df, ctx.schema)
-        return self.aggregate([stats])
+        scores, _ = self._compute(ctx.holdout_df, ctx.synthetic_df, ctx.schema)
+        return scores
 
     def local_evaluate(self, ctx: LocalEvalContext) -> tuple[dict[str, float], int]:
         return self._compute(ctx.train_df, ctx.synthetic_df, ctx.schema)
 
-    @staticmethod
-    def aggregate(stats: Iterable[tuple[dict[str, float], int]]) -> dict[str, float]:
-        keys = ["ks_mean", "wasserstein_mean", "t_stat_mean_abs"]
-        pairs: dict[str, list[tuple[float, int]]] = {k: [] for k in keys}
-        for scores, n in stats:
-            for k in keys:
-                v = scores.get(k, math.nan)
-                if not math.isnan(v) and n > 0:
-                    pairs[k].append((v, n))
-        return {
-            k: weighted_mean(pairs[k]) if pairs[k] else math.nan  # nofmt
-            for k in keys
-        }
+    def aggregate(
+        self,
+        stats: Iterable[tuple[Mapping[str, float], int]],
+    ) -> dict[str, float]:
+        keys = ("ks_mean", "wasserstein_mean", "t_stat_mean_abs")
+        return weighted_mean_metrics(stats, keys)
 
 
 # ---------------------------------------------------------------------------
@@ -323,8 +312,9 @@ class CategoricalTvMeanEvaluator(Evaluator):
     frequencies from global totals, then derives TV distance.
     """
 
-    @staticmethod
+    # noinspection PyMethodMayBeStatic
     def _compute(
+        self,
         real_df: pd.DataFrame,
         syn_df: pd.DataFrame,
         schema: TableSchema,
@@ -354,18 +344,19 @@ class CategoricalTvMeanEvaluator(Evaluator):
     ) -> dict[str, dict[str, dict[str, int]]]:
         return self._compute(ctx.train_df, ctx.synthetic_df, ctx.schema)
 
-    @staticmethod
     def aggregate(
+        self,
         stats: Iterable[dict[str, dict[str, dict[str, int]]]],
     ) -> dict[str, float]:
         acc: dict[str, dict[str, dict[str, int]]] = {}
         for payload in stats:
             for col, sides in payload.items():
-                acc.setdefault(col, {})
-                for side in ("real", "syn"):
-                    acc[col].setdefault(side, {})
-                    for cat, cnt in sides[side].items():
-                        acc[col][side][cat] = acc[col][side].get(cat, 0) + int(cnt)
+                # Synthetic DF is identical on every client — record once only.
+                acc.setdefault(col, {"real": {}, "syn": dict(sides["syn"])})
+                # Real counts are additive: each client holds a disjoint partition.
+                for cat, cnt in sides["real"].items():
+                    acc[col]["real"].setdefault(cat, 0)
+                    acc[col]["real"][cat] += cnt
 
         if not acc:
             return {"categorical_tv_mean": math.nan}
@@ -406,20 +397,29 @@ class CorrFroDiffEvaluator(Evaluator):
         if len(numeric_columns) < 2:
             return {"corr_fro_diff": math.nan}
 
-        def safe_corr(df: pd.DataFrame) -> pd.DataFrame:
-            non_constant = df.columns[df.nunique(dropna=True) > 1]
-            return df[non_constant].corr().fillna(0.0)
+        r = ctx.holdout_df[numeric_columns]
+        s = ctx.synthetic_df[numeric_columns]
 
-        r_corr = safe_corr(ctx.holdout_df[numeric_columns])
-        s_corr = safe_corr(ctx.synthetic_df[numeric_columns])
+        # Filter columns jointly to ensure that both matrices have the same column set.
+        # A constant column produces NaN correlations on its own side and would bias
+        # the computation if included.
+        non_constant = [
+            col
+            for col in numeric_columns
+            if r[col].nunique(dropna=True) > 1 and s[col].nunique(dropna=True) > 1
+        ]
+        if len(non_constant) < 2:
+            return {"corr_fro_diff": math.nan}
 
-        common = r_corr.index.intersection(s_corr.index)
-        diff = r_corr.loc[common, common].values - s_corr.loc[common, common].values
+        r_corr = r[non_constant].corr().fillna(0.0)
+        s_corr = s[non_constant].corr().fillna(0.0)
+
+        diff = r_corr.values - s_corr.values
         return {
             "corr_fro_diff": float(np.linalg.norm(diff, ord="fro")),
         }
 
-    def local_evaluate(self, ctx: LocalEvalContext) -> Any:
+    def local_evaluate(self, ctx: LocalEvalContext) -> dict[str, float]:
         log_debug(
             "CorrFroDiffEvaluator",
             "CorrFroDiffEvaluator does not support federated evaluation. "
@@ -427,8 +427,7 @@ class CorrFroDiffEvaluator(Evaluator):
         )
         return {"corr_fro_diff": math.nan}
 
-    @staticmethod
-    def aggregate(stats: Iterable[Any]) -> dict[str, float]:
+    def aggregate(self, stats: Iterable[Mapping[str, float]]) -> dict[str, float]:
         log_debug(
             "CorrFroDiffEvaluator",
             "CorrFroDiffEvaluator does not support federated aggregation. "
