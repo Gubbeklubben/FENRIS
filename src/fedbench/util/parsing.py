@@ -125,7 +125,10 @@ def parse_for_function(
         optional = has_default or is_optional(param.annotation)
 
         if name in raw:
-            parsed[name] = coerce(raw[name], param.annotation)
+            if param.annotation is inspect.Parameter.empty:
+                parsed[name] = raw[name]
+            else:
+                parsed[name] = coerce(raw[name], param.annotation)
         else:
             if not optional:
                 raise TypeError(
