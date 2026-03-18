@@ -23,6 +23,7 @@ import numpy as np
 import pandas as pd
 import pytest
 
+from fedbench.evaluators.fairness import FairnessEvaluator
 from fedbench.evaluators.fidelity import (
     CategoricalTvMeanEvaluator,
     CorrFroDiffEvaluator,
@@ -32,18 +33,16 @@ from fedbench.evaluators.privacy import (
     DirectOverlapDiagnosticEvaluator,
     MIANearestNeighborAttackEvaluator,
 )
-from fedbench.evaluators.fairness import FairnessEvaluator
 from fedbench.evaluators.utility import TSTREvaluator
 
 from .conftest import (
     NUMERIC_DF,
     _DistSimilarity,
     _MomentReduction,
-    make_ctx,
-    make_centralized_ctx,
     assert_dicts_nan_safe,
+    make_centralized_ctx,
+    make_ctx,
 )
-
 
 # ---------------------------------------------------------------------------
 # Evaluator registry
@@ -65,9 +64,7 @@ ALL_EVALUATORS = [
     FairnessEvaluator(),
 ]
 
-ALL_EVALUATOR_IDS = [
-    type(e).__name__ for e in ALL_EVALUATORS
-]
+ALL_EVALUATOR_IDS = [type(e).__name__ for e in ALL_EVALUATORS]
 
 
 def _make_eval_ctx(evaluator, real, syn, **kwargs):
@@ -79,7 +76,6 @@ def _make_eval_ctx(evaluator, real, syn, **kwargs):
 
 @pytest.mark.parametrize("evaluator", ALL_EVALUATORS, ids=ALL_EVALUATOR_IDS)
 class TestEdgeCases:
-
     def test_single_row_no_crash(self, evaluator):
         """Evaluator must not raise on a single-row DataFrame."""
         real = pd.DataFrame({"x": [1.0], "cat": ["a"]})
@@ -123,10 +119,12 @@ class TestEdgeCases:
         where every value is NaN (e.g. after coercion).  The evaluator should
         still return a valid dict with float values.
         """
-        real = pd.DataFrame({
-            "good": [1.0, 2.0, 3.0],
-            "bad":  [float("nan")] * 3,
-        })
+        real = pd.DataFrame(
+            {
+                "good": [1.0, 2.0, 3.0],
+                "bad": [float("nan")] * 3,
+            }
+        )
         syn = real.copy()
         ctx = _make_eval_ctx(evaluator, real, syn)
         result = evaluator.global_evaluate(ctx)

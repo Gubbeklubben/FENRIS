@@ -1,11 +1,12 @@
 import queue
 import threading
 import time
+from queue import Queue
 
 import pytest
 
-from fedbench.runtime.eventbus import EventBus, BusState
 from fedbench.core.events import Event
+from fedbench.runtime.eventbus import BusState, EventBus
 
 
 class SomeEvent(Event):
@@ -110,12 +111,13 @@ def test_concurrent_emitters(event_bus):
 
     with event_bus:
         threads = [
-            threading.Thread(
-                target=producer, args=(num_events_per_producer,))
+            threading.Thread(target=producer, args=(num_events_per_producer,))
             for _ in range(num_producers)
         ]
-        for t in threads: t.start()
-        for t in threads: t.join()
+        for t in threads:
+            t.start()
+        for t in threads:
+            t.join()
 
     assert total == (num_producers * num_events_per_producer)
 

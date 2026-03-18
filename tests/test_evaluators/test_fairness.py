@@ -32,21 +32,24 @@ import pandas as pd
 
 from fedbench.evaluators.fairness import FairnessEvaluator
 
-from .conftest import make_ctx, assert_dicts_nan_safe
+from .conftest import assert_dicts_nan_safe, make_ctx
 
 # ---------------------------------------------------------------------------
 # Sentinel set for quick key-presence assertions (generic fallback)
 # ---------------------------------------------------------------------------
-GENERIC_NAN_KEYS = frozenset({
-    "demographic_parity_diff",
-    "equalized_odds_diff",
-    "equal_opportunity_diff",
-})
+GENERIC_NAN_KEYS = frozenset(
+    {
+        "demographic_parity_diff",
+        "equalized_odds_diff",
+        "equal_opportunity_diff",
+    }
+)
 
 
 # ---------------------------------------------------------------------------
 # Data factories
 # ---------------------------------------------------------------------------
+
 
 def _biased_df(n_per_group: int = 80) -> pd.DataFrame:
     """Build a dataset where group membership perfectly predicts the label.
@@ -62,22 +65,27 @@ def _biased_df(n_per_group: int = 80) -> pd.DataFrame:
     ``min_group_size`` threshold and are included in the metric computation.
     """
     rng = np.random.default_rng(0)
-    group0 = pd.DataFrame({
-        "feature": rng.normal(3.0, 0.5, n_per_group),
-        "sensitive": 0,
-        "target": 1,
-    })
-    group1 = pd.DataFrame({
-        "feature": rng.normal(-3.0, 0.5, n_per_group),
-        "sensitive": 1,
-        "target": 0,
-    })
+    group0 = pd.DataFrame(
+        {
+            "feature": rng.normal(3.0, 0.5, n_per_group),
+            "sensitive": 0,
+            "target": 1,
+        }
+    )
+    group1 = pd.DataFrame(
+        {
+            "feature": rng.normal(-3.0, 0.5, n_per_group),
+            "sensitive": 1,
+            "target": 0,
+        }
+    )
     return pd.concat([group0, group1], ignore_index=True)
 
 
 # ---------------------------------------------------------------------------
 # Guard tests — prerequisites that cause the generic nan fallback
 # ---------------------------------------------------------------------------
+
 
 class TestFairnessGuards:
     """FairnessEvaluator returns the generic nan result for missing prerequisites."""
@@ -116,6 +124,7 @@ class TestFairnessGuards:
 # Per-column nan tests — prerequisites fail *after* entering the sensitive loop
 # ---------------------------------------------------------------------------
 
+
 class TestFairnessPerColumnNan:
     """FairnessEvaluator emits per-column nan keys when evaluation fails per-column.
 
@@ -128,13 +137,16 @@ class TestFairnessPerColumnNan:
 
     def test_non_binary_target_emits_per_column_nan_keys(self):
         """Multi-class target → non-binary check → per-column nan keys emitted."""
-        df = pd.DataFrame({
-            "feat": [1.0, 2.0, 3.0, 4.0, 5.0],
-            "sens": [0, 0, 1, 1, 0],
-            "target": [0, 1, 2, 3, 4],
-        })
+        df = pd.DataFrame(
+            {
+                "feat": [1.0, 2.0, 3.0, 4.0, 5.0],
+                "sens": [0, 0, 1, 1, 0],
+                "target": [0, 1, 2, 3, 4],
+            }
+        )
         ctx = make_ctx(
-            df, df.copy(),
+            df,
+            df.copy(),
             target_column="target",
             sensitive_columns=("sens",),
         )
@@ -148,13 +160,16 @@ class TestFairnessPerColumnNan:
 
     def test_insufficient_group_size_emits_per_column_nan_keys(self):
         """Groups smaller than min_group_size (30) → per-column nan keys."""
-        small = pd.DataFrame({
-            "feat": [1.0, 2.0, 3.0, 4.0],
-            "sens": [0, 0, 1, 1],
-            "target": [0, 1, 0, 1],
-        })
+        small = pd.DataFrame(
+            {
+                "feat": [1.0, 2.0, 3.0, 4.0],
+                "sens": [0, 0, 1, 1],
+                "target": [0, 1, 0, 1],
+            }
+        )
         ctx = make_ctx(
-            small, small.copy(),
+            small,
+            small.copy(),
             target_column="target",
             sensitive_columns=("sens",),
         )
@@ -168,7 +183,8 @@ class TestFairnessPerColumnNan:
         """Only target + sensitive in the frame, no features → per-column nan keys."""
         df = pd.DataFrame({"sens": [0, 1, 0, 1], "target": [0, 0, 1, 1]})
         ctx = make_ctx(
-            df, df.copy(),
+            df,
+            df.copy(),
             target_column="target",
             sensitive_columns=("sens",),
         )
@@ -182,6 +198,7 @@ class TestFairnessPerColumnNan:
 # ---------------------------------------------------------------------------
 # Metric computation tests
 # ---------------------------------------------------------------------------
+
 
 class TestFairnessMetrics:
     """FairnessEvaluator produces meaningful metrics on well-formed data.
@@ -197,7 +214,8 @@ class TestFairnessMetrics:
         """Per-column metric keys are emitted when all prerequisites are met."""
         df = _biased_df()
         ctx = make_ctx(
-            df, df.copy(),
+            df,
+            df.copy(),
             target_column="target",
             sensitive_columns=("sensitive",),
         )
@@ -211,7 +229,8 @@ class TestFairnessMetrics:
         """Strongly segregated groups → demographic_parity_diff > 0.3."""
         df = _biased_df()
         ctx = make_ctx(
-            df, df.copy(),
+            df,
+            df.copy(),
             target_column="target",
             sensitive_columns=("sensitive",),
         )
@@ -225,7 +244,8 @@ class TestFairnessMetrics:
         """No ±infinity values emitted for valid inputs (NaN contract §7.1.2)."""
         df = _biased_df()
         ctx = make_ctx(
-            df, df.copy(),
+            df,
+            df.copy(),
             target_column="target",
             sensitive_columns=("sensitive",),
         )
@@ -243,7 +263,8 @@ class TestFairnessMetrics:
         df = df.rename(columns={"sensitive": "group_a"})
         df["group_b"] = df["group_a"]
         ctx = make_ctx(
-            df, df.copy(),
+            df,
+            df.copy(),
             target_column="target",
             sensitive_columns=("group_a", "group_b"),
         )
@@ -258,7 +279,8 @@ class TestFairnessMetrics:
         """Same EvalContext produces identical results on consecutive calls."""
         df = _biased_df()
         ctx = make_ctx(
-            df, df.copy(),
+            df,
+            df.copy(),
             target_column="target",
             sensitive_columns=("sensitive",),
         )

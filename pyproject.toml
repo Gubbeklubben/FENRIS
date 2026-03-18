@@ -62,7 +62,7 @@ follow_imports_for_stubs = true
 
 [tool.ruff]
 line-length = 88
-src = ["src"]
+src = ["src", "tests"]
 
 [tool.ruff.lint]
 # E, W: pycodestyle (standard errors and warnings)

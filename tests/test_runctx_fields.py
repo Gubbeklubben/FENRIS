@@ -19,10 +19,7 @@ def instance() -> RunContext:
 
 @pytest.fixture
 def fields() -> Iterable[str]:
-    return (
-        k for k, v in RunContext.__dict__.items()
-        if isinstance(v, _RunCtxField)
-    )
+    return (k for k, v in RunContext.__dict__.items() if isinstance(v, _RunCtxField))
 
 
 def test_get_before_set_raises(instance, fields: Iterable[str]):
