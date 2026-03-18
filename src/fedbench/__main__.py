@@ -3,13 +3,13 @@ from typing import Annotated, Literal
 
 import typer
 
-import fedbench.runner as runner
+import fedbench.runtime.runner as runner
 from fedbench.config.builder import build_config
-from fedbench.pipeline import pipeline
-from fedbench.registries import (
+from fedbench.runtime.pipeline import pipeline
+from fedbench.runtime.registry_builder import (
     build_algorithm_registry,
-    build_partitioner_registry,
     build_evaluator_registries,
+    build_partitioner_registry,
 )
 from fedbench.util.parsing import split_outside_brackets
 

@@ -7,24 +7,16 @@ from numpy.typing import NDArray
 
 from fedbench.core.algorithm import (
     Algorithm,
+    ComponentSpec,
     Coordinator,
     SingleStepCoordinator,
     Synthesizer,
+    coordinator_spec,
+    synthesizer_spec,
 )
 from fedbench.core.data import TableSchema
 from fedbench.core.logger import log_info
 from fedbench.core.update import Update
-
-
-class FedHello(Algorithm):
-    def __init__(self, name: str = "Stranger") -> None:
-        self._name = name
-
-    def create_coordinator(self) -> Coordinator:
-        return FedHelloCoordinator(self._name)
-
-    def create_synthesizer(self) -> Synthesizer:
-        return FedHelloSynthesizer(self._name)
 
 
 class FedHelloCoordinator(SingleStepCoordinator):
@@ -74,6 +66,12 @@ class FedHelloCoordinator(SingleStepCoordinator):
 class FedHelloSynthesizer(Synthesizer):
     def __init__(self, name: str) -> None:
         self._name = name
+        self._cache: Update | None = None
+
+    def attach_client_cache(self, cache: Update) -> None:
+        self._cache = cache
+        if "counters" not in self._cache.metrics:
+            self._cache.metrics["counters"] = {"train": 0, "sample": 0}
 
     def train(
         self,
@@ -81,7 +79,13 @@ class FedHelloSynthesizer(Synthesizer):
         data: pd.DataFrame,
     ) -> Update:
 
-        log_info(str(self), f"Hello from train, {self._name}!")
+        if self._cache is not None:
+            self._cache.metrics["counters"]["train"] += 1  # type: ignore[operator]
+            count = self._cache.metrics["counters"]["train"]
+        else:
+            count = None
+
+        log_info(str(self), f"Hello {count} from train, {self._name}!")
         return Update(arrays=request.arrays, objects={"objects": {"df": data}})
 
     def sample(
@@ -91,9 +95,31 @@ class FedHelloSynthesizer(Synthesizer):
         seed: int,
     ) -> pd.DataFrame:
 
-        log_info(str(self), f"Hello from sample, {self._name}!")
+        if self._cache is not None:
+            self._cache.metrics["counters"]["sample"] += 1  # type: ignore[operator]
+            count = self._cache.metrics["counters"]["sample"]
+        else:
+            count = None
+
+        log_info(str(self), f"Hello {count} from sample, {self._name}!")
         # noinspection PyUnnecessaryCast
         try:
             return cast(pd.DataFrame, request.objects["objects"]["df"])[:num_rows]
         except IndexError:
             return cast(pd.DataFrame, request.objects["objects"]["df"])
+
+
+class FedHello(Algorithm):
+    """Say a federated hello."""
+
+    def __init__(self, name: str = "Stranger") -> None:
+        self._coord_factory = lambda: FedHelloCoordinator(name)
+        self._synth_factory = lambda: FedHelloSynthesizer(name)
+
+    @property
+    def coordinator_spec(self) -> ComponentSpec[Coordinator]:
+        return coordinator_spec(self._coord_factory)
+
+    @property
+    def synthesizer_spec(self) -> ComponentSpec[Synthesizer]:
+        return synthesizer_spec(self._synth_factory)

@@ -4,7 +4,7 @@ import time
 
 import pytest
 
-from fedbench.core.eventbus import EventBus, BusState
+from fedbench.runtime.eventbus import EventBus, BusState
 from fedbench.core.events import Event
 
 

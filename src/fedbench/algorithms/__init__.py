@@ -1,5 +1,5 @@
 from fedbench.core.algorithm import Algorithm
-from fedbench.core.factory_registry import FactoryRegistry
+from fedbench.runtime.registry import FactoryRegistry
 
 
 def register_builtin_algorithms(registry: FactoryRegistry[Algorithm]) -> None:
@@ -18,4 +18,8 @@ def register_builtin_algorithms(registry: FactoryRegistry[Algorithm]) -> None:
     registry.add_builtin(
         "fed_random",
         f"{__package__}.fed_random:FedRandom",
+    )
+    registry.add_builtin(
+        "fed_tgan",
+        f"{__package__}.fed_tgan:FedTGAN",
     )

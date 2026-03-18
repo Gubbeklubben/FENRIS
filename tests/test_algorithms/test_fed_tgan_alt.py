@@ -2,7 +2,7 @@
 
 Coverage:
   - FedTGANAlt constructor validation
-  - Factory methods (create_coordinator / create_synthesizer)
+  - Factory properties (coordinator_spec / synthesizer_spec)
   - Registry key resolution
   - Module-level helpers: _split_cat_num, _gumbel_softmax, _apply_activate,
     _cond_loss, _weighted_average_state_dicts, _sample_condvec_from_info
@@ -53,9 +53,9 @@ from fedbench.algorithms.fed_tgan_alt.weighting import (
     compute_jsd,
     compute_wd,
 )
-from fedbench.core.algorithm import Coordinator, Synthesizer
+from fedbench.core.algorithm import ComponentSpec, Coordinator, Synthesizer
 from fedbench.core.data.schemas import ColumnSchema, TableSchema, infer_schema
-from fedbench.core.factory_registry import FactoryRegistry
+from fedbench.runtime.registry import FactoryRegistry
 from fedbench.core.update import Update
 
 
@@ -170,14 +170,18 @@ def test_constructor_rejects_bad_params(kwargs, match):
 # ---------------------------------------------------------------------------
 
 
-def test_create_coordinator_returns_coordinator(tiny_algo):
-    coordinator = tiny_algo.create_coordinator()
+def test_coordinator_spec_returns_component_spec(tiny_algo):
+    spec = tiny_algo.coordinator_spec
+    assert isinstance(spec, ComponentSpec)
+    coordinator = spec.factory()
     assert isinstance(coordinator, Coordinator)
     assert isinstance(coordinator, FedTGANAltCoordinator)
 
 
-def test_create_synthesizer_returns_synthesizer(tiny_algo):
-    synthesizer = tiny_algo.create_synthesizer()
+def test_synthesizer_spec_returns_component_spec(tiny_algo):
+    spec = tiny_algo.synthesizer_spec
+    assert isinstance(spec, ComponentSpec)
+    synthesizer = spec.factory()
     assert isinstance(synthesizer, Synthesizer)
     assert isinstance(synthesizer, FedTGANAltSynthesizer)
 
@@ -987,17 +991,17 @@ def test_merge_vgm_models_single_client():
 # ---------------------------------------------------------------------------
 
 
-def test_coordinator_arrays_to_ml_framework_map(tiny_cfg):
-    coord = FedTGANAltCoordinator(tiny_cfg)
-    mapping = coord.arrays_to_ml_framework_map
+def test_coordinator_spec_arrays_to_ml_framework_map(tiny_algo):
+    spec = tiny_algo.coordinator_spec
+    mapping = spec.arrays_to_ml_framework_map
     assert mapping is not None
     assert mapping["generator"] == "torch"
     assert mapping["discriminator"] == "torch"
 
 
-def test_synthesizer_arrays_to_ml_framework_map(tiny_cfg):
-    synth = FedTGANAltSynthesizer(tiny_cfg)
-    mapping = synth.arrays_to_ml_framework_map
+def test_synthesizer_spec_arrays_to_ml_framework_map(tiny_algo):
+    spec = tiny_algo.synthesizer_spec
+    mapping = spec.arrays_to_ml_framework_map
     assert mapping is not None
     assert "generator" in mapping
 

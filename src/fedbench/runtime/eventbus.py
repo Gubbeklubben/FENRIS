@@ -4,9 +4,9 @@ from collections.abc import Iterable
 from dataclasses import dataclass
 from enum import Enum
 from types import TracebackType
-from typing import Protocol, Self, cast
+from typing import Self, cast
 
-from fedbench.core.events import Event
+from fedbench.core.events import Event, Observer
 from fedbench.core.logger import log_error, log_warning
 
 
@@ -15,11 +15,6 @@ class BusState(Enum):
     OPEN = 1
     CLOSING = 2
     CLOSED = 3
-
-
-class Observer(Protocol):
-    def __call__(self, event: Event) -> None:
-        pass
 
 
 @dataclass

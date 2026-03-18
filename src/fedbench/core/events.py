@@ -1,5 +1,16 @@
+from __future__ import annotations
+
 import time
+from collections.abc import Iterable
 from dataclasses import dataclass, field
+from typing import Protocol
+
+type ObserverEntry = tuple[Observer, Iterable[type[Event]]]
+
+
+class Observer(Protocol):
+    def __call__(self, event: Event) -> None:
+        pass
 
 
 @dataclass(frozen=True)
@@ -37,7 +48,7 @@ class CommandCompleted(Event):
 
 @dataclass(frozen=True)
 class ClientsConfigured(Event):
-    num_clients: int
+    pass
 
 
 @dataclass(frozen=True)
@@ -51,13 +62,13 @@ class FedInitCompleted(Event):
 
 
 @dataclass(frozen=True)
-class TrainingStarted(Event):
+class RoundStarted(Event):
     current: int
     total: int
 
 
 @dataclass(frozen=True)
-class TrainingCompleted(Event):
+class RoundCompleted(Event):
     current: int
     total: int
 
@@ -66,9 +77,11 @@ class TrainingCompleted(Event):
 class ServerRequest(Event):
     client_id: int
     msg_type: str
+    byte_count: int
 
 
 @dataclass(frozen=True)
 class ClientReply(Event):
     client_id: int
     msg_type: str
+    byte_count: int

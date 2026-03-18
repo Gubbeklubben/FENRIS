@@ -1,16 +1,17 @@
 from __future__ import annotations
 
 from collections.abc import Callable
-from typing import Mapping, cast, overload
+from typing import Any, Mapping, cast, overload
 
 from pandas import DataFrame
 
 from fedbench.config import Config
-from fedbench.core.algorithm import Algorithm
+from fedbench.core.algorithm import Algorithm, GlobalInitArtifacts
 from fedbench.core.data import PartitionedDataset, Partitioner
 from fedbench.core.eval import EvaluationSuite
-from fedbench.core.eventbus import EventBus
 from fedbench.core.update import Update
+from fedbench.runtime.eventbus import EventBus
+from fedbench.runtime.scalability_collector import ScalabilityCollector
 
 
 class _RunCtxField[T]:
@@ -62,20 +63,31 @@ class _RunCtxField[T]:
 
 class RunContext:
     # fmt: off
-    algorithm          = _RunCtxField[Algorithm]()
-    df_loader          = _RunCtxField[Callable[[], DataFrame]]()
-    partitioner        = _RunCtxField[Partitioner]()
-    eval_suite         = _RunCtxField[EvaluationSuite]()
-    dataset            = _RunCtxField[PartitionedDataset]()
-    aggregated_state   = _RunCtxField[Update]()
-    aggregated_metrics = _RunCtxField[Mapping[str, float]]()
-    synthetic_df       = _RunCtxField[DataFrame]()
+    algorithm             = _RunCtxField[Algorithm]()
+    df_loader             = _RunCtxField[Callable[[], DataFrame]]()
+    partitioner           = _RunCtxField[Partitioner]()
+    eval_suite            = _RunCtxField[EvaluationSuite]()
+    dataset               = _RunCtxField[PartitionedDataset]()
+    global_init_artifacts = _RunCtxField[GlobalInitArtifacts]()
+    aggregated_state      = _RunCtxField[Update]()
+    per_client_metrics    = _RunCtxField[Mapping[int, Mapping[str, Any]]]()
+    aggregated_metrics    = _RunCtxField[Mapping[str, float]]()
+    centralized_metrics   = _RunCtxField[Mapping[str, float]]()
+    synthetic_df          = _RunCtxField[DataFrame]()
     # fmt: on
 
-    def __init__(self, run_id: str, config: Config, eventbus: EventBus) -> None:
+    def __init__(
+        self,
+        run_id: str,
+        config: Config,
+        eventbus: EventBus,
+        scalability_collector: ScalabilityCollector,
+    ) -> None:
+
         self._run_id = run_id
         self._config = config
         self._eventbus = eventbus
+        self._scalability_collector = scalability_collector
 
     def __repr__(self) -> str:
         return f"<{self.__class__.__name__}>"
@@ -91,3 +103,7 @@ class RunContext:
     @property
     def eventbus(self) -> EventBus:
         return self._eventbus
+
+    @property
+    def scalability_collector(self) -> ScalabilityCollector:
+        return self._scalability_collector

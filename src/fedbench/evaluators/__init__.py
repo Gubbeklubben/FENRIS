@@ -1,7 +1,7 @@
 from typing import Mapping
 
 from fedbench.core.eval import Category, Evaluator
-from fedbench.core.factory_registry import FactoryRegistry
+from fedbench.runtime.registry import FactoryRegistry
 
 
 def register_builtin_evaluators(
@@ -50,4 +50,10 @@ def register_builtin_evaluators(
     registries[Category.FAIRNESS].add_builtin(
         "fairness",
         f"{__package__}.fairness:FairnessEvaluator",
+    )
+
+    # Fairness Evaluators
+    registries[Category.SCALABILITY].add_builtin(
+        "scalability",
+        f"{__package__}.scalability:ScalabilityEvaluator",
     )

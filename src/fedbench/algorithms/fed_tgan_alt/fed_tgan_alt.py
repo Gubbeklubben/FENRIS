@@ -9,6 +9,7 @@ discrete) and table-similarity-aware weighting are implemented in
 separate modules under this package.
 """
 
+import functools
 from collections.abc import Iterable
 from typing import Any, Literal, cast
 
@@ -20,9 +21,12 @@ from torch import Tensor, nn, optim
 
 from fedbench.core.algorithm import (
     Algorithm,
+    ComponentSpec,
     Coordinator,
     SingleStepCoordinator,
     Synthesizer,
+    coordinator_spec,
+    synthesizer_spec,
 )
 from fedbench.core.data import TableSchema
 from fedbench.core.logger import (
@@ -32,7 +36,7 @@ from fedbench.core.logger import (
     log_info,
     log_warning,
 )
-from fedbench.core.update import Objects, Update
+from fedbench.core.update import Update
 
 from .data_sampler import DataSampler
 from .data_transformer import (
@@ -299,11 +303,22 @@ class FedTGANAlt(Algorithm):
             "device": torch.device("cuda" if torch.cuda.is_available() else "cpu"),
         }
 
-    def create_coordinator(self) -> Coordinator:
-        return FedTGANAltCoordinator(self._cfg)
+        self._coord_factory = functools.partial(FedTGANAltCoordinator, self._cfg)
+        self._synth_factory = functools.partial(FedTGANAltSynthesizer, self._cfg)
 
-    def create_synthesizer(self) -> Synthesizer:
-        return FedTGANAltSynthesizer(self._cfg)
+    @property
+    def coordinator_spec(self) -> ComponentSpec[Coordinator]:
+        return coordinator_spec(
+            self._coord_factory,
+            {"generator": "torch", "discriminator": "torch"},
+        )
+
+    @property
+    def synthesizer_spec(self) -> ComponentSpec[Synthesizer]:
+        return synthesizer_spec(
+            self._synth_factory,
+            {"generator": "torch", "discriminator": "torch"},
+        )
 
 
 # ── Coordinator (server-side) ──────────────────────────────────────────── #
@@ -335,10 +350,6 @@ class FedTGANAltCoordinator(SingleStepCoordinator):
         self._category_probs: np.ndarray = np.array([])
         self._g_state: dict[str, Tensor] | None = None
         self._d_state: dict[str, Tensor] | None = None
-
-    @property
-    def arrays_to_ml_framework_map(self) -> dict[str, str] | None:
-        return {"generator": "torch", "discriminator": "torch"}
 
     @property
     def global_state(self) -> Update | None:
@@ -592,10 +603,6 @@ class FedTGANAltSynthesizer(Synthesizer):
         self._cfg = cfg
         self._device = cfg["device"]
         self._rng: np.random.Generator = np.random.default_rng(0)
-
-    @property
-    def arrays_to_ml_framework_map(self) -> dict[str, str] | None:
-        return {"generator": "torch", "discriminator": "torch"}
 
     def fed_init(
         self,

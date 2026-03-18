@@ -1,6 +1,6 @@
 from typing import Protocol
 
-from fedbench.core.runcontext import RunContext
+from fedbench.runtime.runcontext import RunContext
 
 
 class Command(Protocol):
