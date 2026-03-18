@@ -4,34 +4,34 @@ from fedbench.runtime.registry import FactoryRegistry
 
 def register_builtin_partitioners(registry: FactoryRegistry[Partitioner]) -> None:
     registry.add_builtin(
-        "iid-partitioner",
+        "iid_partitioner",
         f"{__package__}.flwr_delegates:FlwrDelegatePartitioner.with_iid_partitioner",
     )
     registry.add_builtin(
-        "linear-partitioner",
+        "linear_partitioner",
         f"{__package__}.flwr_delegates:FlwrDelegatePartitioner.with_linear_partitioner",
     )
     registry.add_builtin(
-        "square-partitioner",
+        "square_partitioner",
         f"{__package__}.flwr_delegates:FlwrDelegatePartitioner.with_square_partitioner",
     )
     registry.add_builtin(
-        "exponential-partitioner",
+        "exponential_partitioner",
         f"{__package__}.flwr_delegates:FlwrDelegatePartitioner.with_exponential_partitioner",
     )
     registry.add_builtin(
-        "dirichlet-partitioner",
+        "dirichlet_partitioner",
         f"{__package__}.flwr_delegates:FlwrDelegatePartitioner.with_dirichlet_partitioner",
     )
     registry.add_builtin(
-        "pathological-partitioner",
+        "pathological_partitioner",
         f"{__package__}.flwr_delegates:FlwrDelegatePartitioner.with_pathological_partitioner",
     )
     registry.add_builtin(
-        "shard-partitioner",
+        "shard_partitioner",
         f"{__package__}.flwr_delegates:FlwrDelegatePartitioner.with_shard_partitioner",
     )
     registry.add_builtin(
-        "continuous-partitioner",
+        "continuous_partitioner",
         f"{__package__}.flwr_delegates:FlwrDelegatePartitioner.with_continuous_partitioner",
     )

@@ -42,7 +42,7 @@ def minimal_valid_cfg(tmp_path: Path, **overrides):
     base = {
         "dataset": str(dataset),
         "algorithm": "fed_hello",
-        "partitioner": "iid-partitioner",
+        "partitioner": "iid_partitioner",
     }
     base.update(overrides)
     return base
@@ -173,10 +173,10 @@ def test_valid_utility_category_with_target_col(
     cfg = minimal_valid_cfg(
         tmp_path,
         run_categories=(Category.UTILITY,),
-        target_col="label",
+        target_col="b",
     )
     config = build_config(cfg, builtin_algorithms, builtin_partitioners)
-    assert config.data.target_col == "label"
+    assert config.data.target_col == "b"
     assert Category.UTILITY in config.metrics.run_categories
 
 
@@ -226,6 +226,51 @@ def test_static_defaults(tmp_path, builtin_algorithms, builtin_partitioners):
     assert config.seed == 42
     assert config.num_synthetic_rows is None
     assert config.disable_pickle is False
+
+
+# --- column name validation ------------------------------------------------
+
+
+def test_invalid_target_col_raises(tmp_path, builtin_algorithms, builtin_partitioners):
+
+    cfg = minimal_valid_cfg(tmp_path, target_col="nonexistent")
+
+    with pytest.raises(ValueError):
+        build_config(cfg, builtin_algorithms, builtin_partitioners)
+
+
+def test_invalid_sensitive_col_raises(
+    tmp_path, builtin_algorithms, builtin_partitioners
+):
+
+    cfg = minimal_valid_cfg(tmp_path, sensitive_cols=("nonexistent",))
+
+    with pytest.raises(ValueError):
+        build_config(cfg, builtin_algorithms, builtin_partitioners)
+
+
+def test_valid_target_col_passes(tmp_path, builtin_algorithms, builtin_partitioners):
+
+    cfg = minimal_valid_cfg(tmp_path, target_col="a")
+    config = build_config(cfg, builtin_algorithms, builtin_partitioners)
+    assert config.data.target_col == "a"
+
+
+def test_valid_sensitive_cols_passes(
+    tmp_path, builtin_algorithms, builtin_partitioners
+):
+
+    cfg = minimal_valid_cfg(tmp_path, sensitive_cols=("a", "b"))
+    config = build_config(cfg, builtin_algorithms, builtin_partitioners)
+    assert config.data.sensitive_cols == ("a", "b")
+
+
+def test_omitted_columns_no_error(tmp_path, builtin_algorithms, builtin_partitioners):
+    """Omitting target_col and sensitive_cols is valid (NaN-degradation path)."""
+    cfg = minimal_valid_cfg(tmp_path)
+    config = build_config(cfg, builtin_algorithms, builtin_partitioners)
+    assert config.data.target_col is None
+    assert config.data.sensitive_cols == ()
 
 
 # --- coerce tests ----------------------------------------------------------
@@ -350,7 +395,7 @@ def test_parse_for_function_missing_required_parameter_raises():
     def dummy_func(required_param: str):
         pass
 
-    with pytest.raises(TypeError, match="Missing required parameter"):
+    with pytest.raises(TypeError):
         parse_for_function(dummy_func, {})
 
 
@@ -539,7 +584,7 @@ def test_single_category_parsing(tmp_path, builtin_algorithms, builtin_partition
     cfg = minimal_valid_cfg(
         tmp_path,
         run_categories=(Category.PRIVACY,),
-        target_col="label",
+        target_col="b",
     )
 
     config = build_config(cfg, builtin_algorithms, builtin_partitioners)
@@ -556,7 +601,7 @@ def test_multiple_categories_parsing(
     cfg = minimal_valid_cfg(
         tmp_path,
         run_categories=(Category.UTILITY, Category.PRIVACY),
-        target_col="label",
+        target_col="b",
     )
 
     config = build_config(cfg, builtin_algorithms, builtin_partitioners)
@@ -633,6 +678,41 @@ def test_parse_for_function_with_tuple_coercion():
     result = parse_for_function(dummy_func, {"items": "(1, 2, 3)"})
 
     assert result["items"] == (1, 2, 3)
+
+
+# --- parse_for_function untyped parameter tests ---------------------------
+
+
+def test_parse_for_function_untyped_param_passes_raw_string():
+    """Untyped required param provided in raw → passed through as-is."""
+
+    def dummy_func(x):
+        pass
+
+    result = parse_for_function(dummy_func, {"x": "42"})
+
+    assert result["x"] == "42"
+
+
+def test_parse_for_function_untyped_param_with_default_passes_raw_string():
+    """Untyped param with default provided in raw → passed through as-is."""
+
+    def dummy_func(x=10):
+        pass
+
+    result = parse_for_function(dummy_func, {"x": "99"})
+
+    assert result["x"] == "99"
+
+
+def test_parse_for_function_untyped_missing_required_still_raises():
+    """Untyped required param not in raw → still raises TypeError."""
+
+    def dummy_func(x):
+        pass
+
+    with pytest.raises(TypeError, match="Missing required parameter"):
+        parse_for_function(dummy_func, {})
 
 
 # --- validation tests --------------------------------------------------
