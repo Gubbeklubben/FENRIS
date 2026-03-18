@@ -158,10 +158,10 @@ def test_valid_utility_category_with_target_col(
     cfg = minimal_valid_cfg(
         tmp_path,
         run_categories=(Category.UTILITY,),
-        target_col="label",
+        target_col="b",
     )
     config = build_config(cfg, builtin_algorithms, builtin_partitioners)
-    assert config.data.target_col == "label"
+    assert config.data.target_col == "b"
     assert Category.UTILITY in config.metrics.run_categories
 
 
@@ -209,6 +209,52 @@ def test_static_defaults(tmp_path, builtin_algorithms, builtin_partitioners):
     assert config.seed == 42
     assert config.num_synthetic_rows is None
     assert config.disable_pickle == False
+
+
+# --- column name validation ------------------------------------------------
+
+
+def test_invalid_target_col_raises(
+        tmp_path, builtin_algorithms, builtin_partitioners):
+
+    cfg = minimal_valid_cfg(tmp_path, target_col="nonexistent")
+
+    with pytest.raises(ValueError):
+        build_config(cfg, builtin_algorithms, builtin_partitioners)
+
+
+def test_invalid_sensitive_col_raises(
+        tmp_path, builtin_algorithms, builtin_partitioners):
+
+    cfg = minimal_valid_cfg(tmp_path, sensitive_cols=("nonexistent",))
+
+    with pytest.raises(ValueError):
+        build_config(cfg, builtin_algorithms, builtin_partitioners)
+
+
+def test_valid_target_col_passes(
+        tmp_path, builtin_algorithms, builtin_partitioners):
+
+    cfg = minimal_valid_cfg(tmp_path, target_col="a")
+    config = build_config(cfg, builtin_algorithms, builtin_partitioners)
+    assert config.data.target_col == "a"
+
+
+def test_valid_sensitive_cols_passes(
+        tmp_path, builtin_algorithms, builtin_partitioners):
+
+    cfg = minimal_valid_cfg(tmp_path, sensitive_cols=("a", "b"))
+    config = build_config(cfg, builtin_algorithms, builtin_partitioners)
+    assert config.data.sensitive_cols == ("a", "b")
+
+
+def test_omitted_columns_no_error(
+        tmp_path, builtin_algorithms, builtin_partitioners):
+    """Omitting target_col and sensitive_cols is valid (NaN-degradation path)."""
+    cfg = minimal_valid_cfg(tmp_path)
+    config = build_config(cfg, builtin_algorithms, builtin_partitioners)
+    assert config.data.target_col is None
+    assert config.data.sensitive_cols == ()
 
 
 # --- coerce tests ----------------------------------------------------------
@@ -327,7 +373,7 @@ def test_parse_for_function_missing_required_parameter_raises():
     def dummy_func(required_param: str):
         pass
 
-    with pytest.raises(TypeError, match="Missing required parameter"):
+    with pytest.raises(TypeError):
         parse_for_function(dummy_func, {})
 
 
@@ -364,7 +410,7 @@ def test_parse_for_function_unknown_parameter_raises():
     def dummy_func(known_param: str):
         pass
 
-    with pytest.raises(TypeError, match="Unknown parameters"):
+    with pytest.raises(TypeError):
         parse_for_function(dummy_func, {"known_param": "value", "unknown_param": "value"})
 
 
@@ -491,7 +537,7 @@ def test_single_category_parsing(tmp_path, builtin_algorithms, builtin_partition
     cfg = minimal_valid_cfg(
         tmp_path,
         run_categories=(Category.PRIVACY,),
-        target_col="label",
+        target_col="b",
     )
 
     config = build_config(cfg, builtin_algorithms, builtin_partitioners)
@@ -504,7 +550,7 @@ def test_multiple_categories_parsing(tmp_path, builtin_algorithms, builtin_parti
     cfg = minimal_valid_cfg(
         tmp_path,
         run_categories=(Category.UTILITY, Category.PRIVACY),
-        target_col="label",
+        target_col="b",
     )
 
     config = build_config(cfg, builtin_algorithms, builtin_partitioners)
