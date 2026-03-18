@@ -3,8 +3,6 @@ import re
 from types import UnionType
 from typing import Any, Callable, Literal, Union, get_args, get_origin
 
-from fedbench.core.logger import log_warning
-
 
 def split_outside_brackets(s: str) -> list[str]:
     if not s:
@@ -118,18 +116,6 @@ def parse_for_function(
     if unknown:
         raise TypeError(
             f"Unknown parameters for {func.__name__}: {', '.join(sorted(unknown))}"
-        )
-
-    # Warn about untyped parameters that will be passed as raw strings
-    untyped_in_raw = [
-        name for name, param in params.items()
-        if name in raw and param.annotation is inspect.Parameter.empty
-    ]
-    if untyped_in_raw:
-        log_warning(
-            func.__name__,
-            f"Untyped parameters: {', '.join(untyped_in_raw)}. "
-            "Values will be passed as raw strings without type coercion.",
         )
 
     # Parse and validate required params

@@ -1,4 +1,3 @@
-import logging
 from pathlib import Path
 from typing import Any, Optional, Union
 
@@ -604,18 +603,6 @@ def test_parse_for_function_untyped_missing_required_still_raises():
 
     with pytest.raises(TypeError, match="Missing required parameter"):
         parse_for_function(dummy_func, {})
-
-
-def test_parse_for_function_untyped_emits_warning(caplog):
-    """Untyped param in raw → a warning is emitted."""
-    def dummy_func(x):
-        pass
-
-    with caplog.at_level(logging.WARNING, logger="FedBench"):
-        parse_for_function(dummy_func, {"x": "hello"})
-
-    assert "Untyped" in caplog.text
-    assert "x" in caplog.text
 
 
 # --- validation tests --------------------------------------------------
