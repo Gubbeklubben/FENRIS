@@ -636,7 +636,7 @@ def test_partitioner_kwargs_preserved(
     assert config.data.partitioner_kwargs["num_partitions"] == 5
 
 
-# --- seed / shuffle injection into partitioner kwargs ----------------------
+# --- seed injection into partitioner kwargs --------------------------------
 
 
 def test_seed_injected_for_dirichlet(
@@ -655,7 +655,6 @@ def test_seed_injected_for_dirichlet(
     config = build_config(cfg, builtin_algorithms, builtin_partitioners)
 
     assert config.data.partitioner_kwargs["seed"] == 101  # s + 1
-    assert config.data.partitioner_kwargs["shuffle"] is True
 
 
 def test_seed_not_injected_for_iid(tmp_path, builtin_algorithms, builtin_partitioners):
@@ -664,10 +663,9 @@ def test_seed_not_injected_for_iid(tmp_path, builtin_algorithms, builtin_partiti
     )
 
     assert "seed" not in config.data.partitioner_kwargs
-    assert "shuffle" not in config.data.partitioner_kwargs
 
 
-def test_user_seed_override_respected(
+def test_user_seed_in_partitioner_kwargs_raises(
     tmp_path, builtin_algorithms, builtin_partitioners
 ):
     dataset = tmp_path / "data.csv"
@@ -680,15 +678,12 @@ def test_user_seed_override_respected(
             "partition_by": "label",
             "alpha": "0.5",
             "seed": "999",
-            "shuffle": "false",
         },
         seed=100,
     )
     cfg["dataset"] = str(dataset)
-    config = build_config(cfg, builtin_algorithms, builtin_partitioners)
-
-    assert config.data.partitioner_kwargs["seed"] == 999
-    assert config.data.partitioner_kwargs["shuffle"] is False
+    with pytest.raises(ValueError, match="seed"):
+        build_config(cfg, builtin_algorithms, builtin_partitioners)
 
 
 # --- parse_for_function with complex scenarios -------------------

@@ -1,5 +1,6 @@
 import csv
 import inspect
+from collections.abc import Mapping
 from dataclasses import fields
 from pathlib import Path
 from typing import Any
@@ -107,6 +108,27 @@ def parse_algorithm_kwargs(
     )
 
 
+def _reject_and_inject(
+    name: str,
+    value: Any,
+    raw_kwargs: dict[str, Any],
+    params: Mapping[str, Any],
+    *,
+    required: bool = False,
+) -> None:
+    """Reject user-specified framework param; inject into raw kwargs before parse."""
+    if name in raw_kwargs:
+        raise ValueError(
+            f"'{name}' must not be specified in --partitioner-kwargs. "
+            "It is controlled by the framework."
+        )
+    if name not in params:
+        if required:
+            raise ValueError(f"Partitioner must accept a '{name}' parameter.")
+        return
+    raw_kwargs[name] = value
+
+
 def parse_partitioner_kwargs(
     data_cfg: dict[str, Any],
     cfg: dict[str, Any],
@@ -116,50 +138,30 @@ def parse_partitioner_kwargs(
     if data_cfg["partitioner"] not in partitioner_registry:
         raise ValueError(f"Partitioner {data_cfg['partitioner']} is not registered")
 
-    # Check that user has not specified num_partitions explicitly
     partitioner_kwargs = data_cfg.get("partitioner_kwargs", {})
-    if "num_partitions" in partitioner_kwargs:
-        raise ValueError(
-            "num_partitions should not be explicitly specified in partitioner kwargs. "
-            "It is determined automatically based on the num_clients CLI parameter."
-        )
-
-    # Check that the partitioner factory takes a num_partitions parameter of type int
     partitioner_factory = partitioner_registry.load(data_cfg["partitioner"])
     params = inspect.signature(partitioner_factory).parameters
-    if "num_partitions" not in params.keys():
-        raise ValueError(
-            f"Partitioner factory {data_cfg['partitioner']} must have"
-            " a num_partitions parameter"
-        )
+
+    # Inject framework-controlled parameters (reject if user specified).
+    default_num_clients = next(
+        f.default for f in fields(Config) if f.name == "num_clients"
+    )
+    num_clients = cfg.get("num_clients", default_num_clients)
+    _reject_and_inject(
+        "num_partitions", num_clients, partitioner_kwargs, params, required=True
+    )
     if params["num_partitions"].annotation is not int:
         raise TypeError(
             f"Partitioner factory {data_cfg['partitioner']} must have"
             " a num_partitions parameter of type int"
         )
 
-    # Parse partitioner kwargs, then inject num_partitions from num_clients.
-    default_num_clients = next(
-        f.default for f in fields(Config) if f.name == "num_clients"
-    )
-    partitioner_kwargs["num_partitions"] = cfg.get("num_clients", default_num_clients)
-
-    # Inject seed and shuffle if the factory accepts them and user
-    # didn't override. Framework defaults are injected after
-    # parse_for_function to avoid the coerce() string assumption.
     default_seed = next(f.default for f in fields(Config) if f.name == "seed")
-    master_seed = cfg.get("seed", default_seed)
-    inject_seed = "seed" in params and "seed" not in partitioner_kwargs
-    inject_shuffle = "shuffle" in params and "shuffle" not in partitioner_kwargs
+    seed = cfg.get("seed", default_seed)
+    _reject_and_inject("seed", seed + 1, partitioner_kwargs, params)
 
+    # Validate and parse all kwargs (user + framework injected).
     data_cfg["partitioner_kwargs"] = parse_for_function(
         partitioner_factory,
         partitioner_kwargs,
     )
-
-    # Inject framework defaults after parsing (already correctly typed).
-    parsed_kwargs = data_cfg["partitioner_kwargs"]
-    if inject_seed:
-        parsed_kwargs["seed"] = master_seed + 1  # derived: partitioning
-    if inject_shuffle:
-        parsed_kwargs["shuffle"] = True

@@ -42,7 +42,6 @@ class FlwrDelegatePartitioner(Partitioner):
         alpha: float,
         min_partition_size: int = 10,
         self_balancing: bool = False,
-        shuffle: bool = True,
         seed: int | None = 42,
     ) -> Partitioner:
         return cls(
@@ -52,7 +51,7 @@ class FlwrDelegatePartitioner(Partitioner):
                 alpha=alpha,
                 min_partition_size=min_partition_size,
                 self_balancing=self_balancing,
-                shuffle=shuffle,
+                shuffle=True,
                 seed=seed,
             )
         )
@@ -66,7 +65,6 @@ class FlwrDelegatePartitioner(Partitioner):
         class_assignment_mode: Literal[
             "random", "deterministic", "first-deterministic"
         ] = "random",
-        shuffle: bool = True,
         seed: int | None = 42,
     ) -> Partitioner:
         return cls(
@@ -75,7 +73,7 @@ class FlwrDelegatePartitioner(Partitioner):
                 partition_by=partition_by,
                 num_classes_per_partition=num_classes_per_partition,
                 class_assignment_mode=class_assignment_mode,
-                shuffle=shuffle,
+                shuffle=True,
                 seed=seed,
             )
         )
@@ -88,7 +86,6 @@ class FlwrDelegatePartitioner(Partitioner):
         num_shards_per_partition: int | None = None,
         shard_size: int | None = None,
         keep_incomplete_shard: bool = False,
-        shuffle: bool = True,
         seed: int | None = 42,
     ) -> Partitioner:
         return cls(
@@ -98,7 +95,7 @@ class FlwrDelegatePartitioner(Partitioner):
                 num_shards_per_partition=num_shards_per_partition,
                 shard_size=shard_size,
                 keep_incomplete_shard=keep_incomplete_shard,
-                shuffle=shuffle,
+                shuffle=True,
                 seed=seed,
             )
         )
@@ -109,7 +106,6 @@ class FlwrDelegatePartitioner(Partitioner):
         num_partitions: int,
         partition_by: str,
         strictness: float,
-        shuffle: bool = True,
         seed: int | None = 42,
     ) -> Partitioner:
         return cls(
@@ -117,7 +113,7 @@ class FlwrDelegatePartitioner(Partitioner):
                 num_partitions,
                 partition_by=partition_by,
                 strictness=strictness,
-                shuffle=shuffle,
+                shuffle=True,
                 seed=seed,
             )
         )
