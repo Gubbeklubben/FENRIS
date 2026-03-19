@@ -143,7 +143,23 @@ def parse_partitioner_kwargs(
         f.default for f in fields(Config) if f.name == "num_clients"
     )
     partitioner_kwargs["num_partitions"] = cfg.get("num_clients", default_num_clients)
+
+    # Inject seed and shuffle if the factory accepts them and user
+    # didn't override. Framework defaults are injected after
+    # parse_for_function to avoid the coerce() string assumption.
+    default_seed = next(f.default for f in fields(Config) if f.name == "seed")
+    master_seed = cfg.get("seed", default_seed)
+    inject_seed = "seed" in params and "seed" not in partitioner_kwargs
+    inject_shuffle = "shuffle" in params and "shuffle" not in partitioner_kwargs
+
     data_cfg["partitioner_kwargs"] = parse_for_function(
         partitioner_factory,
         partitioner_kwargs,
     )
+
+    # Inject framework defaults after parsing (already correctly typed).
+    parsed_kwargs = data_cfg["partitioner_kwargs"]
+    if inject_seed:
+        parsed_kwargs["seed"] = master_seed + 1  # derived: partitioning
+    if inject_shuffle:
+        parsed_kwargs["shuffle"] = True

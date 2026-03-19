@@ -636,6 +636,61 @@ def test_partitioner_kwargs_preserved(
     assert config.data.partitioner_kwargs["num_partitions"] == 5
 
 
+# --- seed / shuffle injection into partitioner kwargs ----------------------
+
+
+def test_seed_injected_for_dirichlet(
+    tmp_path, builtin_algorithms, builtin_partitioners
+):
+    dataset = tmp_path / "data.csv"
+    dataset.write_text("label,x\nA,1\nB,2\nA,3\nB,4\n")
+
+    cfg = minimal_valid_cfg(
+        tmp_path,
+        partitioner="dirichlet_partitioner",
+        partitioner_kwargs={"partition_by": "label", "alpha": "0.5"},
+        seed=100,
+    )
+    cfg["dataset"] = str(dataset)
+    config = build_config(cfg, builtin_algorithms, builtin_partitioners)
+
+    assert config.data.partitioner_kwargs["seed"] == 101  # s + 1
+    assert config.data.partitioner_kwargs["shuffle"] is True
+
+
+def test_seed_not_injected_for_iid(tmp_path, builtin_algorithms, builtin_partitioners):
+    config = build_config(
+        minimal_valid_cfg(tmp_path), builtin_algorithms, builtin_partitioners
+    )
+
+    assert "seed" not in config.data.partitioner_kwargs
+    assert "shuffle" not in config.data.partitioner_kwargs
+
+
+def test_user_seed_override_respected(
+    tmp_path, builtin_algorithms, builtin_partitioners
+):
+    dataset = tmp_path / "data.csv"
+    dataset.write_text("label,x\nA,1\nB,2\nA,3\nB,4\n")
+
+    cfg = minimal_valid_cfg(
+        tmp_path,
+        partitioner="dirichlet_partitioner",
+        partitioner_kwargs={
+            "partition_by": "label",
+            "alpha": "0.5",
+            "seed": "999",
+            "shuffle": "false",
+        },
+        seed=100,
+    )
+    cfg["dataset"] = str(dataset)
+    config = build_config(cfg, builtin_algorithms, builtin_partitioners)
+
+    assert config.data.partitioner_kwargs["seed"] == 999
+    assert config.data.partitioner_kwargs["shuffle"] is False
+
+
 # --- parse_for_function with complex scenarios -------------------
 
 
