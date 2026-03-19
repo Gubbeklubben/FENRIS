@@ -24,6 +24,7 @@ from fedbench.runtime.registry_builder import (
     build_partitioner_registry,
 )
 from fedbench.runtime.runcontext import RunContext
+from fedbench.util.platform_info import collect_platform_info
 
 
 def create_components(ctx: RunContext) -> None:
@@ -120,8 +121,8 @@ def write_artifacts(ctx: RunContext) -> None:
     with outputdir.joinpath("config_snapshot.json").open("w") as f:
         json.dump(json.loads(ctx.config.jsons()), f, indent=2)
 
-    # Metrics (with experiment metadata)
-    experiment = {
+    # Metrics (with experiment + platform metadata)
+    metadata: dict[str, str | int | float | None] = {
         "experiment.seed": ctx.config.seed,
         "experiment.num_rounds": ctx.config.num_rounds,
         "experiment.num_clients": ctx.config.num_clients,
@@ -129,6 +130,7 @@ def write_artifacts(ctx: RunContext) -> None:
         "experiment.metric_focus": None,
         "experiment.aggregation_variant": None,
         "experiment.model_scope": None,
+        **collect_platform_info(),
     }
     for name, metrics in [
         ("federated", ctx.aggregated_metrics),
@@ -139,7 +141,7 @@ def write_artifacts(ctx: RunContext) -> None:
             for k, v in metrics.items()
         }
         with outputdir.joinpath(f"metrics.{name}.json").open("w") as f:
-            json.dump({**experiment, **clean}, f, indent=2, allow_nan=False)
+            json.dump({**metadata, **clean}, f, indent=2, allow_nan=False)
 
     # Synthetic data
     ctx.synthetic_df.to_csv(outputdir.joinpath("synthetic.csv"), index=False)

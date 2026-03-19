@@ -79,6 +79,18 @@ def test_experiment_metadata_in_metrics(tmp_path: Path) -> None:
     assert cent["utility.tstr_auc"] == 0.9
 
 
+def test_platform_metadata_in_metrics(tmp_path: Path) -> None:
+    ctx = _make_ctx(tmp_path)
+    write_artifacts(ctx)  # type: ignore[arg-type]
+
+    outdir = tmp_path / "test-run"
+    for name in ("federated", "centralized"):
+        data = json.loads(outdir.joinpath(f"metrics.{name}.json").read_text())
+        assert "platform.os" in data
+        assert "platform.python_version" in data
+        assert "platform.cpu_count" in data
+
+
 def test_nan_metrics_written_as_null(tmp_path: Path) -> None:
     ctx = _make_ctx(
         tmp_path,
