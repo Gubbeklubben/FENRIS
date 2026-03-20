@@ -34,3 +34,104 @@ poetry run mypy -p fedbench
 ```bash
 poetry run pytest tests
 ```
+
+---
+
+## Chaos Testing Algorithm (`fed_chaos`)
+
+`fed_chaos` is a built-in algorithm that intentionally injects errors, corrupts data, and violates
+protocol assumptions at configurable lifecycle points. Use it to stress-test the framework, discover
+weak spots in error handling, and verify that the pipeline fails gracefully under adversarial conditions.
+
+### Basic usage
+
+```bash
+poetry run fedbench run fed_chaos <partitioner> <dataset> \
+  --algorithm-kwargs "scenario=<SCENARIO>,point=<POINT>"
+```
+
+### Parameters
+
+| Parameter   | Type    | Default          | Description                                                 |
+| :---------- | :------ | :--------------- | :---------------------------------------------------------- |
+| `scenario`  | `str`   | `"crash"`        | The type of chaos to inject (see table below).              |
+| `point`     | `str`   | `"synth_train"`  | Where in the lifecycle to inject (see table below).         |
+| `exception` | `str`   | `"RuntimeError"` | Exception class for `crash` scenario.                       |
+
+### Injection points
+
+| Point             | Component             | Method triggered              |
+| :---------------- | :-------------------- | :---------------------------- |
+| `global_init`     | `FedChaos`            | `Algorithm.global_init()`     |
+| `coord_fed_init`  | `FedChaosCoordinator` | `configure_fed_init()`        |
+| `coord_train`     | `FedChaosCoordinator` | `aggregate_train()` / `train()` |
+| `synth_fed_init`  | `FedChaosSynthesizer` | `Synthesizer.fed_init()`      |
+| `synth_train`     | `FedChaosSynthesizer` | `Synthesizer.train()`         |
+| `synth_sample`    | `FedChaosSynthesizer` | `Synthesizer.sample()`        |
+
+### Scenarios
+
+| Scenario     | What it does                                                                                   |
+| :----------- | :--------------------------------------------------------------------------------------------- |
+| `crash`      | Raises a configurable exception at the target point.                                           |
+| `corrupt`    | Returns `Update` with NaN/inf values, or `DataFrame` with wrong schema.                        |
+| `wrong_type` | Returns an object of the wrong type (e.g., `str` instead of `Update`).                         |
+| `empty`      | Returns valid but logically empty objects (`Update()`, `DataFrame()`).                         |
+
+### Available exception types (for `crash` scenario)
+
+`RuntimeError`, `ValueError`, `TypeError`, `MemoryError`,
+`OverflowError`, `ZeroDivisionError`, `NotImplementedError`, `OSError`
+
+### Example commands
+
+All 24 scenario × point combinations (default `exception=RuntimeError` for `crash`):
+
+```bash
+# crash
+poetry run fedbench run fed_chaos iid-partitioner datasets/heart_disease.csv --algorithm-kwargs "scenario=crash,point=global_init"
+poetry run fedbench run fed_chaos iid-partitioner datasets/heart_disease.csv --algorithm-kwargs "scenario=crash,point=coord_fed_init"
+poetry run fedbench run fed_chaos iid-partitioner datasets/heart_disease.csv --algorithm-kwargs "scenario=crash,point=coord_train"
+poetry run fedbench run fed_chaos iid-partitioner datasets/heart_disease.csv --algorithm-kwargs "scenario=crash,point=synth_fed_init"
+poetry run fedbench run fed_chaos iid-partitioner datasets/heart_disease.csv --algorithm-kwargs "scenario=crash,point=synth_train"
+poetry run fedbench run fed_chaos iid-partitioner datasets/heart_disease.csv --algorithm-kwargs "scenario=crash,point=synth_sample"
+
+# corrupt
+poetry run fedbench run fed_chaos iid-partitioner datasets/heart_disease.csv --algorithm-kwargs "scenario=corrupt,point=global_init"
+poetry run fedbench run fed_chaos iid-partitioner datasets/heart_disease.csv --algorithm-kwargs "scenario=corrupt,point=coord_fed_init"
+poetry run fedbench run fed_chaos iid-partitioner datasets/heart_disease.csv --algorithm-kwargs "scenario=corrupt,point=coord_train"
+poetry run fedbench run fed_chaos iid-partitioner datasets/heart_disease.csv --algorithm-kwargs "scenario=corrupt,point=synth_fed_init"
+poetry run fedbench run fed_chaos iid-partitioner datasets/heart_disease.csv --algorithm-kwargs "scenario=corrupt,point=synth_train"
+poetry run fedbench run fed_chaos iid-partitioner datasets/heart_disease.csv --algorithm-kwargs "scenario=corrupt,point=synth_sample"
+
+# wrong_type
+poetry run fedbench run fed_chaos iid-partitioner datasets/heart_disease.csv --algorithm-kwargs "scenario=wrong_type,point=global_init"
+poetry run fedbench run fed_chaos iid-partitioner datasets/heart_disease.csv --algorithm-kwargs "scenario=wrong_type,point=coord_fed_init"
+poetry run fedbench run fed_chaos iid-partitioner datasets/heart_disease.csv --algorithm-kwargs "scenario=wrong_type,point=coord_train"
+poetry run fedbench run fed_chaos iid-partitioner datasets/heart_disease.csv --algorithm-kwargs "scenario=wrong_type,point=synth_fed_init"
+poetry run fedbench run fed_chaos iid-partitioner datasets/heart_disease.csv --algorithm-kwargs "scenario=wrong_type,point=synth_train"
+poetry run fedbench run fed_chaos iid-partitioner datasets/heart_disease.csv --algorithm-kwargs "scenario=wrong_type,point=synth_sample"
+
+# empty
+poetry run fedbench run fed_chaos iid-partitioner datasets/heart_disease.csv --algorithm-kwargs "scenario=empty,point=global_init"
+poetry run fedbench run fed_chaos iid-partitioner datasets/heart_disease.csv --algorithm-kwargs "scenario=empty,point=coord_fed_init"
+poetry run fedbench run fed_chaos iid-partitioner datasets/heart_disease.csv --algorithm-kwargs "scenario=empty,point=coord_train"
+poetry run fedbench run fed_chaos iid-partitioner datasets/heart_disease.csv --algorithm-kwargs "scenario=empty,point=synth_fed_init"
+poetry run fedbench run fed_chaos iid-partitioner datasets/heart_disease.csv --algorithm-kwargs "scenario=empty,point=synth_train"
+poetry run fedbench run fed_chaos iid-partitioner datasets/heart_disease.csv --algorithm-kwargs "scenario=empty,point=synth_sample"
+```
+
+Override the exception type for `crash` by appending `,exception=X` — valid values: `RuntimeError`, `ValueError`, `TypeError`, `MemoryError`, `OverflowError`, `ZeroDivisionError`, `NotImplementedError`, `OSError`.
+
+### Interpreting results
+
+Use the following levels to assess how well the framework handles each scenario:
+
+| Level | Name | Description |
+| :---- | :--- | :---------- |
+| **0** | Vulnerable | Framework crashes ungracefully, hangs, or corrupts local state. |
+| **1** | Reactive | Framework catches the error, logs it, and exits cleanly. |
+| **2** | Proactive | Framework validates inputs/outputs before use and reports a specific, actionable error. |
+| **3** | Resilient | Framework recovers (e.g. retries the round, skips the offending client) and completes the run. |
+
+The current framework generally sits at **Level 1** for client-side chaos and **Level 1** for server-side chaos (Flower wraps server exceptions as a generic `RuntimeError("Exception in ServerApp thread")`). Reaching Level 2 requires input/output validation in the core runtime; Level 3 requires retry and fault-isolation logic.
