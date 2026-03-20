@@ -40,9 +40,9 @@ class FlwrDelegatePartitioner(Partitioner):
         num_partitions: int,
         partition_by: str,
         alpha: float,
+        seed: int,
         min_partition_size: int = 10,
         self_balancing: bool = False,
-        seed: int | None = 42,
     ) -> Partitioner:
         return cls(
             DirichletPartitioner(
@@ -62,10 +62,10 @@ class FlwrDelegatePartitioner(Partitioner):
         num_partitions: int,
         partition_by: str,
         num_classes_per_partition: int,
+        seed: int,
         class_assignment_mode: Literal[
             "random", "deterministic", "first-deterministic"
         ] = "random",
-        seed: int | None = 42,
     ) -> Partitioner:
         return cls(
             PathologicalPartitioner(
@@ -83,10 +83,10 @@ class FlwrDelegatePartitioner(Partitioner):
         cls,
         num_partitions: int,
         partition_by: str,
+        seed: int,
         num_shards_per_partition: int | None = None,
         shard_size: int | None = None,
         keep_incomplete_shard: bool = False,
-        seed: int | None = 42,
     ) -> Partitioner:
         return cls(
             ShardPartitioner(
@@ -106,7 +106,7 @@ class FlwrDelegatePartitioner(Partitioner):
         num_partitions: int,
         partition_by: str,
         strictness: float,
-        seed: int | None = 42,
+        seed: int,
     ) -> Partitioner:
         return cls(
             ContinuousPartitioner(

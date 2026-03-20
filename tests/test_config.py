@@ -654,7 +654,7 @@ def test_seed_injected_for_dirichlet(
     cfg["dataset"] = str(dataset)
     config = build_config(cfg, builtin_algorithms, builtin_partitioners)
 
-    assert config.data.partitioner_kwargs["seed"] == 101  # s + 1
+    assert config.data.partitioner_kwargs["seed"] == 100
 
 
 def test_seed_not_injected_for_iid(tmp_path, builtin_algorithms, builtin_partitioners):

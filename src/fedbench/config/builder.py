@@ -108,11 +108,20 @@ def parse_algorithm_kwargs(
     )
 
 
+def _get_config_value_or_default(
+    cfg: dict[str, Any],
+    param: str,
+) -> Any:
+    default = next(f.default for f in fields(Config) if f.name == param)
+    return cfg.get(param, default)
+
+
 def _reject_and_inject(
     name: str,
     value: Any,
     raw_kwargs: dict[str, Any],
-    params: Mapping[str, Any],
+    factory_params: Mapping[str, Any],
+    expected_type: type,
     *,
     required: bool = False,
 ) -> None:
@@ -122,10 +131,14 @@ def _reject_and_inject(
             f"'{name}' must not be specified in --partitioner-kwargs. "
             "It is controlled by the framework."
         )
-    if name not in params:
+    if name not in factory_params:
         if required:
             raise ValueError(f"Partitioner must accept a '{name}' parameter.")
         return
+    if factory_params[name].annotation is not expected_type:
+        raise TypeError(
+            f"Partitioner parameter '{name}' must have type {expected_type}."
+        )
     raw_kwargs[name] = value
 
 
@@ -143,22 +156,24 @@ def parse_partitioner_kwargs(
     params = inspect.signature(partitioner_factory).parameters
 
     # Inject framework-controlled parameters (reject if user specified).
-    default_num_clients = next(
-        f.default for f in fields(Config) if f.name == "num_clients"
-    )
-    num_clients = cfg.get("num_clients", default_num_clients)
+    num_partitions = _get_config_value_or_default(cfg, param="num_clients")
     _reject_and_inject(
-        "num_partitions", num_clients, partitioner_kwargs, params, required=True
+        name="num_partitions",
+        value=num_partitions,
+        raw_kwargs=partitioner_kwargs,
+        factory_params=params,
+        expected_type=int,
+        required=True,
     )
-    if params["num_partitions"].annotation is not int:
-        raise TypeError(
-            f"Partitioner factory {data_cfg['partitioner']} must have"
-            " a num_partitions parameter of type int"
-        )
 
-    default_seed = next(f.default for f in fields(Config) if f.name == "seed")
-    seed = cfg.get("seed", default_seed)
-    _reject_and_inject("seed", seed + 1, partitioner_kwargs, params)
+    seed = _get_config_value_or_default(cfg, param="seed")
+    _reject_and_inject(
+        name="seed",
+        value=seed,
+        raw_kwargs=partitioner_kwargs,
+        factory_params=params,
+        expected_type=int,
+    )
 
     # Validate and parse all kwargs (user + framework injected).
     data_cfg["partitioner_kwargs"] = parse_for_function(
