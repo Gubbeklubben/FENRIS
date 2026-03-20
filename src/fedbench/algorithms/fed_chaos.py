@@ -44,6 +44,7 @@ _EXCEPTION_MAP: dict[str, type[Exception]] = {
     "ZeroDivisionError": ZeroDivisionError,
     "NotImplementedError": NotImplementedError,
     "OSError": OSError,
+    "Exception": Exception,
 }
 
 _VALID_SCENARIOS = frozenset(
