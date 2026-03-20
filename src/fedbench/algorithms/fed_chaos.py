@@ -275,7 +275,7 @@ class FedChaos(Algorithm):
         self,
         scenario: str = "crash",
         point: str = "synth_train",
-        exception: str = "RuntimeError",
+        exception: str = "Exception",
     ) -> None:
         self._config = _ChaosConfig(
             scenario=scenario,
