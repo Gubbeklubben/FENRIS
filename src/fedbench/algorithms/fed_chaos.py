@@ -29,7 +29,7 @@ from fedbench.core.algorithm import (
     synthesizer_spec,
 )
 from fedbench.core.data import TableSchema
-from fedbench.core.logger import log_error, log_info, log_warning
+from fedbench.core.logger import log_info
 from fedbench.core.update import Update
 
 _LOG_SRC = "fed_chaos"
@@ -101,7 +101,7 @@ def _do_crash(config: _ChaosConfig, point: str) -> None:
 
 def _do_corrupt_update(point: str) -> Update:
     """Return an Update filled with NaN/inf values."""
-    log_warning(_LOG_SRC, f"Returning corrupt Update at {point}")
+    log_info(_LOG_SRC, f"Returning corrupt Update at {point}")
     nan_arr: NDArray[Any] = np.full((4, 4), np.nan)
     inf_arr: NDArray[Any] = np.full((4, 4), np.inf)
     return Update(
@@ -130,7 +130,6 @@ class FedChaosCoordinator(SingleStepCoordinator):
         schema: TableSchema,
         client_ids: Iterable[int],
     ) -> Iterable[tuple[int, Update]]:
-        log_info(_LOG_SRC, "FedChaosCoordinator.configure_fed_init")
 
         if self._config.point == "coord_fed_init":
             self._trigger("coord_fed_init")
@@ -140,14 +139,11 @@ class FedChaosCoordinator(SingleStepCoordinator):
             yield cid, Update()
 
     def aggregate_fed_init(self, replies: Iterable[tuple[int, Update]]) -> None:
-        log_info(_LOG_SRC, "FedChaosCoordinator.aggregate_fed_init")
         # Consume replies.
         for _ in replies:
             pass
 
     def aggregate_train(self, replies: Iterable[tuple[int, Update]]) -> None:
-        log_info(_LOG_SRC, "FedChaosCoordinator.aggregate_train")
-
         if self._config.point == "coord_train":
             result = self._trigger("coord_train")
             if isinstance(result, Update):
@@ -165,7 +161,7 @@ class FedChaosCoordinator(SingleStepCoordinator):
     def _trigger(self, point: str) -> Any:
         """Dispatch to the configured chaos scenario."""
         scenario = self._config.scenario
-        log_error(_LOG_SRC, f"CHAOS [{scenario}] triggered at {point}")
+        log_info(_LOG_SRC, f"CHAOS [{scenario}] triggered at {point}")
 
         if scenario == "crash":
             _do_crash(self._config, point)
@@ -195,7 +191,6 @@ class FedChaosSynthesizer(Synthesizer):
         schema: TableSchema,
         data: DataFrame,
     ) -> Update:
-        log_info(_LOG_SRC, "FedChaosSynthesizer.fed_init")
 
         if self._config.point == "synth_fed_init":
             result = self._trigger("synth_fed_init")
@@ -209,7 +204,6 @@ class FedChaosSynthesizer(Synthesizer):
         request: Update,
         data: DataFrame,
     ) -> Update:
-        log_info(_LOG_SRC, "FedChaosSynthesizer.train")
 
         if self._config.point == "synth_train":
             result = self._trigger("synth_train")
@@ -224,7 +218,6 @@ class FedChaosSynthesizer(Synthesizer):
         num_rows: int,
         seed: int,
     ) -> DataFrame:
-        log_info(_LOG_SRC, f"FedChaosSynthesizer.sample (n={num_rows})")
 
         if self._config.point == "synth_sample":
             result = self._trigger_sample("synth_sample", num_rows, seed)
@@ -238,7 +231,7 @@ class FedChaosSynthesizer(Synthesizer):
     def _trigger(self, point: str) -> Any:
         """Dispatch scenarios that return Update-like objects."""
         scenario = self._config.scenario
-        log_error(_LOG_SRC, f"CHAOS [{scenario}] triggered at {point}")
+        log_info(_LOG_SRC, f"CHAOS [{scenario}] triggered at {point}")
 
         if scenario == "crash":
             _do_crash(self._config, point)
@@ -253,7 +246,7 @@ class FedChaosSynthesizer(Synthesizer):
     def _trigger_sample(self, point: str, num_rows: int, seed: int) -> Any:
         """Dispatch scenarios that return DataFrame-like objects."""
         scenario = self._config.scenario
-        log_error(_LOG_SRC, f"CHAOS [{scenario}] triggered at {point}")
+        log_info(_LOG_SRC, f"CHAOS [{scenario}] triggered at {point}")
 
         if scenario == "crash":
             _do_crash(self._config, point)
@@ -309,9 +302,6 @@ class FedChaos(Algorithm):
         schema: TableSchema,
         dataset: DataFrame,
     ) -> GlobalInitArtifacts | None:
-        log_info(
-            _LOG_SRC, f"global_init (rows={len(dataset)}, cols={len(schema.columns)})"
-        )
 
         if self._config.point == "global_init":
             return self._trigger_global_init()
@@ -320,7 +310,7 @@ class FedChaos(Algorithm):
 
     def _trigger_global_init(self) -> GlobalInitArtifacts | None:
         scenario = self._config.scenario
-        log_error(_LOG_SRC, f"CHAOS [{scenario}] triggered at global_init")
+        log_info(_LOG_SRC, f"CHAOS [{scenario}] triggered at global_init")
 
         if scenario == "crash":
             _do_crash(self._config, "global_init")
@@ -328,7 +318,7 @@ class FedChaos(Algorithm):
             corrupt = _do_corrupt_update("global_init")
             return GlobalInitArtifacts(coordinator=corrupt, synthesizer=corrupt)
         elif scenario == "wrong_type":
-            log_warning(_LOG_SRC, "Returning wrong type from global_init")
+            log_info(_LOG_SRC, "Returning wrong type from global_init")
             return "NOT_ARTIFACTS"  # type: ignore[return-value]
         elif scenario == "empty":
             return GlobalInitArtifacts(coordinator=Update(), synthesizer=Update())
