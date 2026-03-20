@@ -1,11 +1,10 @@
-"""Chaos testing algorithm for stress-testing the FedBench framework.
+"""Naughty algorithm for testing the framework.
 
 Intentionally injects errors, corrupts data, and violates protocol
-assumptions at configurable lifecycle points. Used to discover weak spots
-in error handling, validation, and resource management.
+assumptions at configurable lifecycle points. Used to discover weak spots.
 
 Usage:
-    fedbench run fed_chaos iid-partitioner datasets/heart_disease.csv \\
+    fedbench run fed_naughty iid_partitioner datasets/heart_disease.csv \\
         --algorithm-kwargs "scenario=crash,point=synth_train,exception=MemoryError"
 """
 
@@ -32,7 +31,7 @@ from fedbench.core.data import TableSchema
 from fedbench.core.logger import log_info
 from fedbench.core.update import Update
 
-_LOG_SRC = "fed_chaos"
+_LOG_SRC = __name__
 
 # Exception classes that can be raised via the `exception` parameter.
 _EXCEPTION_MAP: dict[str, type[Exception]] = {
@@ -69,9 +68,7 @@ _VALID_POINTS = frozenset(
 
 
 @dataclass(frozen=True)
-class _ChaosConfig:
-    """Immutable chaos injection configuration."""
-
+class _NaughtyConfig:
     scenario: str
     point: str
     exception: str
@@ -79,12 +76,11 @@ class _ChaosConfig:
     def __post_init__(self) -> None:
         if self.scenario not in _VALID_SCENARIOS:
             raise ValueError(
-                f"Unknown chaos scenario '{self.scenario}'. "
-                f"Valid: {sorted(_VALID_SCENARIOS)}"
+                f"Unknown scenario '{self.scenario}'. Valid: {sorted(_VALID_SCENARIOS)}"
             )
         if self.point not in _VALID_POINTS:
             raise ValueError(
-                f"Unknown chaos point '{self.point}'. Valid: {sorted(_VALID_POINTS)}"
+                f"Unknown point '{self.point}'. Valid: {sorted(_VALID_POINTS)}"
             )
         if self.scenario == "crash" and self.exception not in _EXCEPTION_MAP:
             raise ValueError(
@@ -95,9 +91,9 @@ class _ChaosConfig:
 # ── Scenario helpers ─────────────────────────────────────────────────
 
 
-def _do_crash(config: _ChaosConfig, point: str) -> None:
+def _do_crash(config: _NaughtyConfig, point: str) -> None:
     exc_cls = _EXCEPTION_MAP[config.exception]
-    raise exc_cls(f"Chaos: {config.exception} at {point}")
+    raise exc_cls(f"Naughty: {config.exception} at {point}")
 
 
 def _do_corrupt_update(point: str) -> Update:
@@ -114,10 +110,8 @@ def _do_corrupt_update(point: str) -> Update:
 # ── Coordinator ──────────────────────────────────────────────────────
 
 
-class FedChaosCoordinator(SingleStepCoordinator):
-    """Server-side chaos injector."""
-
-    def __init__(self, config: _ChaosConfig) -> None:
+class FedNaughtyCoordinator(SingleStepCoordinator):
+    def __init__(self, config: _NaughtyConfig) -> None:
         self._config = config
         self._state: Update = Update()
 
@@ -160,9 +154,9 @@ class FedChaosCoordinator(SingleStepCoordinator):
             break
 
     def _trigger(self, point: str) -> Any:
-        """Dispatch to the configured chaos scenario."""
+        """Dispatch to the configured scenario."""
         scenario = self._config.scenario
-        log_info(_LOG_SRC, f"CHAOS [{scenario}] triggered at {point}")
+        log_info(_LOG_SRC, f"NAUGHTY [{scenario}] triggered at {point}")
 
         if scenario == "crash":
             _do_crash(self._config, point)
@@ -179,10 +173,8 @@ class FedChaosCoordinator(SingleStepCoordinator):
 # ── Synthesizer ──────────────────────────────────────────────────────
 
 
-class FedChaosSynthesizer(Synthesizer):
-    """Client-side chaos injector."""
-
-    def __init__(self, config: _ChaosConfig) -> None:
+class FedNaughtySynthesizer(Synthesizer):
+    def __init__(self, config: _NaughtyConfig) -> None:
         self._config = config
 
     def fed_init(
@@ -227,12 +219,12 @@ class FedChaosSynthesizer(Synthesizer):
 
         # Default: return a minimal valid DataFrame of random noise.
         rng = np.random.default_rng(seed)
-        return pd.DataFrame({"chaos_col": rng.random(num_rows)})
+        return pd.DataFrame({"naughty_col": rng.random(num_rows)})
 
     def _trigger(self, point: str) -> Any:
         """Dispatch scenarios that return Update-like objects."""
         scenario = self._config.scenario
-        log_info(_LOG_SRC, f"CHAOS [{scenario}] triggered at {point}")
+        log_info(_LOG_SRC, f"NAUGHTY [{scenario}] triggered at {point}")
 
         if scenario == "crash":
             _do_crash(self._config, point)
@@ -247,7 +239,7 @@ class FedChaosSynthesizer(Synthesizer):
     def _trigger_sample(self, point: str, num_rows: int, seed: int) -> Any:
         """Dispatch scenarios that return DataFrame-like objects."""
         scenario = self._config.scenario
-        log_info(_LOG_SRC, f"CHAOS [{scenario}] triggered at {point}")
+        log_info(_LOG_SRC, f"NAUGHTY [{scenario}] triggered at {point}")
 
         if scenario == "crash":
             _do_crash(self._config, point)
@@ -268,8 +260,8 @@ class FedChaosSynthesizer(Synthesizer):
 # ── Algorithm ────────────────────────────────────────────────────────
 
 
-class FedChaos(Algorithm):
-    """CLI-configurable chaos injection algorithm for framework stress testing."""
+class FedNaughty(Algorithm):
+    """CLI-configurable naughty algorithm for framework testing."""
 
     def __init__(
         self,
@@ -277,7 +269,8 @@ class FedChaos(Algorithm):
         point: str = "synth_train",
         exception: str = "Exception",
     ) -> None:
-        self._config = _ChaosConfig(
+
+        self._config = _NaughtyConfig(
             scenario=scenario,
             point=point,
             exception=exception,
@@ -286,8 +279,8 @@ class FedChaos(Algorithm):
             _LOG_SRC,
             f"Configured: scenario={scenario}, point={point}, exception={exception}",
         )
-        self._coord_factory = lambda: FedChaosCoordinator(self._config)
-        self._synth_factory = lambda: FedChaosSynthesizer(self._config)
+        self._coord_factory = lambda: FedNaughtyCoordinator(self._config)
+        self._synth_factory = lambda: FedNaughtySynthesizer(self._config)
 
     @property
     def coordinator_spec(self) -> ComponentSpec[Coordinator]:
@@ -311,7 +304,7 @@ class FedChaos(Algorithm):
 
     def _trigger_global_init(self) -> GlobalInitArtifacts | None:
         scenario = self._config.scenario
-        log_info(_LOG_SRC, f"CHAOS [{scenario}] triggered at global_init")
+        log_info(_LOG_SRC, f"NAUGHTY [{scenario}] triggered at global_init")
 
         if scenario == "crash":
             _do_crash(self._config, "global_init")

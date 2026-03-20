@@ -16,8 +16,8 @@ def register_builtin_algorithms(registry: FactoryRegistry[Algorithm]) -> None:
         f"{__package__}.fed_random:FedRandom",
     )
     registry.add_builtin(
-        "fed_chaos",
-        f"{__package__}.fed_chaos:FedChaos",
+        "fed_naughty",
+        f"{__package__}.fed_naughty:FedNaughty",
     )
     registry.add_builtin(
         "fed_tgan",
