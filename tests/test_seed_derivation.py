@@ -5,7 +5,7 @@ from unittest.mock import MagicMock, patch
 import pandas as pd
 import pytest
 
-from fedbench.config import Config, DataConfig, Seeds
+from fedbench.config import Config, DataConfig, SeedConfig
 from fedbench.core.algorithm import GlobalInitArtifacts
 from fedbench.core.data.schemas import infer_schema
 from fedbench.runtime.pipeline import (
@@ -16,7 +16,7 @@ from fedbench.runtime.pipeline import (
 )
 
 SEED = 100
-SEEDS = Seeds.from_master(SEED)
+SEEDS = SeedConfig.from_master(SEED)
 
 
 @pytest.fixture
@@ -24,7 +24,7 @@ def config():
     return Config(
         algorithm="fed_hello",
         data=DataConfig(dataset="/dev/null", partitioner="iid_partitioner"),
-        seed=SEED,
+        seed=SeedConfig.from_master(SEED),
     )
 
 
@@ -96,4 +96,4 @@ def test_global_evaluate_seed(ctx):
     global_evaluate(ctx)
 
     eval_ctx = ctx.eval_suite.global_evaluate.call_args[0][0]
-    assert eval_ctx.seed == SEEDS.downstream
+    assert eval_ctx.seed == SEEDS.evaluation

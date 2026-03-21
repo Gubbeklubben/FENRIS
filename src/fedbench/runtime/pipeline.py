@@ -49,13 +49,13 @@ def load_dataset(ctx: RunContext) -> None:
         schema,
         ctx.partitioner,
         ctx.config.test_size,
-        ctx.config.seeds.partitioning,
+        ctx.config.seed.partitioning,
     )
 
 
 def global_init(ctx: RunContext) -> None:
     artifacts: GlobalInitArtifacts | None = ctx.algorithm.global_init(
-        ctx.config.seeds.generator,
+        ctx.config.seed.generator,
         ctx.dataset.schema,
         ctx.dataset.load_all_train_data(),
     )
@@ -93,7 +93,7 @@ def global_sample(ctx: RunContext) -> None:
     ctx.synthetic_df = synthesizer.sample(
         ctx.aggregated_state,
         ctx.config.num_synthetic_rows or 1000,
-        ctx.config.seeds.sampling,
+        ctx.config.seed.sampling,
     )
 
 
@@ -105,7 +105,7 @@ def global_evaluate(ctx: RunContext) -> None:
         target_column=ctx.config.data.target_col,
         sensitive_columns=ctx.config.data.sensitive_cols,
         schema=ctx.dataset.schema,
-        seed=ctx.config.seeds.downstream,
+        seed=ctx.config.seed.evaluation,
     )
     ctx.centralized_metrics = ctx.eval_suite.global_evaluate(eval_ctx)
 

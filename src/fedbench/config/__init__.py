@@ -1,8 +1,8 @@
-from fedbench.config.config import Config, DataConfig, MetricsConfig, Seeds
+from fedbench.config.config import Config, DataConfig, MetricsConfig, SeedConfig
 
 __all__ = [
     "Config",
     "DataConfig",
     "MetricsConfig",
-    "Seeds",
+    "SeedConfig",
 ]

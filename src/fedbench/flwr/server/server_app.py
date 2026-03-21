@@ -31,7 +31,7 @@ def make_server_app(ctx: RunContext) -> ServerApp:
             artifacts=ctx.global_init_artifacts.coordinator,
         )
         strategy = Strategy(
-            seed=ctx.config.seeds.generator,
+            seed=ctx.config.seed.generator,
             schema=ctx.dataset.schema,
             serde=serde,
             eventbus=ctx.eventbus,

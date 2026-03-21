@@ -49,7 +49,7 @@ def fed_init(message: Message, flwr_context: Context) -> Message:
             client_cache=cache,
         )
         reply = synthesizer.fed_init(
-            request, ctx.config.seeds.generator, ctx.dataset.schema, train_df
+            request, ctx.config.seed.generator, ctx.dataset.schema, train_df
         )
 
     rdict = ctx.serde.to_flwr(reply)
@@ -101,7 +101,7 @@ def evaluate(message: Message, flwr_context: Context) -> Message:
         synthetic_df = synthesizer.sample(
             request,
             len(train_df),
-            ctx.config.seeds.sampling,
+            ctx.config.seed.sampling,
         )
 
     if synthetic_df.empty:
@@ -121,7 +121,7 @@ def evaluate(message: Message, flwr_context: Context) -> Message:
         train_df=train_df,
         test_df=test_df,
         synthetic_df=synthetic_df,
-        seed=ctx.config.seeds.downstream,
+        seed=ctx.config.seed.evaluation,
         target_column=ctx.config.data.target_col,
         sensitive_columns=ctx.config.data.sensitive_cols,
         schema=ctx.dataset.schema,
