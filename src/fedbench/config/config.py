@@ -32,6 +32,29 @@ class MetricsConfig:
 
 
 @dataclass(frozen=True)
+class Seeds:
+    """Derived seeds per §23.2 of the technical reference.
+
+    Each randomness source gets a distinct offset so that changing the
+    master seed produces a genuinely different experiment.
+    """
+
+    partitioning: int  # s + 1
+    generator: int  # s + 2
+    sampling: int  # s + 3
+    downstream: int  # s + 4
+
+    @classmethod
+    def from_master(cls, seed: int) -> "Seeds":
+        return cls(
+            partitioning=seed + 1,
+            generator=seed + 2,
+            sampling=seed + 3,
+            downstream=seed + 4,
+        )
+
+
+@dataclass(frozen=True)
 class Config:
     algorithm: str
     data: DataConfig
@@ -72,6 +95,10 @@ class Config:
             data=DataConfig(**data_cfg),
             metrics=MetricsConfig(**metrics_cfg),
         )
+
+    @property
+    def seeds(self) -> Seeds:
+        return Seeds.from_master(self.seed)
 
     def jsons(self) -> str:
         return json.dumps(asdict(self))

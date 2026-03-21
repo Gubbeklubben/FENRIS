@@ -92,6 +92,6 @@ def _get_dataset(config: Config) -> PartitionedDataset:
         schema=schema,
         partitioner=partitioner,
         test_size=config.test_size,
-        seed=config.seed + 1,  # derived seed: partitioning
+        seed=config.seeds.partitioning,
     )
     return _dataset

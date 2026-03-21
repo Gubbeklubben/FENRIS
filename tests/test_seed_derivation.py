@@ -5,7 +5,7 @@ from unittest.mock import MagicMock, patch
 import pandas as pd
 import pytest
 
-from fedbench.config import Config, DataConfig
+from fedbench.config import Config, DataConfig, Seeds
 from fedbench.core.algorithm import GlobalInitArtifacts
 from fedbench.core.data.schemas import infer_schema
 from fedbench.runtime.pipeline import (
@@ -16,6 +16,7 @@ from fedbench.runtime.pipeline import (
 )
 
 SEED = 100
+SEEDS = Seeds.from_master(SEED)
 
 
 @pytest.fixture
@@ -46,7 +47,7 @@ def test_load_dataset_seed(ctx):
 
     load_dataset(ctx)
 
-    assert ctx.dataset._seed == SEED + 1
+    assert ctx.dataset._seed == SEEDS.partitioning
 
 
 def test_global_init_seed(ctx):
@@ -62,7 +63,7 @@ def test_global_init_seed(ctx):
 
     global_init(ctx)
 
-    algorithm.global_init.assert_called_once_with(SEED + 2, schema, df)
+    algorithm.global_init.assert_called_once_with(SEEDS.generator, schema, df)
 
 
 def test_global_sample_seed(ctx):
@@ -77,7 +78,7 @@ def test_global_sample_seed(ctx):
         global_sample(ctx)
 
     synthesizer.sample.assert_called_once()
-    assert synthesizer.sample.call_args[0][2] == SEED + 3
+    assert synthesizer.sample.call_args[0][2] == SEEDS.sampling
 
 
 def test_global_evaluate_seed(ctx):
@@ -95,4 +96,4 @@ def test_global_evaluate_seed(ctx):
     global_evaluate(ctx)
 
     eval_ctx = ctx.eval_suite.global_evaluate.call_args[0][0]
-    assert eval_ctx.seed == SEED + 4
+    assert eval_ctx.seed == SEEDS.downstream
