@@ -15,25 +15,28 @@ Design rationale
   instantiated in tests.
 """
 
+from __future__ import annotations
+
 import math
 
 import numpy as np
 import pandas as pd
 
-from fedbench.core.data.schemas import TableSchema, ColumnSchema, infer_schema
+from fedbench.core.data.schemas import ColumnSchema, TableSchema, infer_schema
 from fedbench.core.eval.evalcontext import (
+    CentralizedEvalContext,
     GlobalEvalContext,
-    CentralizedEvalContext
+    LocalEvalContext,
 )
 from fedbench.evaluators.fidelity import (
     DistributionSimilarityMetricsEvaluator,
     MomentReductionMetricsEvaluator,
 )
 
-
 # ---------------------------------------------------------------------------
 # Assertion helpers
 # ---------------------------------------------------------------------------
+
 
 def assert_dicts_nan_safe(d1: dict[str, float], d2: dict[str, float]) -> None:
     """Assert two metric dicts are equal, treating NaN == NaN.
@@ -42,9 +45,7 @@ def assert_dicts_nan_safe(d1: dict[str, float], d2: dict[str, float]) -> None:
     the ``math.nan`` singleton.  This helper is portable: it compares key
     sets explicitly, then checks each value with ``math.isnan`` awareness.
     """
-    assert d1.keys() == d2.keys(), (
-        f"Key mismatch: {set(d1) ^ set(d2)}"
-    )
+    assert d1.keys() == d2.keys(), f"Key mismatch: {set(d1) ^ set(d2)}"
     for k in d1:
         v1, v2 = d1[k], d2[k]
         if math.isnan(v1):
@@ -56,6 +57,7 @@ def assert_dicts_nan_safe(d1: dict[str, float], d2: dict[str, float]) -> None:
 # ---------------------------------------------------------------------------
 # EvalContext factories
 # ---------------------------------------------------------------------------
+
 
 def make_ctx(
     train_df: pd.DataFrame,
@@ -95,9 +97,8 @@ def make_local_ctx(
     sensitive_columns: tuple[str, ...] | None = None,
     seed: int = 42,
     schema: TableSchema | None = None,
-) -> "LocalEvalContext":
+) -> LocalEvalContext:
     """Build a LocalEvalContext representing a single federated client."""
-    from fedbench.core.eval.evalcontext import LocalEvalContext
     if schema is None:
         schema = infer_schema(train_df)
     if test_df is None:
@@ -110,7 +111,7 @@ def make_local_ctx(
         seed=seed,
         target_column=target_column,
         sensitive_columns=sensitive_columns,
-        local_train_seconds=math.nan
+        local_train_seconds=math.nan,
     )
 
 
@@ -153,16 +154,20 @@ def make_centralized_ctx(
 _RNG = np.random.default_rng(0)
 N = 200
 
-NUMERIC_DF = pd.DataFrame({
-    "age":    _RNG.normal(50, 10, N),
-    "income": _RNG.normal(60_000, 15_000, N),
-    "score":  _RNG.uniform(0, 1, N),
-})
+NUMERIC_DF = pd.DataFrame(
+    {
+        "age": _RNG.normal(50, 10, N),
+        "income": _RNG.normal(60_000, 15_000, N),
+        "score": _RNG.uniform(0, 1, N),
+    }
+)
 
-CATEGORICAL_DF = pd.DataFrame({
-    "color": _RNG.choice(["red", "blue", "green"], N),
-    "size":  _RNG.choice(["S", "M", "L"], N),
-})
+CATEGORICAL_DF = pd.DataFrame(
+    {
+        "color": _RNG.choice(["red", "blue", "green"], N),
+        "size": _RNG.choice(["S", "M", "L"], N),
+    }
+)
 
 MIXED_DF = pd.concat([NUMERIC_DF, CATEGORICAL_DF], axis=1)
 
@@ -170,6 +175,7 @@ MIXED_DF = pd.concat([NUMERIC_DF, CATEGORICAL_DF], axis=1)
 # ---------------------------------------------------------------------------
 # Schema helpers
 # ---------------------------------------------------------------------------
+
 
 def make_schema(*col_defs: tuple[str, str]) -> TableSchema:
     """Shorthand: make_schema(("age", "continuous"), ("sex", "binary"))."""
@@ -184,6 +190,7 @@ def make_schema(*col_defs: tuple[str, str]) -> TableSchema:
 # subclasses satisfy the abstract interface without adding any logic of
 # their own — they exist purely so pytest can construct evaluator instances.
 # ---------------------------------------------------------------------------
+
 
 class _MomentReduction(MomentReductionMetricsEvaluator):
     """Concrete stub — no overrides; exists only to satisfy the ABC."""

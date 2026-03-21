@@ -4,7 +4,8 @@ Covers:
 - Round-trip for flat and nested dataclasses
 - Round-trip for dicts and lists containing dataclasses
 - Correct __dataclass__ / __module__ tags in encoded form
-- Locally-defined dataclasses (not reachable as module attributes) decode to a plain dict
+- Locally-defined dataclasses (not reachable as module
+  attributes) decode to a plain dict
 - Unknown module tags pass through decode unchanged
 - Primitive values encode and decode normally
 """
@@ -33,15 +34,18 @@ def roundtrip(obj):
 # Module-level dataclasses used by TestNestedRoundTrip
 # ---------------------------------------------------------------------------
 
+
 @dataclass(frozen=True)
 class _Inner:
     a: int = 0
     b: int = 0
 
+
 @dataclass(frozen=True)
 class _Outer:
     x: _Inner = field(default_factory=_Inner)
     y: str = ""
+
 
 @dataclass
 class _OuterWithDictField:
@@ -52,8 +56,8 @@ class _OuterWithDictField:
 # Encoding format
 # ---------------------------------------------------------------------------
 
-class TestEncodingFormat:
 
+class TestEncodingFormat:
     def test_encoded_contains_dataclass_tag(self):
         raw = json.loads(dumps(_Inner(a=1, b=3)))
         assert raw["__dataclass__"] == "_Inner"
@@ -72,8 +76,8 @@ class TestEncodingFormat:
 # Round-trips
 # ---------------------------------------------------------------------------
 
-class TestRoundTrip:
 
+class TestRoundTrip:
     def test_flat_dataclass(self):
         assert roundtrip(_Inner(a=10, b=85)) == _Inner(a=10, b=85)
 
@@ -90,8 +94,7 @@ class TestRoundTrip:
         assert roundtrip(payload) == payload
 
     def test_dict_of_dataclasses(self):
-        payload = {"group_a": _Inner(a=10, b=80),
-                   "group_b": _Inner(a=20, b=70)}
+        payload = {"group_a": _Inner(a=10, b=80), "group_b": _Inner(a=20, b=70)}
         assert roundtrip(payload) == payload
 
     def test_nested_dict_of_dataclasses(self):
@@ -105,8 +108,7 @@ class TestRoundTrip:
         assert roundtrip(payload) == payload
 
     def test_list_of_dataclasses(self):
-        payload = [_Inner(a=1, b=9),
-                   _Inner(a=2, b=7)]
+        payload = [_Inner(a=1, b=9), _Inner(a=2, b=7)]
         assert roundtrip(payload) == payload
 
 
@@ -114,8 +116,8 @@ class TestRoundTrip:
 # Pass-through behaviour
 # ---------------------------------------------------------------------------
 
-class TestPassThrough:
 
+class TestPassThrough:
     def test_plain_dict(self):
         payload = {"key": "value", "count": 42}
         assert roundtrip(payload) == payload
@@ -129,6 +131,7 @@ class TestPassThrough:
     def test_locally_defined_dataclass_decodes_to_dict(self):
         """A locally-defined dataclass is not reachable as a module attribute
         on the decoding side, so decode falls back to a plain dict."""
+
         @dataclass
         class _Local:
             x: int = 0

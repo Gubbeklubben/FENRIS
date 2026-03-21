@@ -1,7 +1,7 @@
 import pandas as pd
-from datasets import Dataset
 from pandas import DataFrame
 
+from fedbench.core.data import Partitioner
 from fedbench.partitioners.flwr_delegates import FlwrDelegatePartitioner
 
 
@@ -9,7 +9,7 @@ def make_dummy_dataset(n: int = 100) -> pd.DataFrame:
     return pd.DataFrame({"value": range(n), "label": [i % 3 for i in range(n)]})
 
 
-def assert_valid_partition(p: FlwrDelegatePartitioner, num_partitions: int) -> None:
+def assert_valid_partition(p: Partitioner, num_partitions: int) -> None:
     assert p.num_partitions == num_partitions
     for i in range(num_partitions):
         partition = p.load_partition(i, split="train", seed=42, test_size=0.2)
@@ -56,7 +56,7 @@ def test_exponential_partitioner():
 
 def test_dirichlet_partitioner():
     p = FlwrDelegatePartitioner.with_dirichlet_partitioner(
-        num_partitions=5, partition_by="label", alpha=0.5
+        num_partitions=5, partition_by="label", alpha=0.5, seed=42
     )
     p.set_dataset(
         make_dummy_dataset(n=1000)
@@ -72,7 +72,7 @@ def test_dirichlet_partitioner():
 
 def test_pathological_partitioner():
     p = FlwrDelegatePartitioner.with_pathological_partitioner(
-        num_partitions=5, partition_by="label", num_classes_per_partition=2
+        num_partitions=5, partition_by="label", num_classes_per_partition=2, seed=42
     )
     p.set_dataset(make_dummy_dataset())
     assert_valid_partition(p, 5)
@@ -87,7 +87,7 @@ def test_pathological_partitioner():
 
 def test_shard_partitioner():
     p = FlwrDelegatePartitioner.with_shard_partitioner(
-        num_partitions=5, partition_by="label", num_shards_per_partition=2
+        num_partitions=5, partition_by="label", num_shards_per_partition=2, seed=42
     )
     p.set_dataset(make_dummy_dataset())
     assert_valid_partition(p, 5)
@@ -104,12 +104,12 @@ def test_shard_partitioner():
 
 def test_continuous_partitioner():
     p = FlwrDelegatePartitioner.with_continuous_partitioner(
-        num_partitions=5, partition_by="value", strictness=0.7
+        num_partitions=5, partition_by="value", strictness=0.7, seed=42
     )
     p.set_dataset(make_dummy_dataset())
     assert_valid_partition(p, 5)
 
-    # Higher strictness should produce partitions concentrated around different value ranges
+    # Higher strictness → partitions concentrated around different value ranges
     partition_means = [
         p.load_partition(i, split="train", seed=42, test_size=0.2)["value"].mean()
         for i in range(5)

@@ -34,10 +34,10 @@ from .conftest import (
     make_schema,
 )
 
-
 # ===================================================================
 # MomentReductionMetricsEvaluator
 # ===================================================================
+
 
 class TestMomentReduction:
     """Tests for mean_abs_diff and std_abs_diff metrics."""
@@ -71,8 +71,12 @@ class TestMomentReduction:
 
     def test_single_column(self):
         """Single-column case: mean diff = 3.0, std diff = 0.0 (parallel shift)."""
-        real = pd.DataFrame({"x": [1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0, 9.0, 10.0, 11.0, 12.0]})
-        syn = pd.DataFrame({"x": [4.0, 5.0, 6.0, 7.0, 8.0, 9.0, 10.0, 11.0, 12.0, 13.0, 14.0, 15.0]})
+        real = pd.DataFrame(
+            {"x": [1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0, 9.0, 10.0, 11.0, 12.0]}
+        )
+        syn = pd.DataFrame(
+            {"x": [4.0, 5.0, 6.0, 7.0, 8.0, 9.0, 10.0, 11.0, 12.0, 13.0, 14.0, 15.0]}
+        )
         ctx = make_ctx(real, syn)
         result = self.evaluator.global_evaluate(ctx)
 
@@ -99,6 +103,7 @@ class TestMomentReduction:
 # ===================================================================
 # DistributionSimilarityMetricsEvaluator
 # ===================================================================
+
 
 class TestDistributionSimilarity:
     """Tests for ks_mean, wasserstein_mean, t_stat_mean_abs metrics."""
@@ -155,6 +160,7 @@ class TestDistributionSimilarity:
 # ===================================================================
 # CategoricalTvMeanEvaluator
 # ===================================================================
+
 
 class TestCategoricalTvMean:
     """Tests for categorical_tv_mean (Total Variation distance)."""
@@ -214,6 +220,7 @@ class TestCategoricalTvMean:
 # ===================================================================
 # CorrFroDiffEvaluator
 # ===================================================================
+
 
 class TestCorrFroDiff:
     """Tests for corr_fro_diff (Frobenius norm of correlation difference)."""
@@ -275,8 +282,8 @@ class TestCorrFroDiff:
         the joint filter, so the metric is undefined.
         """
         a = np.linspace(1, 10, 20)
-        real = pd.DataFrame({"a": a, "b": a * 2.0})    # b non-constant in real
-        syn  = pd.DataFrame({"a": a, "b": [5.0] * 20}) # b constant in syn
+        real = pd.DataFrame({"a": a, "b": a * 2.0})  # b non-constant in real
+        syn = pd.DataFrame({"a": a, "b": [5.0] * 20})  # b constant in syn
 
         ctx = make_ctx(real, syn)
         result = self.evaluator.global_evaluate(ctx)

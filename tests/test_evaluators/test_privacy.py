@@ -13,6 +13,7 @@ omitting the key.  Tests assert the full key set is present and values are nan.
 """
 
 import math
+
 import numpy as np
 import pandas as pd
 import pytest
@@ -23,12 +24,18 @@ from fedbench.evaluators.privacy import (
     MIANearestNeighborAttackEvaluator,
 )
 
-from .conftest import NUMERIC_DF, make_ctx, make_centralized_ctx, make_local_ctx, make_schema
-
+from .conftest import (
+    NUMERIC_DF,
+    make_centralized_ctx,
+    make_ctx,
+    make_local_ctx,
+    make_schema,
+)
 
 # ===================================================================
 # DirectOverlapDiagnosticEvaluator
 # ===================================================================
+
 
 class TestDirectOverlap:
     """Tests for exact-match and partial-match memorization diagnostics.
@@ -69,11 +76,13 @@ class TestDirectOverlap:
     def test_no_overlap(self):
         """Completely different synthetic data → 0 % match."""
         rng = np.random.default_rng(999)
-        syn = pd.DataFrame({
-            "age":    rng.normal(200, 1, len(NUMERIC_DF)),
-            "income": rng.normal(999_999, 1, len(NUMERIC_DF)),
-            "score":  rng.uniform(100, 200, len(NUMERIC_DF)),
-        })
+        syn = pd.DataFrame(
+            {
+                "age": rng.normal(200, 1, len(NUMERIC_DF)),
+                "income": rng.normal(999_999, 1, len(NUMERIC_DF)),
+                "score": rng.uniform(100, 200, len(NUMERIC_DF)),
+            }
+        )
         ctx = make_local_ctx(NUMERIC_DF, syn)
         result = self.evaluator.aggregate([self.evaluator.local_evaluate(ctx)])
 
@@ -84,11 +93,13 @@ class TestDirectOverlap:
         """First half from train, second half random → ~50 % match."""
         half = len(NUMERIC_DF) // 2
         rng = np.random.default_rng(123)
-        random_half = pd.DataFrame({
-            "age":    rng.normal(200, 1, half),
-            "income": rng.normal(999_999, 1, half),
-            "score":  rng.uniform(100, 200, half),
-        })
+        random_half = pd.DataFrame(
+            {
+                "age": rng.normal(200, 1, half),
+                "income": rng.normal(999_999, 1, half),
+                "score": rng.uniform(100, 200, half),
+            }
+        )
         syn = pd.concat(
             [NUMERIC_DF.iloc[:half].reset_index(drop=True), random_half],
             ignore_index=True,
@@ -120,6 +131,7 @@ class TestDirectOverlap:
 # MIANearestNeighborAttackEvaluator
 # ===================================================================
 
+
 class TestMIA:
     """Tests for Membership Inference Attack using nearest-neighbor distance.
 
@@ -137,14 +149,18 @@ class TestMIA:
 
     def _make_disjoint_datasets(self, rng, n=200):
         """Create train and test with different distributions."""
-        train = pd.DataFrame({
-            "x": rng.normal(0, 1, n),
-            "y": rng.normal(0, 1, n),
-        })
-        test = pd.DataFrame({
-            "x": rng.normal(10, 1, n),
-            "y": rng.normal(10, 1, n),
-        })
+        train = pd.DataFrame(
+            {
+                "x": rng.normal(0, 1, n),
+                "y": rng.normal(0, 1, n),
+            }
+        )
+        test = pd.DataFrame(
+            {
+                "x": rng.normal(10, 1, n),
+                "y": rng.normal(10, 1, n),
+            }
+        )
         return train, test
 
     def test_memorized_syn_high_auc(self):
@@ -174,7 +190,7 @@ class TestMIA:
         assert 0.35 < result["mia_auc"] < 0.65
 
     def test_empty_train_returns_nan_keys(self):
-        """Empty training set → all three MIA keys present as nan (NaN contract §7.1.2)."""
+        """Empty training set → all three MIA keys present as nan."""
         empty = pd.DataFrame({"x": pd.Series(dtype=float)})
         syn = pd.DataFrame({"x": [1.0, 2.0]})
         ctx = make_centralized_ctx(empty, syn, test_df=empty, client_train_df=empty)
@@ -201,6 +217,7 @@ class TestMIA:
 # ===================================================================
 # AIASupervisedAttackEvaluator
 # ===================================================================
+
 
 class TestAIA:
     """Tests for Attribute Inference Attack (supervised regression/classification).
@@ -237,7 +254,8 @@ class TestAIA:
         schema = make_schema(("x", "continuous"), ("sensitive", "binary"))
 
         ctx = make_ctx(
-            df, df.copy(),
+            df,
+            df.copy(),
             sensitive_columns=("sensitive",),
             schema=schema,
         )
@@ -256,7 +274,8 @@ class TestAIA:
         schema = make_schema(("x", "continuous"), ("sens_val", "continuous"))
 
         ctx = make_ctx(
-            df, df.copy(),
+            df,
+            df.copy(),
             sensitive_columns=("sens_val",),
             schema=schema,
         )
@@ -270,7 +289,8 @@ class TestAIA:
         schema = make_schema(("target", "binary"), ("sensitive", "binary"))
 
         ctx = make_ctx(
-            df, df.copy(),
+            df,
+            df.copy(),
             target_column="target",
             sensitive_columns=("sensitive",),
             schema=schema,
@@ -291,7 +311,8 @@ class TestAIA:
         schema = make_schema(("x", "continuous"), ("sensitive", "binary"))
 
         ctx = make_ctx(
-            df, df.copy(),
+            df,
+            df.copy(),
             sensitive_columns=("sensitive",),
             schema=schema,
         )
@@ -301,11 +322,11 @@ class TestAIA:
         auc = result["aia_auc.sensitive"]
         rmse = result["aia_rmse.sensitive"]
 
-        assert math.isfinite(acc),  f"accuracy not finite: {acc}"
-        assert 0.0 <= acc <= 1.0,   f"accuracy out of range: {acc}"
-        assert math.isfinite(auc),  f"AUC not finite: {auc}"
-        assert 0.0 <= auc <= 1.0,   f"AUC out of range: {auc}"
-        assert math.isnan(rmse),    f"Expected NaN rmse for classification, got {rmse}"
+        assert math.isfinite(acc), f"accuracy not finite: {acc}"
+        assert 0.0 <= acc <= 1.0, f"accuracy out of range: {acc}"
+        assert math.isfinite(auc), f"AUC not finite: {auc}"
+        assert 0.0 <= auc <= 1.0, f"AUC out of range: {auc}"
+        assert math.isnan(rmse), f"Expected NaN rmse for classification, got {rmse}"
 
     def test_multiclass_no_auc(self):
         """Categorical sensitive column with >2 classes: accuracy finite, AUC NaN.
@@ -317,14 +338,17 @@ class TestAIA:
         labels = ["A"] * n_per_class + ["B"] * n_per_class + ["C"] * n_per_class
         rng = np.random.default_rng(3)
         n = len(labels)
-        df = pd.DataFrame({
-            "x":         rng.standard_normal(n),
-            "sensitive": labels,
-        })
+        df = pd.DataFrame(
+            {
+                "x": rng.standard_normal(n),
+                "sensitive": labels,
+            }
+        )
         schema = make_schema(("x", "continuous"), ("sensitive", "categorical"))
 
         ctx = make_ctx(
-            df, df.copy(),
+            df,
+            df.copy(),
             sensitive_columns=("sensitive",),
             schema=schema,
         )
@@ -332,7 +356,7 @@ class TestAIA:
 
         acc = result["aia_accuracy.sensitive"]
         assert math.isfinite(acc), f"accuracy not finite: {acc}"
-        assert 0.0 <= acc <= 1.0,  f"accuracy out of range: {acc}"
+        assert 0.0 <= acc <= 1.0, f"accuracy out of range: {acc}"
         assert math.isnan(result["aia_auc.sensitive"]), (
             f"Expected NaN AUC for multiclass task, got {result['aia_auc.sensitive']}"
         )
@@ -368,12 +392,10 @@ class TestAIALabelCoercion:
         syn_df uses string-encoded labels; real_df uses float labels.
         """
         x_neg = rng.normal(-5, 0.1, n_per_class)
-        x_pos = rng.normal( 5, 0.1, n_per_class)
+        x_pos = rng.normal(5, 0.1, n_per_class)
         x = np.concatenate([x_neg, x_pos])
 
-        y_float = pd.Series(
-            [0.0] * n_per_class + [1.0] * n_per_class
-        )
+        y_float = pd.Series([0.0] * n_per_class + [1.0] * n_per_class)
         y_str = y_float.astype(str)  # "0.0", "1.0"
 
         syn_df = pd.DataFrame({"x": x, "sensitive": y_str})
@@ -391,7 +413,8 @@ class TestAIALabelCoercion:
         syn_df, real_df, schema = self._make_separable_aia(rng)
 
         ctx = make_ctx(
-            real_df, syn_df,
+            real_df,
+            syn_df,
             sensitive_columns=("sensitive",),
             schema=schema,
         )
@@ -434,18 +457,22 @@ class TestAIACollapse:
         """Two-class synthetic and test DataFrames with 'income' as the
         sensitive attribute and 'age'/'hours' as numeric quasi-identifiers."""
         rng = np.random.default_rng(seed)
-        syn = pd.DataFrame({
-            "age":    rng.integers(20, 65, n_syn).astype(float),
-            "hours":  rng.integers(20, 60, n_syn).astype(float),
-            "income": ["low"] * (n_syn // 2) + ["high"] * (n_syn - n_syn // 2),
-            "target": rng.integers(0, 2, n_syn),
-        })
-        test = pd.DataFrame({
-            "age":    rng.integers(20, 65, n_test).astype(float),
-            "hours":  rng.integers(20, 60, n_test).astype(float),
-            "income": ["low"] * (n_test // 2) + ["high"] * (n_test - n_test // 2),
-            "target": rng.integers(0, 2, n_test),
-        })
+        syn = pd.DataFrame(
+            {
+                "age": rng.integers(20, 65, n_syn).astype(float),
+                "hours": rng.integers(20, 60, n_syn).astype(float),
+                "income": ["low"] * (n_syn // 2) + ["high"] * (n_syn - n_syn // 2),
+                "target": rng.integers(0, 2, n_syn),
+            }
+        )
+        test = pd.DataFrame(
+            {
+                "age": rng.integers(20, 65, n_test).astype(float),
+                "hours": rng.integers(20, 60, n_test).astype(float),
+                "income": ["low"] * (n_test // 2) + ["high"] * (n_test - n_test // 2),
+                "target": rng.integers(0, 2, n_test),
+            }
+        )
         return syn, test
 
     @staticmethod
@@ -457,18 +484,22 @@ class TestAIACollapse:
         """Same as _binary_frames but every synthetic row has income='low'
         (simulating a fully-collapsed generator)."""
         rng = np.random.default_rng(seed)
-        syn = pd.DataFrame({
-            "age":    rng.integers(20, 65, n_syn).astype(float),
-            "hours":  rng.integers(20, 60, n_syn).astype(float),
-            "income": ["low"] * n_syn,
-            "target": rng.integers(0, 2, n_syn),
-        })
-        test = pd.DataFrame({
-            "age":    rng.integers(20, 65, n_test).astype(float),
-            "hours":  rng.integers(20, 60, n_test).astype(float),
-            "income": ["low"] * (n_test // 2) + ["high"] * (n_test - n_test // 2),
-            "target": rng.integers(0, 2, n_test),
-        })
+        syn = pd.DataFrame(
+            {
+                "age": rng.integers(20, 65, n_syn).astype(float),
+                "hours": rng.integers(20, 60, n_syn).astype(float),
+                "income": ["low"] * n_syn,
+                "target": rng.integers(0, 2, n_syn),
+            }
+        )
+        test = pd.DataFrame(
+            {
+                "age": rng.integers(20, 65, n_test).astype(float),
+                "hours": rng.integers(20, 60, n_test).astype(float),
+                "income": ["low"] * (n_test // 2) + ["high"] * (n_test - n_test // 2),
+                "target": rng.integers(0, 2, n_test),
+            }
+        )
         return syn, test
 
     # ------------------------------------------------------------------
@@ -483,11 +514,14 @@ class TestAIACollapse:
         """
         syn_df, test_df = self._collapsed_frames()
         schema = make_schema(
-            ("age", "continuous"), ("hours", "continuous"),
-            ("income", "binary"), ("target", "binary"),
+            ("age", "continuous"),
+            ("hours", "continuous"),
+            ("income", "binary"),
+            ("target", "binary"),
         )
         ctx = make_ctx(
-            test_df, syn_df,
+            test_df,
+            syn_df,
             target_column="target",
             sensitive_columns=("income",),
             schema=schema,
@@ -510,21 +544,28 @@ class TestAIACollapse:
         Exercises the same ValueError path in the multiclass branch.
         """
         n = 90
-        syn_df = pd.DataFrame({
-            "x":      np.ones(n),
-            "group":  ["A"] * n,    # collapsed: only class A
-            "target": [0] * n,
-        })
-        test_df = pd.DataFrame({
-            "x":      np.arange(n, dtype=float),
-            "group":  ["A"] * 30 + ["B"] * 30 + ["C"] * 30,
-            "target": [0] * n,
-        })
+        syn_df = pd.DataFrame(
+            {
+                "x": np.ones(n),
+                "group": ["A"] * n,  # collapsed: only class A
+                "target": [0] * n,
+            }
+        )
+        test_df = pd.DataFrame(
+            {
+                "x": np.arange(n, dtype=float),
+                "group": ["A"] * 30 + ["B"] * 30 + ["C"] * 30,
+                "target": [0] * n,
+            }
+        )
         schema = make_schema(
-            ("x", "continuous"), ("group", "categorical"), ("target", "binary"),
+            ("x", "continuous"),
+            ("group", "categorical"),
+            ("target", "binary"),
         )
         ctx = make_ctx(
-            test_df, syn_df,
+            test_df,
+            syn_df,
             target_column="target",
             sensitive_columns=("group",),
             schema=schema,
@@ -548,21 +589,28 @@ class TestAIACollapse:
         the collapse fix (i.e., the try/except does not suppress valid fits).
         """
         n = 100
-        syn_df = pd.DataFrame({
-            "age":    [20.0] * (n // 2) + [60.0] * (n - n // 2),
-            "income": ["low"] * (n // 2) + ["high"] * (n - n // 2),
-            "target": [0] * n,
-        })
-        test_df = pd.DataFrame({
-            "age":    [20.0] * (n // 2) + [60.0] * (n - n // 2),
-            "income": ["low"] * (n // 2) + ["high"] * (n - n // 2),
-            "target": [0] * n,
-        })
+        syn_df = pd.DataFrame(
+            {
+                "age": [20.0] * (n // 2) + [60.0] * (n - n // 2),
+                "income": ["low"] * (n // 2) + ["high"] * (n - n // 2),
+                "target": [0] * n,
+            }
+        )
+        test_df = pd.DataFrame(
+            {
+                "age": [20.0] * (n // 2) + [60.0] * (n - n // 2),
+                "income": ["low"] * (n // 2) + ["high"] * (n - n // 2),
+                "target": [0] * n,
+            }
+        )
         schema = make_schema(
-            ("age", "continuous"), ("income", "binary"), ("target", "binary"),
+            ("age", "continuous"),
+            ("income", "binary"),
+            ("target", "binary"),
         )
         ctx = make_ctx(
-            test_df, syn_df,
+            test_df,
+            syn_df,
             target_column="target",
             sensitive_columns=("income",),
             schema=schema,
@@ -586,16 +634,21 @@ class TestAIACollapse:
         """
         rng = np.random.default_rng(7)
         n = 200
-        df = pd.DataFrame({
-            "noise":  rng.standard_normal(n),
-            "income": ["low"] * (n // 2) + ["high"] * (n - n // 2),
-            "target": [0] * n,
-        })
+        df = pd.DataFrame(
+            {
+                "noise": rng.standard_normal(n),
+                "income": ["low"] * (n // 2) + ["high"] * (n - n // 2),
+                "target": [0] * n,
+            }
+        )
         schema = make_schema(
-            ("noise", "continuous"), ("income", "binary"), ("target", "binary"),
+            ("noise", "continuous"),
+            ("income", "binary"),
+            ("target", "binary"),
         )
         ctx = make_ctx(
-            df, df.copy(),
+            df,
+            df.copy(),
             target_column="target",
             sensitive_columns=("income",),
             schema=schema,

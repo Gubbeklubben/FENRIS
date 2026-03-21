@@ -5,12 +5,15 @@ Approach
 TSTR trains a classifier or regressor on synthetic data and evaluates it on
 held-out real data.  The evaluator always returns all three keys; inapplicable
 paths emit ``float("nan")``:
-  * Binary classification  → ``tstr_auc`` computed; ``tstr_accuracy`` and ``tstr_rmse`` are nan
-  * Multi-class classification → ``tstr_accuracy`` computed; ``tstr_auc`` and ``tstr_rmse`` are nan
+  * Binary classification  → ``tstr_auc`` computed;
+    ``tstr_accuracy`` and ``tstr_rmse`` are nan
+  * Multi-class classification → ``tstr_accuracy`` computed;
+    ``tstr_auc`` and ``tstr_rmse`` are nan
   * Regression  → ``tstr_rmse`` computed; ``tstr_auc`` and ``tstr_accuracy`` are nan
 """
 
 import math
+
 import numpy as np
 import pandas as pd
 import pytest
@@ -19,10 +22,10 @@ from fedbench.evaluators.utility import TSTREvaluator
 
 from .conftest import make_ctx, make_schema
 
-
 # ===================================================================
 # Guard clauses
 # ===================================================================
+
 
 class TestTSTRGuards:
     """Guard-clause tests: missing prerequisites produce the full nan key set."""
@@ -32,7 +35,7 @@ class TestTSTRGuards:
     EXPECTED_KEYS = {"tstr_auc", "tstr_accuracy", "tstr_rmse"}
 
     def test_no_target_returns_nan_keys(self):
-        """No target_column set → all three keys present as nan (NaN contract §7.1.2)."""
+        """No target_column set → all three keys present as nan."""
         df = pd.DataFrame({"x": [1.0, 2.0], "y": [0, 1]})
         ctx = make_ctx(df, df.copy(), target_column=None)
         result = self.evaluator.global_evaluate(ctx)
@@ -66,10 +69,12 @@ class TestTSTRGuards:
 # Binary classification path
 # ===================================================================
 
+
 class TestTSTRBinary:
-    """Binary classification path: target has exactly two classes → emits ``tstr_auc``."""
+    """Binary: target has exactly two classes → emits ``tstr_auc``."""
 
     evaluator = TSTREvaluator()
+
     @pytest.fixture()
     def separable_data(self):
         """Linearly separable binary task: y=1 when x > 0."""
@@ -85,7 +90,8 @@ class TestTSTRBinary:
         """Synthetic data identical to real → AUC should exceed 0.85."""
         df, schema = separable_data
         ctx = make_ctx(
-            df, df.copy(),
+            df,
+            df.copy(),
             test_df=df.copy(),
             target_column="target",
             schema=schema,
@@ -105,7 +111,8 @@ class TestTSTRBinary:
         schema = make_schema(("x", "continuous"), ("target", "binary"))
 
         ctx = make_ctx(
-            syn_df, syn_df.copy(),
+            syn_df,
+            syn_df.copy(),
             test_df=test_df,
             target_column="target",
             schema=schema,
@@ -129,8 +136,9 @@ class TestTSTRBinary:
 # Multiclass / categorical classification path
 # ===================================================================
 
+
 class TestTSTRCategorical:
-    """Multi-class classification path: target has >2 classes → emits ``tstr_accuracy``."""
+    """Multi-class: target has >2 classes → emits ``tstr_accuracy``."""
 
     evaluator = TSTREvaluator()
 
@@ -154,6 +162,7 @@ class TestTSTRCategorical:
 # Regression path
 # ===================================================================
 
+
 class TestTSTRRegression:
     """Regression path: continuous target → emits ``tstr_rmse``."""
 
@@ -174,15 +183,16 @@ class TestTSTRRegression:
         assert "tstr_rmse" in result
         assert result["tstr_rmse"] < 0.1
 
-
     def test_regression_emits_rmse_key(self):
         """Continuous target → rmse computed; auc and accuracy are nan."""
         rng = np.random.default_rng(0)
         n = 100
-        df = pd.DataFrame({
-            "x": rng.normal(0, 1, n),
-            "target": rng.normal(0, 1, n),
-        })
+        df = pd.DataFrame(
+            {
+                "x": rng.normal(0, 1, n),
+                "target": rng.normal(0, 1, n),
+            }
+        )
         schema = make_schema(("x", "continuous"), ("target", "continuous"))
 
         ctx = make_ctx(df, df.copy(), target_column="target", schema=schema)
@@ -223,12 +233,12 @@ class TestTSTRLabelCoercion:
         synthetic labels are string-encoded floats.
         """
         rows_per_class = 20
-        x_vals = np.concatenate([
-            rng.normal(i * 10, 0.1, rows_per_class) for i in range(n_classes)
-        ])
-        y_float = pd.Series(np.repeat(
-            np.arange(n_classes, dtype=float), rows_per_class
-        ))
+        x_vals = np.concatenate(
+            [rng.normal(i * 10, 0.1, rows_per_class) for i in range(n_classes)]
+        )
+        y_float = pd.Series(
+            np.repeat(np.arange(n_classes, dtype=float), rows_per_class)
+        )
         y_str = y_float.astype(str)  # "0.0", "1.0", ...
         X = pd.DataFrame({"x": x_vals})
         return X, y_str, y_float
@@ -244,7 +254,7 @@ class TestTSTRLabelCoercion:
         X, y_str, y_float = self._make_separable(n_classes=3, rng=rng)
 
         syn_df = X.copy()
-        syn_df["target"] = y_str    # string labels in synthetic
+        syn_df["target"] = y_str  # string labels in synthetic
 
         real_df = X.copy()
         real_df["target"] = y_float  # float labels in real data
