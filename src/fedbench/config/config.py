@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import json
 from dataclasses import asdict, dataclass, field
 from typing import Literal, Self
@@ -45,7 +47,7 @@ class Seeds:
     downstream: int  # s + 4
 
     @classmethod
-    def from_master(cls, seed: int) -> "Seeds":
+    def from_master(cls, seed: int) -> Seeds:
         return cls(
             partitioning=seed + 1,
             generator=seed + 2,
