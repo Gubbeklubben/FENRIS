@@ -17,6 +17,7 @@ import pandas as pd
 from numpy.typing import NDArray
 from sklearn.mixture import BayesianGaussianMixture
 from sklearn.preprocessing import OneHotEncoder
+from threadpoolctl import threadpool_limits
 
 
 @dataclass(frozen=True)
@@ -64,6 +65,7 @@ def fit_local_continuous(
     column_data: NDArray[Any],
     max_clusters: int = 10,
     weight_threshold: float = 0.005,
+    seed: int = 0,
 ) -> dict[str, Any]:
     """Fit a BayesianGaussianMixture on a single continuous column.
 
@@ -75,6 +77,8 @@ def fit_local_continuous(
         Upper bound on the number of Gaussian components.
     weight_threshold
         Components with weight below this value are pruned.
+    seed
+        Random state for the BGM model.
 
     Returns
     -------
@@ -91,9 +95,10 @@ def fit_local_continuous(
         weight_concentration_prior=0.001,
         max_iter=100,
         n_init=1,
-        random_state=0,
+        random_state=seed,
     )
-    gm.fit(column_data.reshape(-1, 1))
+    with threadpool_limits(limits=1):
+        gm.fit(column_data.reshape(-1, 1))
 
     valid = gm.weights_ > weight_threshold
     return {
@@ -205,7 +210,8 @@ def merge_vgm_models(
         n_init=1,
         random_state=seed,
     )
-    gm.fit(combined)
+    with threadpool_limits(limits=1):
+        gm.fit(combined)
 
     valid = gm.weights_ > weight_threshold
     return {

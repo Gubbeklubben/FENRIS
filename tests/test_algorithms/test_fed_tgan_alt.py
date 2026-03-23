@@ -8,12 +8,16 @@ Coverage:
     _cond_loss, _weighted_average_state_dicts, _sample_condvec_from_info
   - Generator / Residual / Discriminator forward passes
   - DataSampler: dim_cond_vec, sample_condvec, sample_original_condvec,
-    sample_data (both branches), no-discrete-column paths
-  - data_transformer: fit_local_continuous, fit_local_discrete,
-    merge_vgm_models (all branches), merge_category_frequencies,
-    GlobalDataTransformer (mixed / continuous-only / discrete-only),
+    sample_data (both branches), no-discrete-column paths, RNG isolation
+  - data_transformer: fit_local_continuous (incl. seed reproducibility),
+    fit_local_discrete, merge_vgm_models (all branches),
+    merge_category_frequencies, GlobalDataTransformer (mixed /
+    continuous-only / discrete-only),
     convert_column_name_value_to_id (happy path + errors)
   - weighting: compute_jsd, compute_wd, compute_client_weights
+  - Determinism: fingerprint generation, configure_train seed injection,
+    canonical node ordering in aggregate_train, full pipeline
+    reproducibility, _ensure_single_threaded idempotency
   - End-to-end smoke: fed_init → aggregate_fed_init → train → sample
   - Coordinator / Synthesizer properties and edge cases
 """
@@ -56,8 +60,6 @@ from fedbench.algorithms.fed_tgan_alt.weighting import (
 from fedbench.core.algorithm import ComponentSpec, Coordinator, Synthesizer
 from fedbench.core.data.schemas import ColumnSchema, TableSchema, infer_schema
 from fedbench.runtime.registry import FactoryRegistry
-from fedbench.core.update import Update
-
 
 # ---------------------------------------------------------------------------
 # Shared fixtures
@@ -413,15 +415,19 @@ def e2e_state(sample_df, sample_schema, tiny_cfg):
 
     # Split sample_df into two halves to simulate two clients
     half = len(sample_df) // 2
-    client_data = {0: sample_df.iloc[:half].reset_index(drop=True),
-                   1: sample_df.iloc[half:].reset_index(drop=True)}
+    client_data = {
+        0: sample_df.iloc[:half].reset_index(drop=True),
+        1: sample_df.iloc[half:].reset_index(drop=True),
+    }
 
     # configure_fed_init → yields (client_id, config_update)
-    init_requests = list(coordinator.configure_fed_init(
-        seed=42,
-        schema=sample_schema,
-        client_ids=client_ids,
-    ))
+    init_requests = list(
+        coordinator.configure_fed_init(
+            seed=42,
+            schema=sample_schema,
+            client_ids=client_ids,
+        )
+    )
     assert len(init_requests) == 2
 
     # Each client runs fed_init
@@ -442,9 +448,9 @@ def test_fed_init_reply_keys(sample_df, sample_schema, tiny_cfg):
     synthesizer = FedTGANAltSynthesizer(tiny_cfg)
 
     # We only need the first request to test fed_init reply structure
-    init_requests = list(coordinator.configure_fed_init(
-        seed=0, schema=sample_schema, client_ids=[0]
-    ))
+    init_requests = list(
+        coordinator.configure_fed_init(seed=0, schema=sample_schema, client_ids=[0])
+    )
     request = init_requests[0][1]
     reply = synthesizer.fed_init(request, 0, sample_schema, sample_df)
 
@@ -611,7 +617,10 @@ def test_apply_activate_tanh_range():
 
 
 def test_cond_loss_returns_scalar():
-    output_info = [[SpanInfo(1, "tanh"), SpanInfo(2, "softmax")], [SpanInfo(3, "softmax")]]
+    output_info = [
+        [SpanInfo(1, "tanh"), SpanInfo(2, "softmax")],
+        [SpanInfo(3, "softmax")],
+    ]
     batch = 10
     fake = torch.randn(batch, 6)
     cond = torch.zeros(batch, 5)
@@ -1006,17 +1015,16 @@ def test_synthesizer_spec_arrays_to_ml_framework_map(tiny_algo):
     assert "generator" in mapping
 
 
-def test_aggregate_train_weight_mismatch_fallback(e2e_state, sample_df):
-    """When weight count mismatches client count, aggregate_train falls back to uniform."""
+def test_aggregate_train_unknown_node_fallback(e2e_state, sample_df):
+    """Unknown node ID in replies triggers uniform-weight fallback."""
     coordinator, synthesizer = e2e_state
     global_state = coordinator.global_state
     train_reply = synthesizer.train(global_state, sample_df)
 
-    # Deliberately corrupt weights to trigger the fallback branch
-    coordinator._client_weights = [0.5, 0.5, 0.5]  # 3 weights for 1 client
-    coordinator.aggregate_train([(0, train_reply)])
+    # Use a node ID not in _client_weights_by_node
+    unknown_id = 9999
+    coordinator.aggregate_train([(unknown_id, train_reply)])
 
-    # The aggregation should succeed (uniform fallback used)
     new_state = coordinator.global_state
     assert "generator" in new_state.arrays
 
@@ -1053,10 +1061,12 @@ def test_sample_integer_column_is_int(tiny_cfg):
     """Integer-kind columns in the schema must be returned as dtype int."""
     rng = np.random.default_rng(99)
     n = 60
-    df = pd.DataFrame({
-        "count": rng.integers(1, 20, n),
-        "label": rng.choice(["a", "b"], n),
-    })
+    df = pd.DataFrame(
+        {
+            "count": rng.integers(1, 20, n),
+            "label": rng.choice(["a", "b"], n),
+        }
+    )
     schema = infer_schema(df)
     coordinator = FedTGANAltCoordinator(tiny_cfg)
     synthesizer = FedTGANAltSynthesizer(tiny_cfg)
@@ -1093,10 +1103,12 @@ def test_e2e_continuous_only_dataset(tiny_cfg):
     """Algorithm must work on a dataset with no categorical / binary columns."""
     rng = np.random.default_rng(11)
     n = 60
-    df = pd.DataFrame({
-        "x": rng.normal(0, 1, n).astype(float),
-        "y": rng.normal(5, 2, n).astype(float),
-    })
+    df = pd.DataFrame(
+        {
+            "x": rng.normal(0, 1, n).astype(float),
+            "y": rng.normal(5, 2, n).astype(float),
+        }
+    )
     schema = infer_schema(df)
     coordinator = FedTGANAltCoordinator(tiny_cfg)
     synthesizer = FedTGANAltSynthesizer(tiny_cfg)
@@ -1214,3 +1226,234 @@ def test_sample_condvec_from_info_with_rng():
 def test_constructor_rejects_zero_max_total_samples():
     with pytest.raises(ValueError, match="max_total_samples"):
         FedTGANAlt(batch_size=10, pac=2, embedding_dim=8, max_total_samples=0)
+
+
+# ---------------------------------------------------------------------------
+# Determinism: fed_init fingerprint
+# ---------------------------------------------------------------------------
+
+
+def test_fed_init_reply_contains_fingerprint(sample_df, sample_schema, tiny_cfg):
+    """fed_init reply must include a SHA-256 fingerprint in init-extras."""
+    coordinator = FedTGANAltCoordinator(tiny_cfg)
+    synthesizer = FedTGANAltSynthesizer(tiny_cfg)
+    req = list(coordinator.configure_fed_init(42, sample_schema, [0]))[0][1]
+    reply = synthesizer.fed_init(req, 42, sample_schema, sample_df)
+    fp = reply.extras["init-extras"]["fingerprint"]
+    assert isinstance(fp, str)
+    assert len(fp) == 64  # SHA-256 hex digest
+
+
+def test_fed_init_fingerprint_deterministic(sample_df, sample_schema, tiny_cfg):
+    """Same data and seed must produce the same fingerprint."""
+    fps = []
+    for _ in range(2):
+        coord = FedTGANAltCoordinator(tiny_cfg)
+        synth = FedTGANAltSynthesizer(tiny_cfg)
+        req = list(coord.configure_fed_init(42, sample_schema, [0]))[0][1]
+        reply = synth.fed_init(req, 42, sample_schema, sample_df)
+        fps.append(reply.extras["init-extras"]["fingerprint"])
+    assert fps[0] == fps[1]
+
+
+def test_fed_init_fingerprint_differs_for_different_data(
+    sample_df, sample_schema, tiny_cfg
+):
+    """Different client data must produce different fingerprints."""
+    half = len(sample_df) // 2
+    dfs = [
+        sample_df.iloc[:half].reset_index(drop=True),
+        sample_df.iloc[half:].reset_index(drop=True),
+    ]
+    fps = []
+    for df in dfs:
+        coord = FedTGANAltCoordinator(tiny_cfg)
+        synth = FedTGANAltSynthesizer(tiny_cfg)
+        req = list(coord.configure_fed_init(42, sample_schema, [0]))[0][1]
+        reply = synth.fed_init(req, 42, sample_schema, df)
+        fps.append(reply.extras["init-extras"]["fingerprint"])
+    assert fps[0] != fps[1]
+
+
+# ---------------------------------------------------------------------------
+# Determinism: configure_train seed injection
+# ---------------------------------------------------------------------------
+
+
+def test_configure_train_injects_training_seed(e2e_state):
+    """configure_train must add a training-seed to each Update."""
+    coordinator, _ = e2e_state
+    updates = list(coordinator.configure_train([0, 1]))
+    for _cid, upd in updates:
+        assert "training-seed" in upd.extras["model-info"]
+        assert isinstance(upd.extras["model-info"]["training-seed"], int)
+
+
+def test_configure_train_seeds_differ_across_rounds(e2e_state):
+    """Consecutive configure_train calls must produce different seeds."""
+    coordinator, _ = e2e_state
+    seeds = []
+    for _ in range(3):
+        updates = list(coordinator.configure_train([0]))
+        seeds.append(updates[0][1].extras["model-info"]["training-seed"])
+    assert len(set(seeds)) == 3
+
+
+# ---------------------------------------------------------------------------
+# Determinism: canonical node ordering in aggregate_train
+# ---------------------------------------------------------------------------
+
+
+def test_aggregate_train_order_independent(sample_df, sample_schema, tiny_cfg):
+    """aggregate_train must produce identical state regardless of reply order."""
+    client_ids = [0, 1]
+    half = len(sample_df) // 2
+    client_data = {
+        0: sample_df.iloc[:half].reset_index(drop=True),
+        1: sample_df.iloc[half:].reset_index(drop=True),
+    }
+
+    def _run(reply_order):
+        coord = FedTGANAltCoordinator(tiny_cfg)
+        synth = FedTGANAltSynthesizer(tiny_cfg)
+        reqs = list(coord.configure_fed_init(42, sample_schema, client_ids))
+        init_replies = [
+            (cid, synth.fed_init(req, 42, sample_schema, client_data[cid]))
+            for cid, req in reqs
+        ]
+        coord.aggregate_fed_init(init_replies)
+
+        train_reqs = list(coord.configure_train(client_ids))
+        train_replies = [
+            (cid, synth.train(req, client_data[cid])) for cid, req in train_reqs
+        ]
+        # Reorder replies
+        reordered = [train_replies[i] for i in reply_order]
+        coord.aggregate_train(reordered)
+        return coord.global_state
+
+    state_fwd = _run([0, 1])
+    state_rev = _run([1, 0])
+
+    for key in state_fwd.arrays["generator"]:
+        torch.testing.assert_close(
+            state_fwd.arrays["generator"][key],
+            state_rev.arrays["generator"][key],
+        )
+
+
+# ---------------------------------------------------------------------------
+# Determinism: fit_local_continuous seed reproducibility
+# ---------------------------------------------------------------------------
+
+
+def test_fit_local_continuous_seed_reproducibility():
+    """Same seed must produce identical VGM parameters."""
+    data = np.random.default_rng(7).normal(0, 1, 200)
+    r1 = fit_local_continuous(data, max_clusters=5, seed=42)
+    r2 = fit_local_continuous(data, max_clusters=5, seed=42)
+    np.testing.assert_array_equal(r1["means"], r2["means"])
+    np.testing.assert_array_equal(r1["covariances"], r2["covariances"])
+
+
+def test_fit_local_continuous_different_seeds_differ():
+    """Different seeds should produce different VGM parameters."""
+    data = np.random.default_rng(7).normal(0, 1, 200)
+    r1 = fit_local_continuous(data, max_clusters=5, seed=42)
+    r2 = fit_local_continuous(data, max_clusters=5, seed=99)
+    # At least one field should differ
+    assert r1["means"] != r2["means"] or r1["covariances"] != r2["covariances"]
+
+
+# ---------------------------------------------------------------------------
+# Determinism: DataSampler RNG isolation
+# ---------------------------------------------------------------------------
+
+
+def test_data_sampler_rng_determinism():
+    """Same RNG seed must produce identical conditional vectors."""
+    data = np.zeros((20, 3), dtype=np.float32)
+    data[:, 0] = 1.0
+    output_info: list[list[SpanInfo]] = [[SpanInfo(3, "softmax")]]
+
+    s1 = DataSampler(data, output_info, rng=np.random.default_rng(42))
+    s2 = DataSampler(data, output_info, rng=np.random.default_rng(42))
+
+    cv1 = s1.sample_condvec(8)
+    cv2 = s2.sample_condvec(8)
+    assert cv1 is not None and cv2 is not None
+    np.testing.assert_array_equal(cv1[0], cv2[0])
+
+
+def test_data_sampler_rng_isolation():
+    """Two DataSamplers with different seeds must not share state."""
+    # Use balanced categories so sampling has real randomness
+    n = 60
+    data = np.zeros((n, 3), dtype=np.float32)
+    data[:20, 0] = 1.0  # category 0: rows 0-19
+    data[20:40, 1] = 1.0  # category 1: rows 20-39
+    data[40:, 2] = 1.0  # category 2: rows 40-59
+    output_info: list[list[SpanInfo]] = [[SpanInfo(3, "softmax")]]
+
+    s1 = DataSampler(data, output_info, rng=np.random.default_rng(1))
+    s2 = DataSampler(data, output_info, rng=np.random.default_rng(2))
+
+    cv1 = s1.sample_condvec(100)
+    cv2 = s2.sample_condvec(100)
+    assert cv1 is not None and cv2 is not None
+    # Different seeds with uniform categories → different samples
+    assert not np.array_equal(cv1[0], cv2[0])
+
+
+# ---------------------------------------------------------------------------
+# Determinism: full pipeline reproducibility
+# ---------------------------------------------------------------------------
+
+
+def test_full_pipeline_reproducible(sample_df, sample_schema, tiny_cfg):
+    """Two identical runs must produce bitwise-identical synthetic data."""
+    client_ids = [0, 1]
+    half = len(sample_df) // 2
+    client_data = {
+        0: sample_df.iloc[:half].reset_index(drop=True),
+        1: sample_df.iloc[half:].reset_index(drop=True),
+    }
+
+    def _run():
+        coord = FedTGANAltCoordinator(tiny_cfg)
+        synth = FedTGANAltSynthesizer(tiny_cfg)
+        reqs = list(coord.configure_fed_init(42, sample_schema, client_ids))
+        init_replies = [
+            (cid, synth.fed_init(req, 42, sample_schema, client_data[cid]))
+            for cid, req in reqs
+        ]
+        coord.aggregate_fed_init(init_replies)
+
+        for _ in range(2):
+            train_reqs = list(coord.configure_train(client_ids))
+            train_replies = [
+                (cid, synth.train(req, client_data[cid])) for cid, req in train_reqs
+            ]
+            coord.aggregate_train(train_replies)
+
+        return synth.sample(coord.global_state, num_rows=20, seed=7)
+
+    df1 = _run()
+    df2 = _run()
+    pd.testing.assert_frame_equal(df1, df2)
+
+
+# ---------------------------------------------------------------------------
+# Determinism: _ensure_single_threaded idempotency
+# ---------------------------------------------------------------------------
+
+
+def test_ensure_single_threaded_idempotent():
+    """Calling _ensure_single_threaded multiple times must not raise."""
+    from fedbench.algorithms.fed_tgan_alt.fed_tgan_alt import (
+        _ensure_single_threaded,
+    )
+
+    # Should be safe to call repeatedly
+    _ensure_single_threaded()
+    _ensure_single_threaded()  # no error

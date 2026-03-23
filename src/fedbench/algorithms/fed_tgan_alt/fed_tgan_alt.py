@@ -10,13 +10,23 @@ separate modules under this package.
 """
 
 import functools
+import hashlib
+import os
 from collections.abc import Iterable
 from typing import Any, Literal, cast
+
+# Force single-threaded BLAS/OpenMP before any numerical library
+# initializes its thread pool.  This MUST happen before importing
+# numpy/torch in Ray actor sub-processes for deterministic results.
+os.environ.setdefault("OMP_NUM_THREADS", "1")
+os.environ.setdefault("MKL_NUM_THREADS", "1")
+os.environ.setdefault("OPENBLAS_NUM_THREADS", "1")
 
 import numpy as np
 import pandas as pd
 import torch
 from pandas import DataFrame
+from threadpoolctl import threadpool_limits
 from torch import Tensor, nn, optim
 
 from fedbench.core.algorithm import (
@@ -50,6 +60,29 @@ from .data_transformer import (
 from .discriminator import Discriminator
 from .generator import Generator
 from .weighting import compute_client_weights
+
+_thread_limits_locked = False
+
+
+def _ensure_single_threaded() -> None:
+    """Pin all BLAS/OpenMP thread pools to a single thread.
+
+    Ray actors inherit ``os.environ`` but the BLAS runtime may have
+    already initialised its pool before the env vars take effect.
+    We call ``threadpool_limits(limits=1).__enter__()`` *without*
+    a matching ``__exit__()`` so the restriction is permanent for the
+    lifetime of the process, eliminating floating-point non-determinism
+    from multi-threaded BLAS.
+
+    Safe to call multiple times; only the first invocation has effect.
+    """
+    global _thread_limits_locked  # noqa: PLW0603
+    if _thread_limits_locked:
+        return
+    threadpool_limits(limits=1).__enter__()
+    torch.set_num_threads(1)
+    torch.use_deterministic_algorithms(True)
+    _thread_limits_locked = True
 
 
 def _split_cat_num(schema: TableSchema) -> tuple[list[str], list[str]]:
@@ -346,6 +379,8 @@ class FedTGANAltCoordinator(SingleStepCoordinator):
         self._schema_column_order: list[str] = []
         self._transformer: GlobalDataTransformer | None = None
         self._client_weights: list[float] = []
+        self._client_weights_by_node: dict[int, float] = {}
+        self._canonical_node_order: list[int] = []
         self._rng: np.random.Generator = np.random.default_rng(0)
         self._category_probs: np.ndarray = np.array([])
         self._g_state: dict[str, Tensor] | None = None
@@ -381,6 +416,7 @@ class FedTGANAltCoordinator(SingleStepCoordinator):
         tuple of (int, Update)
             ``(client_id, config_update)`` pairs.
         """
+        _ensure_single_threaded()
         self._rng = np.random.default_rng(seed)
         torch.manual_seed(seed)
         if torch.cuda.is_available():
@@ -414,13 +450,22 @@ class FedTGANAltCoordinator(SingleStepCoordinator):
             ``"cat-freqs"`` and ``"cont-vgms"`` in ``.objects`` and
             ``"init-extras"`` (containing ``"num-samples"``) in ``.extras``.
         """
-        # Collect local statistics from all clients
+        # Collect local statistics from all clients.  Sort by a
+        # content-based fingerprint so the merge order is deterministic
+        # regardless of Flower's random node-ID assignment.
+        sorted_replies = sorted(
+            replies,
+            key=lambda r: cast(str, r[1].extras["init-extras"]["fingerprint"]),
+        )
+
         all_cat_freqs: list[dict[str, dict[str, int]]] = []
         all_cont_vgms: list[dict[str, dict[str, Any]]] = []
         client_sample_counts: list[int] = []
+        node_id_order: list[int] = []
 
-        for _, reply in replies:
+        for cid, reply in sorted_replies:
             extras = reply.extras["init-extras"]
+            node_id_order.append(cid)
             all_cat_freqs.append(
                 cast(dict[str, dict[str, int]], reply.objects["cat-freqs"])
             )
@@ -463,19 +508,28 @@ class FedTGANAltCoordinator(SingleStepCoordinator):
                 client_sample_counts,
                 max_clusters=self._cfg["max-clusters"],
                 weight_threshold=self._cfg["weight-threshold"],
+                seed=int(self._rng.integers(0, 2**31)),
                 max_total_samples=self._cfg["max-total-samples"],
             )
 
         # Compute table-similarity-aware client weights
-        self._client_weights = compute_client_weights(
+        weight_list = compute_client_weights(
             cat_freqs=all_cat_freqs,
             cont_vgms=all_cont_vgms,
             client_sample_counts=client_sample_counts,
             cat_columns=self._cat_attrs,
             cont_columns=self._num_attrs,
         )
+        # Store as node_id → weight so aggregate_train can look up by ID
+        # regardless of reply ordering.
+        self._client_weights_by_node = dict(
+            zip(node_id_order, weight_list, strict=True)
+        )
+        # Canonical ordering: deterministic across runs (fingerprint-sorted).
+        self._canonical_node_order = node_id_order
+        self._client_weights = weight_list
         log_info(str(self), "Computed client weights:")
-        for i, w in enumerate(self._client_weights):
+        for i, w in enumerate(weight_list):
             log_info("", f"\t{TEE} client {i}: {w:.4f}")
 
         # Build global transformer
@@ -536,26 +590,57 @@ class FedTGANAltCoordinator(SingleStepCoordinator):
         if not replies_list:
             raise ValueError("No replies, cannot aggregate.")
 
+        # Sort replies in the canonical order established during fed_init
+        # (fingerprint-sorted) so that the weighted-average accumulation
+        # order is identical across runs despite Flower's random node IDs.
+        canon = {nid: idx for idx, nid in enumerate(self._canonical_node_order)}
+        replies_list.sort(key=lambda r: canon.get(r[0], r[0]))
+
         g_state_dicts: list[dict[str, Tensor]] = []
         d_state_dicts: list[dict[str, Tensor]] = []
+        weights: list[float] = []
 
-        for _, reply in replies_list:
+        for cid, reply in replies_list:
             g_state_dicts.append(cast(dict[str, Tensor], reply.arrays["generator"]))
             d_state_dicts.append(cast(dict[str, Tensor], reply.arrays["discriminator"]))
-
-        # Use precomputed similarity weights
-        weights = self._client_weights
-        if len(weights) != len(g_state_dicts):
-            log_warning(
-                str(self),
-                f"Client weight count ({len(weights)}) does not match "
-                f"reply count ({len(g_state_dicts)}); falling back to "
-                f"uniform weights.",
-            )
-            weights = [1.0 / len(g_state_dicts)] * len(g_state_dicts)
+            w = self._client_weights_by_node.get(cid)
+            if w is None:
+                log_warning(
+                    str(self),
+                    f"Unknown node {cid}; falling back to uniform weights.",
+                )
+                weights = [1.0 / len(replies_list)] * len(replies_list)
+                break
+            weights.append(w)
 
         self._g_state = _weighted_average_state_dicts(g_state_dicts, weights)
         self._d_state = _weighted_average_state_dicts(d_state_dicts, weights)
+
+    def configure_train(
+        self, client_ids: Iterable[int]
+    ) -> Iterable[tuple[int, Update]]:
+        """Broadcast global model state with a per-round training seed.
+
+        Overrides the base ``SingleStepCoordinator.configure_train`` to
+        inject a deterministic ``training-seed`` drawn from the
+        coordinator's RNG, ensuring each round uses a unique but
+        reproducible seed across runs.
+
+        Parameters
+        ----------
+        client_ids
+            IDs of participating clients for this round.
+
+        Yields
+        ------
+        tuple of (int, Update)
+            ``(client_id, global_state_update)`` pairs.
+        """
+        state = self._create_update()
+        train_seed = int(self._rng.integers(0, 2**31))
+        state.extras["model-info"]["training-seed"] = train_seed
+        for cid in client_ids:
+            yield cid, state
 
     def _create_update(self) -> Update:
         assert self._transformer is not None
@@ -602,7 +687,6 @@ class FedTGANAltSynthesizer(Synthesizer):
     def __init__(self, cfg: dict[str, Any]) -> None:
         self._cfg = cfg
         self._device = cfg["device"]
-        self._rng: np.random.Generator = np.random.default_rng(0)
 
     def fed_init(
         self,
@@ -624,7 +708,8 @@ class FedTGANAltSynthesizer(Synthesizer):
             ``"max-clusters"`` and ``"weight-threshold"`` in
             ``.extras["config"]``.
         seed
-            Client-local random seed (reserved for future use).
+            Client-local random seed, forwarded to
+            ``fit_local_continuous`` for reproducible VGM fitting.
         schema
             Table schema identifying categorical/continuous column kinds.
         data
@@ -636,6 +721,7 @@ class FedTGANAltSynthesizer(Synthesizer):
             Reply with ``"cat-freqs"`` and ``"cont-vgms"`` in ``.objects``
             and ``"init-extras"`` (``{"num-samples": int}``) in ``.extras``.
         """
+        _ensure_single_threaded()
         cat_attrs, num_attrs = _split_cat_num(schema)
         extras_cfg = request.extras["config"]
         max_clusters = cast(int, extras_cfg["max-clusters"])
@@ -649,6 +735,7 @@ class FedTGANAltSynthesizer(Synthesizer):
                 col_data,
                 max_clusters=max_clusters,
                 weight_threshold=weight_threshold,
+                seed=seed,
             )
 
         # Compute category frequencies for each discrete column
@@ -668,7 +755,20 @@ class FedTGANAltSynthesizer(Synthesizer):
         reply = Update()
         reply.objects["cat-freqs"] = cat_freqs
         reply.objects["cont-vgms"] = cont_vgms
-        reply.extras["init-extras"] = {"num-samples": num_samples}
+
+        # Content-based fingerprint for deterministic reply ordering
+        # in ``aggregate_fed_init`` (independent of Flower node IDs).
+        fp_parts: list[str] = [str(num_samples)]
+        for col in sorted(cont_vgms):
+            fp_parts.append(repr(cont_vgms[col].get("means", [])))
+        for col in sorted(cat_freqs):
+            fp_parts.append(repr(sorted(cat_freqs[col].items())))
+        fingerprint = hashlib.sha256("|".join(fp_parts).encode()).hexdigest()
+
+        reply.extras["init-extras"] = {
+            "num-samples": num_samples,
+            "fingerprint": fingerprint,
+        }
         return reply
 
     def train(self, request: Update, data: DataFrame) -> Update:
@@ -696,9 +796,7 @@ class FedTGANAltSynthesizer(Synthesizer):
         log_info(str(self), "Start training...")
 
         # Extract global state
-        transformer = GlobalDataTransformer.from_dict(
-            request.objects["transformer"]
-        )
+        transformer = GlobalDataTransformer.from_dict(request.objects["transformer"])
         output_info = transformer.output_info_list
         data_dim = transformer.output_dimensions
 
@@ -711,11 +809,20 @@ class FedTGANAltSynthesizer(Synthesizer):
         pac = cast(int, model_info["pac"])
         log_frequency = cast(bool, model_info["log-frequency"])
 
+        _ensure_single_threaded()
+
+        # Seed RNGs for reproducible training
+        train_seed = cast(int, model_info.get("training-seed", 0))
+        torch.manual_seed(train_seed)
+        if torch.cuda.is_available():
+            torch.cuda.manual_seed(train_seed)
+        rng = np.random.default_rng(train_seed)
+
         # Transform local data
         train_data = transformer.transform(data)
 
         # Build local data sampler
-        sampler = DataSampler(train_data, output_info, log_frequency)
+        sampler = DataSampler(train_data, output_info, log_frequency, rng=rng)
         cond_dim = sampler.dim_cond_vec()
 
         # Reconstruct networks
@@ -769,7 +876,7 @@ class FedTGANAltSynthesizer(Synthesizer):
                     c1 = torch.from_numpy(c1).to(self._device)
                     fakez = torch.cat([fakez, c1], dim=1)
                     perm = np.arange(batch_size)
-                    self._rng.shuffle(perm)
+                    rng.shuffle(perm)
                     real = sampler.sample_data(
                         train_data, batch_size, col[perm], opt[perm]
                     )
@@ -877,9 +984,7 @@ class FedTGANAltSynthesizer(Synthesizer):
         """
         log_info(str(self), "Start sampling...")
 
-        transformer = GlobalDataTransformer.from_dict(
-            request.objects["transformer"]
-        )
+        transformer = GlobalDataTransformer.from_dict(request.objects["transformer"])
         output_info = transformer.output_info_list
         data_dim = transformer.output_dimensions
 
@@ -888,7 +993,6 @@ class FedTGANAltSynthesizer(Synthesizer):
         embedding_dim = cast(int, model_info["embedding-dim"])
         batch_size = cast(int, model_info["batch-size"])
 
-        # We need cond_dim to reconstruct generator input size
         cond_dim = transformer.cond_dim
 
         generator = Generator(
@@ -899,10 +1003,11 @@ class FedTGANAltSynthesizer(Synthesizer):
         generator.load_state_dict(g_state)
         generator.eval()
 
+        _ensure_single_threaded()
         rng = np.random.default_rng(seed)
         torch.manual_seed(seed)
 
-        # Recover category probabilities for data-aware sampling
+        # Category probabilities for data-aware conditional sampling
         raw_probs = model_info.get("category-probs")
         category_probs = np.array(raw_probs, dtype=np.float64) if raw_probs else None
 
@@ -945,9 +1050,7 @@ class FedTGANAltSynthesizer(Synthesizer):
                 )
 
         # Restore original schema column order
-        schema_order = cast(
-            list[str] | None, model_info.get("schema-column-order")
-        )
+        schema_order = cast(list[str] | None, model_info.get("schema-column-order"))
         if schema_order:
             result = result[[c for c in schema_order if c in result.columns]]
 

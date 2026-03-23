@@ -27,7 +27,9 @@ class DataSampler:
         data: NDArray[np.floating],
         output_info: list[list[SpanInfo]],
         log_frequency: bool = True,
+        rng: np.random.Generator | None = None,
     ) -> None:
+        self._rng = rng if rng is not None else np.random.default_rng()
         self._data_length = len(data)
 
         def _is_discrete(col_info: list[SpanInfo]) -> bool:
@@ -122,7 +124,7 @@ class DataSampler:
         if self._n_discrete_columns == 0:
             return None
 
-        discrete_column_id = np.random.choice(self._n_discrete_columns, batch)
+        discrete_column_id = self._rng.choice(self._n_discrete_columns, batch)
 
         cond = np.zeros((batch, self._n_categories), dtype=np.float32)
         mask = np.zeros((batch, self._n_discrete_columns), dtype=np.float32)
@@ -130,7 +132,7 @@ class DataSampler:
 
         # Sample category weighted by probability
         probs = self._discrete_column_category_prob[discrete_column_id]
-        r = np.expand_dims(np.random.rand(batch), axis=1)
+        r = np.expand_dims(self._rng.random(batch), axis=1)
         category_id_in_col = (probs.cumsum(axis=1) > r).argmax(axis=1)
 
         category_id = (
@@ -163,7 +165,7 @@ class DataSampler:
         category_freq = self._discrete_column_category_prob.flatten()
         category_freq = category_freq[category_freq != 0]
         category_freq = category_freq / np.sum(category_freq)
-        col_idxs = np.random.choice(len(category_freq), batch, p=category_freq)
+        col_idxs = self._rng.choice(len(category_freq), batch, p=category_freq)
         cond = np.zeros((batch, self._n_categories), dtype=np.float32)
         cond[np.arange(batch), col_idxs] = 1
 
@@ -198,7 +200,7 @@ class DataSampler:
             Sampled rows from *data*.
         """
         if col is None:
-            idx = np.random.randint(len(data), size=n)
+            idx = self._rng.integers(len(data), size=n)
             return data[idx]
 
         assert opt is not None  # opt is always provided when col is
@@ -208,9 +210,9 @@ class DataSampler:
             if len(candidates) == 0:
                 # Guard: category exists in global encoding but has no
                 # local rows (extreme non-IID).  Fall back to a random row.
-                row_indices.append(int(np.random.randint(len(data))))
+                row_indices.append(int(self._rng.integers(len(data))))
             else:
-                row_indices.append(int(np.random.choice(candidates)))
+                row_indices.append(int(self._rng.choice(candidates)))
 
         result: NDArray[np.floating] = data[np.array(row_indices)]
         return result
