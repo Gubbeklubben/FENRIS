@@ -1,12 +1,12 @@
 import json
 import time
 from collections.abc import Generator, Iterable
-from typing import Any, cast
+from typing import Any, Self, cast
 
 from flwr.common import ConfigRecord, Message, RecordDict
 from flwr.server import Grid
 
-from fedbench.config import Config
+from fedbench.config import Config, SeedConfig
 from fedbench.core.algorithm import Coordinator
 from fedbench.core.data import TableSchema
 from fedbench.core.encoder import FedbenchEncoder
@@ -26,16 +26,34 @@ from fedbench.util.metrics import count_rdict_bytes
 
 
 class Strategy:
+    @classmethod
+    def from_seed_config(
+        cls,
+        seed_config: SeedConfig,
+        schema: TableSchema,
+        serde: FlwrSerde,
+        eventbus: EventBus,
+        coordinator: Coordinator,
+    ) -> Self:
+
+        return cls(
+            seed_config.init,
+            schema,
+            serde,
+            eventbus,
+            coordinator,
+        )
+
     def __init__(
         self,
-        seed: int,
+        init_seed: int,
         schema: TableSchema,
         serde: FlwrSerde,
         eventbus: EventBus,
         coordinator: Coordinator,
     ) -> None:
 
-        self._seed = seed
+        self._init_seed = init_seed
         self._schema = schema
         self._serde = serde
         self._eventbus = eventbus
@@ -44,7 +62,7 @@ class Strategy:
 
     def fed_init(self, grid: Grid) -> None:
         generator = self._coordinator.fed_init(
-            self._seed,
+            self._init_seed,
             self._schema,
             grid.get_node_ids(),
         )
