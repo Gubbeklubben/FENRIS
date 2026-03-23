@@ -7,7 +7,7 @@ from fedbench.runtime.registry import FactoryRegistry
 
 
 class EvaluationSuite:
-    def __init__(self, evaluators: Iterable[tuple[str, str, Evaluator]]):
+    def __init__(self, evaluators: Iterable[Evaluator]):
         self._evaluators = tuple(evaluators)
 
     @classmethod
@@ -21,7 +21,7 @@ class EvaluationSuite:
     def with_evaluator_categories(
         cls,
         registries: Mapping[str, FactoryRegistry[Evaluator]],
-        categories: Iterable[str],
+        categories: Iterable[Category],
     ) -> Self:
         return cls(cls._get_evaluators(registries, categories=categories))
 
@@ -36,36 +36,39 @@ class EvaluationSuite:
     @staticmethod
     def _get_evaluators(
         registries: Mapping[str, FactoryRegistry[Evaluator]],
-        categories: Iterable[str] = tuple(Category),
+        categories: Iterable[Category] = tuple(Category),
         names: Iterable[str] = (),
-    ) -> Iterable[tuple[str, str, Evaluator]]:
+    ) -> Iterable[Evaluator]:
         names = set(names)
         for category in categories:
             registry = registries[category]
             for name in registry:
                 if names and name not in names:
                     continue
-                yield name, category, registry.call(name)
+                yield registry.call(name)
 
     def global_evaluate(self, ctx: GlobalEvalContext) -> dict[str, float]:
         metrics: dict[str, float] = {}
-        for _, category, ev in self._evaluators:
+        for ev in self._evaluators:
             for key, value in ev.global_evaluate(ctx).items():
-                metrics[f"{category}.{key}"] = value
+                metrics[f"{ev.metadata.category}.{key}"] = value
         return metrics
 
     def local_evaluate(self, ctx: LocalEvalContext) -> dict[str, Any]:
         metrics: dict[str, Any] = {}
-        for name, _, ev in self._evaluators:
-            metrics[name] = ev.local_evaluate(ctx)
+        for ev in self._evaluators:
+            metrics[ev.metadata.name] = ev.local_evaluate(ctx)
         return metrics
 
     def aggregate(
         self, per_client_metrics: Iterable[Mapping[str, Any]]
     ) -> dict[str, float]:
         aggregated_metrics: dict[str, float] = {}
-        for name, category, ev in self._evaluators:
-            stats = [client_metrics[name] for client_metrics in per_client_metrics]
+        for ev in self._evaluators:
+            stats = [
+                client_metrics[ev.metadata.name]
+                for client_metrics in per_client_metrics
+            ]
             for key, value in ev.aggregate(stats).items():
-                aggregated_metrics[f"{category}.{key}"] = value
+                aggregated_metrics[f"{ev.metadata.category}.{key}"] = value
         return aggregated_metrics

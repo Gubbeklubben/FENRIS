@@ -15,8 +15,13 @@ from sklearn.linear_model import LogisticRegression, Ridge
 from sklearn.metrics import accuracy_score, mean_squared_error, roc_auc_score
 
 from fedbench.core.data import TableSchema
-from fedbench.core.eval import Evaluator, LocalEvalContext
+from fedbench.core.eval import Category, Evaluator, LocalEvalContext
 from fedbench.core.eval.evalcontext import GlobalEvalContext
+from fedbench.core.eval.evaluator import (
+    EvaluationMode,
+    EvaluatorDescriptor,
+    MetricDescriptor,
+)
 from fedbench.evaluators._helpers import (
     fit_tabular_model,
     weighted_mean_metrics,
@@ -24,6 +29,19 @@ from fedbench.evaluators._helpers import (
 
 
 class TSTREvaluator(Evaluator):
+    @property
+    def metadata(self) -> EvaluatorDescriptor:
+        return EvaluatorDescriptor(
+            name="tstr",
+            category=Category.UTILITY,
+            eval_mode=EvaluationMode.BOTH,
+            metrics=[
+                MetricDescriptor("tstr_auc", default_stop_mode="max"),
+                MetricDescriptor("tstr_accuracy", default_stop_mode="max"),
+                MetricDescriptor("tstr_rmse"),
+            ],
+        )
+
     # noinspection PyMethodMayBeStatic
     def _compute(
         self,

@@ -41,8 +41,13 @@ import pandas as pd
 import scipy
 
 from fedbench.core.data import TableSchema
-from fedbench.core.eval import Evaluator, LocalEvalContext
+from fedbench.core.eval import Category, Evaluator, LocalEvalContext
 from fedbench.core.eval.evalcontext import GlobalEvalContext
+from fedbench.core.eval.evaluator import (
+    EvaluationMode,
+    EvaluatorDescriptor,
+    MetricDescriptor,
+)
 from fedbench.core.logger import log_debug
 from fedbench.evaluators._helpers import (
     safe_nanmean,
@@ -91,6 +96,18 @@ class MomentReductionMetricsEvaluator(Evaluator):
     mean and std from any single client's payload, then averages |Δmean| and
     |Δstd| over columns.
     """
+
+    @property
+    def metadata(self) -> EvaluatorDescriptor:
+        return EvaluatorDescriptor(
+            name="moment_reduction_metrics",
+            category=Category.FIDELITY,
+            eval_mode=EvaluationMode.BOTH,
+            metrics=[
+                MetricDescriptor("mean_abs_diff"),
+                MetricDescriptor("std_abs_diff"),
+            ],
+        )
 
     # noinspection PyMethodMayBeStatic
     def _to_numeric_series(self, series: pd.Series) -> pd.Series:
@@ -222,6 +239,19 @@ class DistributionSimilarityMetricsEvaluator(Evaluator):
     and ``n_rows`` is the number of real rows used on this client.
     """
 
+    @property
+    def metadata(self) -> EvaluatorDescriptor:
+        return EvaluatorDescriptor(
+            name="distribution_similarity_metrics",
+            category=Category.FIDELITY,
+            eval_mode=EvaluationMode.BOTH,
+            metrics=[
+                MetricDescriptor("ks_mean"),
+                MetricDescriptor("wasserstein_mean"),
+                MetricDescriptor("t_stat_mean_abs"),
+            ],
+        )
+
     # noinspection PyMethodMayBeStatic
     def _compute(
         self,
@@ -310,6 +340,17 @@ class CategoricalTvMeanEvaluator(Evaluator):
     frequencies from global totals, then derives TV distance.
     """
 
+    @property
+    def metadata(self) -> EvaluatorDescriptor:
+        return EvaluatorDescriptor(
+            name="categorical_tv_mean",
+            category=Category.FIDELITY,
+            eval_mode=EvaluationMode.BOTH,
+            metrics=[
+                MetricDescriptor("categorical_tv_mean"),
+            ],
+        )
+
     # noinspection PyMethodMayBeStatic
     def _compute(
         self,
@@ -389,6 +430,17 @@ class CorrFroDiffEvaluator(Evaluator):
     evaluator must therefore be used in centralized mode only; see reference
     guide §3.3.1 and §15.1.
     """
+
+    @property
+    def metadata(self) -> EvaluatorDescriptor:
+        return EvaluatorDescriptor(
+            name="corr_fro_diff",
+            category=Category.FIDELITY,
+            eval_mode=EvaluationMode.CENTRALIZED,
+            metrics=[
+                MetricDescriptor("corr_fro_diff"),
+            ],
+        )
 
     def global_evaluate(self, ctx: GlobalEvalContext) -> dict[str, float]:
         numeric_columns = ctx.schema.numeric_columns(ctx.holdout_df)

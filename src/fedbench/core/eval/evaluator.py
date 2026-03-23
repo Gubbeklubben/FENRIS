@@ -1,6 +1,7 @@
 from abc import ABC, abstractmethod
-from enum import StrEnum
-from typing import Any, Iterable
+from dataclasses import dataclass
+from enum import Flag, StrEnum, auto
+from typing import Any, Iterable, Literal
 
 from fedbench.core.eval.evalcontext import GlobalEvalContext, LocalEvalContext
 
@@ -13,7 +14,32 @@ class Category(StrEnum):
     SCALABILITY = "scalability"
 
 
+class EvaluationMode(Flag):
+    CENTRALIZED = auto()
+    FEDERATED = auto()
+    BOTH = CENTRALIZED | FEDERATED
+
+
+@dataclass(frozen=True)
+class MetricDescriptor:
+    key: str
+    default_stop_mode: Literal["min", "max"] | None = "min"
+    suffix_type: Literal["sensitive", "target", None] = None
+
+
+@dataclass(frozen=True)
+class EvaluatorDescriptor:
+    name: str
+    category: Category
+    eval_mode: EvaluationMode
+    metrics: list[MetricDescriptor]
+
+
 class Evaluator(ABC):
+    @property
+    @abstractmethod
+    def metadata(self) -> EvaluatorDescriptor: ...
+
     # Centralized mode
     @abstractmethod
     def global_evaluate(self, ctx: GlobalEvalContext) -> dict[str, float]: ...

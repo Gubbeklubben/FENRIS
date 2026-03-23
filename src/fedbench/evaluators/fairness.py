@@ -18,8 +18,13 @@ import numpy as np
 import pandas as pd
 from sklearn.linear_model import LogisticRegression
 
-from fedbench.core.eval import Evaluator, LocalEvalContext
+from fedbench.core.eval import Category, Evaluator, LocalEvalContext
 from fedbench.core.eval.evalcontext import GlobalEvalContext
+from fedbench.core.eval.evaluator import (
+    EvaluationMode,
+    EvaluatorDescriptor,
+    MetricDescriptor,
+)
 from fedbench.core.logger import log_debug
 from fedbench.evaluators._helpers import fit_tabular_model, to_snake_case
 
@@ -59,6 +64,19 @@ class FairnessEvaluator(Evaluator):
     * ``fairness.equalized_odds_diff.<column>``
     * ``fairness.equal_opportunity_diff.<column>``
     """
+
+    @property
+    def metadata(self) -> EvaluatorDescriptor:
+        return EvaluatorDescriptor(
+            name="fairness",
+            category=Category.FAIRNESS,
+            eval_mode=EvaluationMode.BOTH,
+            metrics=[
+                MetricDescriptor("demographic_parity_diff", suffix_type="sensitive"),
+                MetricDescriptor("equalized_odds_diff", suffix_type="sensitive"),
+                MetricDescriptor("equal_opportunity_diff", suffix_type="sensitive"),
+            ],
+        )
 
     MIN_GROUP_SIZE = 30
 

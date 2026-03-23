@@ -49,8 +49,13 @@ from sklearn.linear_model import LogisticRegression, Ridge
 from sklearn.metrics import accuracy_score, mean_squared_error, roc_auc_score
 
 from fedbench.core.data import TableSchema
-from fedbench.core.eval import Evaluator, LocalEvalContext
+from fedbench.core.eval import Category, Evaluator, LocalEvalContext
 from fedbench.core.eval.evalcontext import CentralizedEvalContext, GlobalEvalContext
+from fedbench.core.eval.evaluator import (
+    EvaluationMode,
+    EvaluatorDescriptor,
+    MetricDescriptor,
+)
 from fedbench.core.logger import log_debug
 from fedbench.evaluators._helpers import (
     fit_tabular_model,
@@ -95,6 +100,22 @@ class DirectOverlapDiagnosticEvaluator(Evaluator):
     Partial rates computed analogously.  n_syn is identical across clients
     (same synthetic DF broadcast to all), so any client's value is used.
     """
+
+    @property
+    def metadata(self) -> EvaluatorDescriptor:
+        return EvaluatorDescriptor(
+            name="direct_overlap_diagnostic",
+            category=Category.PRIVACY,
+            eval_mode=EvaluationMode.FEDERATED,
+            metrics=[
+                MetricDescriptor("exact_row_match_rate_train"),
+                MetricDescriptor("exact_row_match_any"),
+                MetricDescriptor("partial_match_rate_top1"),
+                MetricDescriptor("partial_match_rate_top2"),
+                MetricDescriptor("partial_match_rate_top3"),
+                MetricDescriptor("partial_match_any"),
+            ],
+        )
 
     # noinspection PyMethodMayBeStatic
     def _nan_result(self) -> dict[str, float]:
@@ -247,6 +268,19 @@ class MIANearestNeighborAttackEvaluator(Evaluator):
     The server aggregates via a weighted mean AUC (approximate; see
     reference guide §15.3.2).
     """
+
+    @property
+    def metadata(self) -> EvaluatorDescriptor:
+        return EvaluatorDescriptor(
+            name="mia_nearest_neighbor_attack",
+            category=Category.PRIVACY,
+            eval_mode=EvaluationMode.BOTH,
+            metrics=[
+                MetricDescriptor("mia_auc"),
+                MetricDescriptor("mia_accuracy"),
+                MetricDescriptor("mia_advantage"),
+            ],
+        )
 
     DEFAULT_MIA_K = 1000
 
@@ -407,6 +441,19 @@ class AIASupervisedAttackEvaluator(Evaluator):
     ------------------
     Weighted mean per metric key, weighted by ``n_test``.
     """
+
+    @property
+    def metadata(self) -> EvaluatorDescriptor:
+        return EvaluatorDescriptor(
+            name="aia_supervised_attack",
+            category=Category.PRIVACY,
+            eval_mode=EvaluationMode.BOTH,
+            metrics=[
+                MetricDescriptor("aia_auc", suffix_type="sensitive"),
+                MetricDescriptor("aia_accuracy", suffix_type="sensitive"),
+                MetricDescriptor("aia_rmse", suffix_type="sensitive"),
+            ],
+        )
 
     # noinspection PyMethodMayBeStatic
     def _nan_result(self) -> dict[str, float]:
