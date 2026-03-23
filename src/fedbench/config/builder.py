@@ -5,7 +5,13 @@ from dataclasses import fields
 from pathlib import Path
 from typing import Any
 
-from fedbench.config.config import Config, ConfigCls, DataConfig, MetricsConfig
+from fedbench.config.config import (
+    Config,
+    ConfigCls,
+    DataConfig,
+    MetricsConfig,
+    SeedConfig,
+)
 from fedbench.core.algorithm import Algorithm
 from fedbench.core.data import Partitioner
 from fedbench.core.eval import Category
@@ -18,6 +24,12 @@ def build_config(
     algorithm_registry: FactoryRegistry[Algorithm],
     partitioner_registry: FactoryRegistry[Partitioner],
 ) -> Config:
+    # Remove seed from cli_input so it doesn't become part of the cfg dict.
+    # We use cli_input["seed"] to construct Config.seed of type SeedConfig.
+    default_seed = inspect.signature(SeedConfig.from_master).parameters["seed"].default
+    seed = cli_input.pop("seed", default_seed)
+    seed_cfg = SeedConfig.from_master(seed)
+
     # Build dicts containing only kv pairs relevant for the associated cfg
     data_cfg = build_cli_dict(DataConfig, cli_input)
     metrics_cfg = build_cli_dict(MetricsConfig, cli_input)
@@ -29,12 +41,15 @@ def build_config(
     resolve_run_categories(metrics_cfg)
 
     parse_algorithm_kwargs(cfg, algorithm_registry)
-    parse_partitioner_kwargs(data_cfg, cfg, partitioner_registry)
+    parse_partitioner_kwargs(cfg, data_cfg, seed_cfg, partitioner_registry)
 
     # Build complete config object
-    cfg["data"] = DataConfig(**data_cfg)
-    cfg["metrics"] = MetricsConfig(**metrics_cfg)
-    return Config(**cfg)
+    return Config(
+        **cfg,
+        data=DataConfig(**data_cfg),
+        metrics=MetricsConfig(**metrics_cfg),
+        seed=seed_cfg,
+    )
 
 
 def build_cli_dict(config_cls: ConfigCls, cli_input: dict[str, Any]) -> dict[str, Any]:
@@ -143,8 +158,9 @@ def _reject_and_inject(
 
 
 def parse_partitioner_kwargs(
-    data_cfg: dict[str, Any],
     cfg: dict[str, Any],
+    data_cfg: dict[str, Any],
+    seed: SeedConfig,
     partitioner_registry: FactoryRegistry[Partitioner],
 ) -> None:
     # Check that specified partitioner is registered
@@ -166,10 +182,9 @@ def parse_partitioner_kwargs(
         required=True,
     )
 
-    seed = _get_config_value_or_default(cfg, param="seed")
     _reject_and_inject(
         name="seed",
-        value=seed,
+        value=seed.partitioning,
         raw_kwargs=partitioner_kwargs,
         factory_params=params,
         expected_type=int,

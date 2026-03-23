@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import json
 from dataclasses import asdict, dataclass, field
 from typing import Literal, Self
@@ -32,6 +34,29 @@ class MetricsConfig:
 
 
 @dataclass(frozen=True)
+class SeedConfig:
+    """Derived seeds per §23.2 of the technical reference.
+
+    Each randomness source gets a distinct offset so that changing the
+    master seed produces a genuinely different experiment.
+    """
+
+    partitioning: int  # s + 1
+    init: int  # s + 2
+    sampling: int  # s + 3
+    evaluation: int  # s + 4
+
+    @classmethod
+    def from_master(cls, seed: int = 42) -> SeedConfig:
+        return cls(
+            partitioning=seed + 1,
+            init=seed + 2,
+            sampling=seed + 3,
+            evaluation=seed + 4,
+        )
+
+
+@dataclass(frozen=True)
 class Config:
     algorithm: str
     data: DataConfig
@@ -42,7 +67,7 @@ class Config:
     num_clients: int = 3
     num_rounds: int = 3
     test_size: float = 0.2
-    seed: int = 42
+    seed: SeedConfig = field(default_factory=SeedConfig.from_master)
     outputdir: str = ""
     num_synthetic_rows: int | None = None
     disable_pickle: bool = False
@@ -67,10 +92,12 @@ class Config:
         cfg = json.loads(jsons)
         data_cfg = cfg.pop("data")
         metrics_cfg = cfg.pop("metrics")
+        seed_cfg = cfg.pop("seed")
         return cls(
             **cfg,
             data=DataConfig(**data_cfg),
             metrics=MetricsConfig(**metrics_cfg),
+            seed=SeedConfig(**seed_cfg),
         )
 
     def jsons(self) -> str:
