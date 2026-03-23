@@ -4,11 +4,13 @@ from typing import cast
 import numpy as np
 import pandas as pd
 from numpy.typing import NDArray
+from pandas import DataFrame
 
 from fedbench.core.algorithm import (
     Algorithm,
     ComponentSpec,
     Coordinator,
+    GlobalInitArtifacts,
     SingleStepCoordinator,
     Synthesizer,
     coordinator_spec,
@@ -29,26 +31,11 @@ class FedHelloCoordinator(SingleStepCoordinator):
     def global_state(self) -> Update | None:
         return self._create_update()
 
-    def configure_fed_init(
-        self,
-        seed: int,
-        schema: TableSchema,
-        client_ids: Iterable[int],
-    ) -> Iterable[tuple[int, Update]]:
-
-        log_info(str(self), f"Hello from configure_fed_init, {self._name}!")
-        rng = np.random.default_rng(seed)
-        self._state = [rng.integers(0, 100, (3, 3)) for _ in range(10)]
-
-        update = self._create_update()
-        for cid in client_ids:
-            yield cid, update
-
-    def aggregate_fed_init(self, replies: Iterable[tuple[int, Update]]) -> None:
-        log_info(str(self), f"Hello from aggregate_fed_init, {self._name}!")
+    def attach_global_init_artifacts(self, artifacts: Update) -> None:
+        # noinspection PyUnnecessaryCast
+        self._state = cast(list[NDArray[np.int_]], artifacts.arrays["state"])
 
     def aggregate_train(self, replies: Iterable[tuple[int, Update]]) -> None:
-
         replies = list(replies)
         reply = replies[0][1]
         self._df = reply.objects["objects"]["df"]
@@ -123,3 +110,14 @@ class FedHello(Algorithm):
     @property
     def synthesizer_spec(self) -> ComponentSpec[Synthesizer]:
         return synthesizer_spec(self._synth_factory)
+
+    def global_init(
+        self, seed: int, schema: TableSchema, dataset: DataFrame
+    ) -> GlobalInitArtifacts | None:
+
+        rng = np.random.default_rng(seed)
+        return GlobalInitArtifacts(
+            coordinator=Update(
+                arrays={"state": [rng.integers(0, 100, (3, 3)) for _ in range(10)]},
+            )
+        )

@@ -58,9 +58,7 @@ _VALID_SCENARIOS = frozenset(
 _VALID_POINTS = frozenset(
     {
         "global_init",
-        "coord_fed_init",
         "coord_train",
-        "synth_fed_init",
         "synth_train",
         "synth_sample",
     }
@@ -119,25 +117,6 @@ class FedNaughtyCoordinator(SingleStepCoordinator):
     def global_state(self) -> Update:
         return self._state
 
-    def configure_fed_init(
-        self,
-        seed: int,
-        schema: TableSchema,
-        client_ids: Iterable[int],
-    ) -> Iterable[tuple[int, Update]]:
-
-        if self._config.point == "coord_fed_init":
-            self._trigger("coord_fed_init")
-
-        # Minimal passthrough — send empty update to every client.
-        for cid in client_ids:
-            yield cid, Update()
-
-    def aggregate_fed_init(self, replies: Iterable[tuple[int, Update]]) -> None:
-        # Consume replies.
-        for _ in replies:
-            pass
-
     def aggregate_train(self, replies: Iterable[tuple[int, Update]]) -> None:
         if self._config.point == "coord_train":
             result = self._trigger("coord_train")
@@ -176,21 +155,6 @@ class FedNaughtyCoordinator(SingleStepCoordinator):
 class FedNaughtySynthesizer(Synthesizer):
     def __init__(self, config: _NaughtyConfig) -> None:
         self._config = config
-
-    def fed_init(
-        self,
-        request: Update,
-        seed: int,
-        schema: TableSchema,
-        data: DataFrame,
-    ) -> Update:
-
-        if self._config.point == "synth_fed_init":
-            result = self._trigger("synth_fed_init")
-            if result is not None:
-                return result  # type: ignore[no-any-return]
-
-        return Update()
 
     def train(
         self,

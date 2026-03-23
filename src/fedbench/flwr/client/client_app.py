@@ -33,29 +33,6 @@ def configure(message: Message, flwr_context: Context) -> Message:
     return Message(content=RecordDict(), reply_to=message)
 
 
-@app.query("fed_init")
-def fed_init(message: Message, flwr_context: Context) -> Message:
-    ctx = build_client_context(flwr_context.state)
-    partition_id = get_partition_id(flwr_context)
-    train_df = ctx.dataset.load_train_partition(partition_id)
-
-    artifacts = ctx.serde.from_flwr(ctx.artifacts_cache)
-    request = ctx.serde.from_flwr(message.content)
-
-    with ctx.serde.use_deserialized(ctx.synthesizer_cache) as cache:
-        synthesizer = create_synthesizer(
-            ctx.synthesizer_factory,
-            artifacts=artifacts,
-            client_cache=cache,
-        )
-        reply = synthesizer.fed_init(
-            request, ctx.config.seed.init, ctx.dataset.schema, train_df
-        )
-
-    rdict = ctx.serde.to_flwr(reply)
-    return Message(content=rdict, reply_to=message)
-
-
 @app.train()
 def train(message: Message, flwr_context: Context) -> Message:
     ctx = build_client_context(flwr_context.state)

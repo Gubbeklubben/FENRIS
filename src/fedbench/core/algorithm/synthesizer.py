@@ -2,7 +2,6 @@ from abc import ABC, abstractmethod
 
 from pandas import DataFrame
 
-from fedbench.core.data import TableSchema
 from fedbench.core.update import Update
 
 
@@ -29,16 +28,6 @@ class Synthesizer(ABC):
         """
 
         pass
-
-    # noinspection PyMethodMayBeStatic,PyUnusedLocal
-    def fed_init(
-        self,
-        request: Update,
-        seed: int,
-        schema: TableSchema,
-        data: DataFrame,
-    ) -> Update:
-        return Update()
 
     @abstractmethod
     def train(

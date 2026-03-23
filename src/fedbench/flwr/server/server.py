@@ -12,8 +12,6 @@ from fedbench.core.data import TableSchema
 from fedbench.core.encoder import FedbenchEncoder
 from fedbench.core.events import (
     ClientReply,
-    FedInitCompleted,
-    FedInitStarted,
     RoundCompleted,
     RoundStarted,
     ServerRequest,
@@ -58,14 +56,6 @@ class Strategy:
         self._eventbus = eventbus
         self._coordinator = coordinator
         self._per_client_metrics: dict[int, Metrics] = {}
-
-    def fed_init(self, grid: Grid) -> None:
-        generator = self._coordinator.fed_init(
-            self._init_seed,
-            self._schema,
-            grid.get_node_ids(),
-        )
-        self._send_and_receive(grid, generator, msg_type="query.fed_init")
 
     def train(self, grid: Grid) -> None:
         generator = self._coordinator.train(grid.get_node_ids())
@@ -113,10 +103,6 @@ class Strategy:
         grid: Grid,
         num_rounds: int,
     ) -> tuple[Update, dict[int, Any]]:
-
-        self._eventbus.emit(FedInitStarted())
-        self.fed_init(grid)
-        self._eventbus.emit(FedInitCompleted())
 
         for curr_round in range(1, num_rounds + 1):
             self._eventbus.emit(RoundStarted(curr_round, num_rounds))
