@@ -1,5 +1,6 @@
 """Verify that pipeline functions pass the correct derived seeds (§23.2)."""
 
+import random
 from unittest.mock import MagicMock, patch
 
 import pandas as pd
@@ -15,7 +16,7 @@ from fedbench.runtime.pipeline import (
     load_dataset,
 )
 
-SEED = 100
+SEED = random.randint(1, (2**32) - 3)
 SEEDS = SeedConfig.from_master(SEED)
 
 
@@ -63,7 +64,7 @@ def test_global_init_seed(ctx):
 
     global_init(ctx)
 
-    algorithm.global_init.assert_called_once_with(SEEDS.generator, schema, df)
+    algorithm.global_init.assert_called_once_with(SEEDS.init, schema, df)
 
 
 def test_global_sample_seed(ctx):

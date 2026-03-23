@@ -55,7 +55,7 @@ def load_dataset(ctx: RunContext) -> None:
 
 def global_init(ctx: RunContext) -> None:
     artifacts: GlobalInitArtifacts | None = ctx.algorithm.global_init(
-        ctx.config.seed.generator,
+        ctx.config.seed.init,
         ctx.dataset.schema,
         ctx.dataset.load_all_train_data(),
     )

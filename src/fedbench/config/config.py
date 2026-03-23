@@ -42,7 +42,7 @@ class SeedConfig:
     """
 
     partitioning: int  # s + 1
-    generator: int  # s + 2
+    init: int  # s + 2
     sampling: int  # s + 3
     evaluation: int  # s + 4
 
@@ -50,7 +50,7 @@ class SeedConfig:
     def from_master(cls, seed: int = 42) -> SeedConfig:
         return cls(
             partitioning=seed + 1,
-            generator=seed + 2,
+            init=seed + 2,
             sampling=seed + 3,
             evaluation=seed + 4,
         )
