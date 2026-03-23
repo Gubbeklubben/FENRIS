@@ -125,14 +125,9 @@ class MomentReductionMetricsEvaluator(Evaluator):
         )
 
     def global_evaluate(self, ctx: GlobalEvalContext) -> dict[str, float]:
-        nan_result = {
-            "mean_abs_diff": math.nan,
-            "std_abs_diff": math.nan,
-        }
-
         numeric_columns = ctx.schema.numeric_columns(ctx.holdout_df)
         if not numeric_columns:
-            return nan_result
+            return self._nan_result()
 
         mean_abs_diffs, std_abs_diffs = [], []
         for col in numeric_columns:
@@ -259,20 +254,14 @@ class DistributionSimilarityMetricsEvaluator(Evaluator):
         syn_df: pd.DataFrame,
         schema: TableSchema,
     ) -> tuple[dict[str, float], int]:
-        nan_result = {
-            "ks_mean": math.nan,
-            "wasserstein_mean": math.nan,
-            "t_stat_mean_abs": math.nan,
-        }
-
         numeric_columns = schema.numeric_columns(real_df)
         if not numeric_columns:
-            return nan_result, 0
+            return self._nan_result(), 0
 
         r_df = sanitize_numeric_df(real_df, numeric_columns)
         s_df = sanitize_numeric_df(syn_df, numeric_columns)
         if r_df.empty or s_df.empty:
-            return nan_result, 0
+            return self._nan_result(), 0
 
         ks_vals, wasserstein_vals, t_vals = [], [], []
         for col in numeric_columns:
@@ -308,8 +297,7 @@ class DistributionSimilarityMetricsEvaluator(Evaluator):
         self,
         stats: Iterable[tuple[Mapping[str, float], int]],
     ) -> dict[str, float]:
-        keys = ("ks_mean", "wasserstein_mean", "t_stat_mean_abs")
-        return weighted_mean_metrics(stats, keys)
+        return weighted_mean_metrics(stats, self.get_metric_keys())
 
 
 # ---------------------------------------------------------------------------
@@ -398,7 +386,7 @@ class CategoricalTvMeanEvaluator(Evaluator):
                     acc[col]["real"][cat] += cnt
 
         if not acc:
-            return {"categorical_tv_mean": math.nan}
+            return self._nan_result()
 
         tvs = []
         for sides in acc.values():
@@ -445,7 +433,7 @@ class CorrFroDiffEvaluator(Evaluator):
     def global_evaluate(self, ctx: GlobalEvalContext) -> dict[str, float]:
         numeric_columns = ctx.schema.numeric_columns(ctx.holdout_df)
         if len(numeric_columns) < 2:
-            return {"corr_fro_diff": math.nan}
+            return self._nan_result()
 
         r = ctx.holdout_df[numeric_columns]
         s = ctx.synthetic_df[numeric_columns]
@@ -459,7 +447,7 @@ class CorrFroDiffEvaluator(Evaluator):
             if r[col].nunique(dropna=True) > 1 and s[col].nunique(dropna=True) > 1
         ]
         if len(non_constant) < 2:
-            return {"corr_fro_diff": math.nan}
+            return self._nan_result()
 
         r_corr = r[non_constant].corr().fillna(0.0)
         s_corr = s[non_constant].corr().fillna(0.0)
@@ -475,7 +463,7 @@ class CorrFroDiffEvaluator(Evaluator):
             "CorrFroDiffEvaluator does not support federated evaluation. "
             "Use global_evaluate (centralized mode) only.",
         )
-        return {"corr_fro_diff": math.nan}
+        return self._nan_result()
 
     def aggregate(self, stats: Iterable[Mapping[str, float]]) -> dict[str, float]:
         log_debug(
@@ -483,4 +471,4 @@ class CorrFroDiffEvaluator(Evaluator):
             "CorrFroDiffEvaluator does not support federated aggregation. "
             "Use global_evaluate (centralized mode) only.",
         )
-        return {"corr_fro_diff": math.nan}
+        return self._nan_result()

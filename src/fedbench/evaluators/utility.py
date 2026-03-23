@@ -6,7 +6,6 @@ using a Train-on-Synthetic / Test-on-Real (TSTR) approach with
 logistic regression (classification) or ridge regression (regression).
 """
 
-import math
 from typing import Iterable, Mapping
 
 import numpy as np
@@ -52,11 +51,7 @@ class TSTREvaluator(Evaluator):
         seed: int,
     ) -> dict[str, float]:
 
-        metrics = {
-            "tstr_auc": math.nan,
-            "tstr_accuracy": math.nan,
-            "tstr_rmse": math.nan,
-        }
+        metrics = self._nan_result()
 
         if y_col is None or D_test is None:
             return metrics
@@ -118,5 +113,4 @@ class TSTREvaluator(Evaluator):
     def aggregate(
         self, stats: Iterable[tuple[Mapping[str, float], int]]
     ) -> dict[str, float]:
-        keys = ("tstr_auc", "tstr_accuracy", "tstr_rmse")
-        return weighted_mean_metrics(stats, keys)
+        return weighted_mean_metrics(stats, self.get_metric_keys())

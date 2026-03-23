@@ -256,14 +256,6 @@ class FairnessEvaluator(Evaluator):
             min_group_size=min_group_size,
         )
 
-    # noinspection PyMethodMayBeStatic
-    def _nan_result(self) -> dict[str, float]:
-        return {
-            "demographic_parity_diff": math.nan,
-            "equalized_odds_diff": math.nan,
-            "equal_opportunity_diff": math.nan,
-        }
-
     def global_evaluate(self, ctx: GlobalEvalContext) -> dict[str, float]:
         if not ctx.target_column:
             return self._nan_result()

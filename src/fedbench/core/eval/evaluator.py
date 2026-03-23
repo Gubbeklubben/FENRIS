@@ -1,3 +1,4 @@
+import math
 import re
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
@@ -44,6 +45,32 @@ class Evaluator(ABC):
     @property
     @abstractmethod
     def metadata(self) -> EvaluatorDescriptor: ...
+
+    def get_metric_descriptor_dict(
+        self,
+        target_column: str | None = None,
+        sensitive_columns: tuple[str, ...] | None = None,
+    ) -> dict[str, MetricDescriptor]:
+        descriptors: dict[str, MetricDescriptor] = {}
+        for metric in self.metadata.metrics:
+            if sensitive_columns and metric.suffix_type == "sensitive":
+                for suffix in sensitive_columns:
+                    descriptors[f"{metric.key}.{normalize_key(suffix)}"] = metric
+            elif target_column and metric.suffix_type == "target":
+                descriptors[f"{metric.key}.{normalize_key(target_column)}"] = metric
+            else:
+                descriptors[metric.key] = metric
+        return descriptors
+
+    def get_metric_keys(
+        self,
+        target_column: str | None = None,
+        sensitive_columns: tuple[str, ...] | None = None,
+    ) -> Iterable[str]:
+        return self.get_metric_descriptor_dict(target_column, sensitive_columns).keys()
+
+    def _nan_result(self) -> dict[str, float]:
+        return {key: math.nan for key in self.get_metric_keys()}
 
     # Centralized mode
     @abstractmethod

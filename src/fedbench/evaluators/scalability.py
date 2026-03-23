@@ -22,7 +22,6 @@ Registered metric keys (spec §9)
 
 from __future__ import annotations
 
-import math
 from typing import Iterable
 
 from fedbench.core.eval import Category
@@ -67,13 +66,7 @@ class ScalabilityEvaluator(Evaluator):
         """Return NaN for all keys
         — scalability has no centralized analogue (spec §15.5).
         """
-        return {
-            "wall_clock_seconds": math.nan,
-            "bytes_sent": math.nan,
-            "bytes_received": math.nan,
-            "rounds_to_converge": math.nan,
-            "local_train_seconds_mean": math.nan,
-        }
+        return self._nan_result()
 
     # ------------------------------------------------------------------
     # Federated client-side path
@@ -93,8 +86,10 @@ class ScalabilityEvaluator(Evaluator):
         """Compute row-count-weighted mean of per-client ``local_train_seconds``.
 
         Clients whose value is NaN are excluded from the mean.
-        The four ScalabilityCollector keys are not emitted here.
+        The other ScalabilityCollector keys are emitted as NaN here.
+        Their proper values are injected during aggregate_federated_metrics.
         """
         return {
+            **self._nan_result(),
             "local_train_seconds_mean": weighted_mean(stats),
         }

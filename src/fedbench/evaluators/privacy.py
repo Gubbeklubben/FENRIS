@@ -118,17 +118,6 @@ class DirectOverlapDiagnosticEvaluator(Evaluator):
         )
 
     # noinspection PyMethodMayBeStatic
-    def _nan_result(self) -> dict[str, float]:
-        return {
-            "exact_row_match_rate_train": math.nan,
-            "exact_row_match_any": math.nan,
-            "partial_match_rate_top1": math.nan,
-            "partial_match_rate_top2": math.nan,
-            "partial_match_rate_top3": math.nan,
-            "partial_match_any": math.nan,
-        }
-
-    # noinspection PyMethodMayBeStatic
     def _canonical_value(self, val: Any) -> str:
         """Deterministic string representation for a value."""
         if pd.isna(val):
@@ -368,11 +357,7 @@ class MIANearestNeighborAttackEvaluator(Evaluator):
                 "global_evaluate requires CentralizedEvalContext to access client "
                 "training data for membership sampling. Returning NaN.",
             )
-            return {
-                "mia_auc": math.nan,
-                "mia_accuracy": math.nan,
-                "mia_advantage": math.nan,
-            }
+            return self._nan_result()
 
         result = self._compute(
             ctx.client_train_df,
@@ -454,14 +439,6 @@ class AIASupervisedAttackEvaluator(Evaluator):
                 MetricDescriptor("aia_rmse", suffix_type="sensitive"),
             ],
         )
-
-    # noinspection PyMethodMayBeStatic
-    def _nan_result(self) -> dict[str, float]:
-        return {
-            "aia_accuracy": math.nan,
-            "aia_auc": math.nan,
-            "aia_rmse": math.nan,
-        }
 
     # noinspection PyMethodMayBeStatic
     def _compute_column(
@@ -562,8 +539,8 @@ class AIASupervisedAttackEvaluator(Evaluator):
         metrics: dict[str, float] = {}
 
         for key, scores in results.items():
-            metrics[f"aia_accuracy.{key}"] = scores.accuracy
             metrics[f"aia_auc.{key}"] = scores.auc
+            metrics[f"aia_accuracy.{key}"] = scores.accuracy
             metrics[f"aia_rmse.{key}"] = scores.rmse
 
         return metrics or self._nan_result()
@@ -587,7 +564,7 @@ class AIASupervisedAttackEvaluator(Evaluator):
         for payload in stats:
             for col_key, entry in payload.items():
                 n = int(entry.n_test)
-                for metric in ("accuracy", "auc", "rmse"):
+                for metric in ("auc", "accuracy", "rmse"):
                     v = getattr(entry, metric)
                     full_key = f"aia_{metric}.{col_key}"
                     acc.setdefault(full_key, []).append((v, n))
