@@ -26,6 +26,7 @@ def config():
         algorithm="fed_hello",
         data=DataConfig(dataset="/dev/null", partitioner="iid_partitioner"),
         seed=SeedConfig.from_master(SEED),
+        num_synthetic_rows=20,
     )
 
 
