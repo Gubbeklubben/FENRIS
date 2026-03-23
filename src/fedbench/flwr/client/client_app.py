@@ -49,7 +49,7 @@ def fed_init(message: Message, flwr_context: Context) -> Message:
             client_cache=cache,
         )
         reply = synthesizer.fed_init(
-            request, ctx.config.seed, ctx.dataset.schema, train_df
+            request, ctx.config.seed.init, ctx.dataset.schema, train_df
         )
 
     rdict = ctx.serde.to_flwr(reply)
@@ -98,7 +98,11 @@ def evaluate(message: Message, flwr_context: Context) -> Message:
             artifacts=artifacts,
             client_cache=cache,
         )
-        synthetic_df = synthesizer.sample(request, len(train_df), ctx.config.seed)
+        synthetic_df = synthesizer.sample(
+            request,
+            len(train_df),
+            ctx.config.seed.sampling,
+        )
 
     if synthetic_df.empty:
         log_warning(__name__, f"Recv empty sample from {synthesizer}.")
@@ -108,6 +112,7 @@ def evaluate(message: Message, flwr_context: Context) -> Message:
         )
 
     cached_metrics = ctx.framework_cache.metric_records.get("metrics", MetricRecord())
+    # noinspection PyUnnecessaryCast
     local_train_seconds = cast(
         float,
         cached_metrics.get("prev-train-seconds", math.nan),
@@ -117,7 +122,7 @@ def evaluate(message: Message, flwr_context: Context) -> Message:
         train_df=train_df,
         test_df=test_df,
         synthetic_df=synthetic_df,
-        seed=ctx.config.seed,
+        seed=ctx.config.seed.evaluation,
         target_column=ctx.config.data.target_col,
         sensitive_columns=ctx.config.data.sensitive_cols,
         schema=ctx.dataset.schema,

@@ -223,7 +223,10 @@ def test_static_defaults(tmp_path, builtin_algorithms, builtin_partitioners):
 
     assert config.num_rounds == 3
     assert config.test_size == 0.2
-    assert config.seed == 42
+    assert config.seed.partitioning == 43
+    assert config.seed.init == 44
+    assert config.seed.sampling == 45
+    assert config.seed.evaluation == 46
     assert config.num_synthetic_rows is None
     assert config.disable_pickle is False
 
@@ -654,7 +657,7 @@ def test_seed_injected_for_dirichlet(
     cfg["dataset"] = str(dataset)
     config = build_config(cfg, builtin_algorithms, builtin_partitioners)
 
-    assert config.data.partitioner_kwargs["seed"] == 100
+    assert config.data.partitioner_kwargs["seed"] == 101
 
 
 def test_seed_not_injected_for_iid(tmp_path, builtin_algorithms, builtin_partitioners):
