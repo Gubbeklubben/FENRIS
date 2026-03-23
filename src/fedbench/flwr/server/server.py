@@ -15,6 +15,8 @@ from fedbench.core.events import (
     RoundCompleted,
     RoundStarted,
     ServerRequest,
+    TrainEvalLoopCompleted,
+    TrainEvalLoopStarted,
 )
 from fedbench.core.payload import Metrics, Payload
 from fedbench.flwr.namespace import Namespace
@@ -104,11 +106,15 @@ class Strategy:
         num_rounds: int,
     ) -> tuple[Payload, dict[int, Any]]:
 
+        self._eventbus.emit(TrainEvalLoopStarted())
+        curr_round = 0
         for curr_round in range(1, num_rounds + 1):
             self._eventbus.emit(RoundStarted(curr_round, num_rounds))
             self.train(grid)
             self.evaluate(grid)
             self._eventbus.emit(RoundCompleted(curr_round, num_rounds))
+
+        self._eventbus.emit(TrainEvalLoopCompleted(curr_round))
 
         return self._get_and_check_training_artifacts(), self._per_client_metrics
 

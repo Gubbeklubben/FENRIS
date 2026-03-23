@@ -52,6 +52,16 @@ class ClientsConfigured(Event):
 
 
 @dataclass(frozen=True)
+class TrainEvalLoopStarted(Event):
+    pass
+
+
+@dataclass(frozen=True)
+class TrainEvalLoopCompleted(Event):
+    rounds: int
+
+
+@dataclass(frozen=True)
 class RoundStarted(Event):
     current: int
     total: int
