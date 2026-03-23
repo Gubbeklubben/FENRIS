@@ -6,24 +6,46 @@ from fedbench.core.eval.evaluator import Category, Evaluator
 from fedbench.runtime.registry import FactoryRegistry
 
 
-def _get_evaluators(
-    registries: Mapping[str, FactoryRegistry[Evaluator]],
-    categories: Iterable[str] = tuple(Category),
-    names: Iterable[str] = (),
-) -> Iterable[tuple[str, str, Evaluator]]:
-
-    names = set(names)
-    for category in categories:
-        registry = registries[category]
-        for name in registry:
-            if names and name not in names:
-                continue
-            yield name, category, registry.call(name)
-
-
 class EvaluationSuite:
     def __init__(self, evaluators: Iterable[tuple[str, str, Evaluator]]):
         self._evaluators = tuple(evaluators)
+
+    @classmethod
+    def default(
+        cls,
+        registries: Mapping[str, FactoryRegistry[Evaluator]],
+    ) -> Self:
+        return cls(cls._get_evaluators(registries))
+
+    @classmethod
+    def with_evaluator_categories(
+        cls,
+        registries: Mapping[str, FactoryRegistry[Evaluator]],
+        categories: Iterable[str],
+    ) -> Self:
+        return cls(cls._get_evaluators(registries, categories=categories))
+
+    @classmethod
+    def with_evaluator_names(
+        cls,
+        registries: Mapping[str, FactoryRegistry[Evaluator]],
+        names: Iterable[str],
+    ) -> Self:
+        return cls(cls._get_evaluators(registries, names=names))
+
+    @staticmethod
+    def _get_evaluators(
+        registries: Mapping[str, FactoryRegistry[Evaluator]],
+        categories: Iterable[str] = tuple(Category),
+        names: Iterable[str] = (),
+    ) -> Iterable[tuple[str, str, Evaluator]]:
+        names = set(names)
+        for category in categories:
+            registry = registries[category]
+            for name in registry:
+                if names and name not in names:
+                    continue
+                yield name, category, registry.call(name)
 
     def global_evaluate(self, ctx: GlobalEvalContext) -> dict[str, float]:
         metrics: dict[str, float] = {}
@@ -47,26 +69,3 @@ class EvaluationSuite:
             for key, value in ev.aggregate(stats).items():
                 aggregated_metrics[f"{category}.{key}"] = value
         return aggregated_metrics
-
-    @classmethod
-    def default(
-        cls,
-        registries: Mapping[str, FactoryRegistry[Evaluator]],
-    ) -> Self:
-        return cls(_get_evaluators(registries))
-
-    @classmethod
-    def with_evaluator_categories(
-        cls,
-        registries: Mapping[str, FactoryRegistry[Evaluator]],
-        categories: Iterable[str],
-    ) -> Self:
-        return cls(_get_evaluators(registries, categories=categories))
-
-    @classmethod
-    def with_evaluator_names(
-        cls,
-        registries: Mapping[str, FactoryRegistry[Evaluator]],
-        names: Iterable[str],
-    ) -> Self:
-        return cls(_get_evaluators(registries, names=names))
