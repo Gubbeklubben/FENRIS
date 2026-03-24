@@ -13,39 +13,43 @@ class EvaluationSuite:
     @classmethod
     def default(
         cls,
-        registries: Mapping[str, FactoryRegistry[Evaluator]],
+        registry: FactoryRegistry[Evaluator],
     ) -> Self:
-        return cls(cls._get_evaluators(registries))
+        return cls(cls._get_evaluators(registry))
 
     @classmethod
     def with_evaluator_categories(
         cls,
-        registries: Mapping[str, FactoryRegistry[Evaluator]],
+        registry: FactoryRegistry[Evaluator],
         categories: Iterable[Category],
     ) -> Self:
-        return cls(cls._get_evaluators(registries, categories=categories))
+        return cls(cls._get_evaluators(registry, categories=categories))
 
     @classmethod
     def with_evaluator_names(
         cls,
-        registries: Mapping[str, FactoryRegistry[Evaluator]],
+        registry: FactoryRegistry[Evaluator],
         names: Iterable[str],
     ) -> Self:
-        return cls(cls._get_evaluators(registries, names=names))
+        return cls(cls._get_evaluators(registry, names=names))
 
     @staticmethod
     def _get_evaluators(
-        registries: Mapping[str, FactoryRegistry[Evaluator]],
+        registry: FactoryRegistry[Evaluator],
         categories: Iterable[Category] = tuple(Category),
         names: Iterable[str] = (),
     ) -> Iterable[Evaluator]:
+        categories = set(categories)
         names = set(names)
-        for category in categories:
-            registry = registries[category]
-            for name in registry:
+        for name in registry:
+            evaluator = registry.call(name)
+            is_scalability = evaluator.metadata.category == Category.SCALABILITY
+            if not is_scalability:
+                if evaluator.metadata.category not in categories:
+                    continue
                 if names and name not in names:
                     continue
-                yield registry.call(name)
+            yield evaluator
 
     # noinspection PyMethodMayBeStatic
     def _prefix_and_verify_key_names(

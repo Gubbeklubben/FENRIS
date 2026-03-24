@@ -9,13 +9,13 @@ from fedbench.config.parsing import split_outside_brackets
 from fedbench.runtime.pipeline import pipeline
 from fedbench.runtime.registry_builder import (
     build_algorithm_registry,
-    build_evaluator_registries,
+    build_evaluator_registry,
     build_partitioner_registry,
 )
 
 algorithms = build_algorithm_registry()
 partitioners = build_partitioner_registry()
-evaluators = build_evaluator_registries()
+evaluators = build_evaluator_registry()
 
 app = typer.Typer()
 
@@ -93,16 +93,12 @@ def show(
             print(f"  {metadata.locator}" if include_locators else "")
 
     if Component.EVALUATORS in selected:
-        for category, registry in evaluators.items():
-            print(f"\n--- EVALUATORS: {category.upper()} ---")
-            registered_items = list(registry.metadata())
-            if not registered_items:
-                print("  (No evaluators registered)")
-                continue
-            width = max(len(m.name) for m in registered_items)
-            for metadata in registered_items:
-                print(f"  {metadata.name:<{width}}", end="")
-                print(f"  {metadata.locator}" if include_locators else "")
+        items = list(evaluators.metadata())
+        width = max(len(m.name) for m in items)
+        print("\n--- EVALUATORS ---")
+        for metadata in items:
+            print(f"  {metadata.name:<{width}}", end="")
+            print(f"  {metadata.locator}" if include_locators else "")
 
     print()
 
