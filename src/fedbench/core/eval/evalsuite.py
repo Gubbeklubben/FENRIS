@@ -47,11 +47,37 @@ class EvaluationSuite:
                     continue
                 yield registry.call(name)
 
+    # noinspection PyMethodMayBeStatic
+    def _prefix_and_verify_key_names(
+        self,
+        evaluator: Evaluator,
+        raw_metrics: dict[str, float],
+        target_column: str | None,
+        sensitive_columns: tuple[str, ...] | None,
+    ) -> dict[str, float]:
+        declared_keys = set(evaluator.get_metric_keys(target_column, sensitive_columns))
+        actual_keys = set(raw_metrics.keys())
+        if actual_keys != declared_keys:
+            raise ValueError(
+                f"Incorrect output shape for evaluator {evaluator.metadata.name}."
+                f"\nDeclared: {declared_keys}\nActual: {actual_keys}"
+            )
+        return {
+            f"{evaluator.metadata.category}.{key}": value  # nofmt
+            for key, value in raw_metrics.items()
+        }
+
     def global_evaluate(self, ctx: GlobalEvalContext) -> dict[str, float]:
         metrics: dict[str, float] = {}
         for ev in self._evaluators:
-            for key, value in ev.global_evaluate(ctx).items():
-                metrics[f"{ev.metadata.category}.{key}"] = value
+            metrics.update(
+                self._prefix_and_verify_key_names(
+                    ev,
+                    ev.global_evaluate(ctx),
+                    ctx.target_column,
+                    ctx.sensitive_columns,
+                )
+            )
         return metrics
 
     def local_evaluate(self, ctx: LocalEvalContext) -> dict[str, Any]:
@@ -61,7 +87,10 @@ class EvaluationSuite:
         return metrics
 
     def aggregate(
-        self, per_client_metrics: Iterable[Mapping[str, Any]]
+        self,
+        per_client_metrics: Iterable[Mapping[str, Any]],
+        target_column: str | None,
+        sensitive_columns: tuple[str, ...] | None,
     ) -> dict[str, float]:
         aggregated_metrics: dict[str, float] = {}
         for ev in self._evaluators:
@@ -69,6 +98,9 @@ class EvaluationSuite:
                 client_metrics[ev.metadata.name]
                 for client_metrics in per_client_metrics
             ]
-            for key, value in ev.aggregate(stats).items():
-                aggregated_metrics[f"{ev.metadata.category}.{key}"] = value
+            aggregated_metrics.update(
+                self._prefix_and_verify_key_names(
+                    ev, ev.aggregate(stats), target_column, sensitive_columns
+                )
+            )
         return aggregated_metrics

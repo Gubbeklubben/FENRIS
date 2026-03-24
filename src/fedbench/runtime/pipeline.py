@@ -82,7 +82,11 @@ def federated_train_eval_loop(ctx: RunContext) -> None:
 
 def aggregate_federated_metrics(ctx: RunContext) -> None:
     ctx.aggregated_metrics = {
-        **ctx.eval_suite.aggregate(ctx.per_client_metrics.values()),
+        **ctx.eval_suite.aggregate(
+            ctx.per_client_metrics.values(),
+            ctx.config.data.target_col,
+            ctx.config.data.sensitive_cols,
+        ),
         **ctx.scalability_collector.get_metrics(),
     }
 
