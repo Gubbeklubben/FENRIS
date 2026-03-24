@@ -145,6 +145,7 @@ def evaluate(message: Message, flwr_context: Context) -> Message:
             raise ValueError(
                 f"Could not encode metric {key} with value {value}."
             ) from e
+    metrics["__partition_id__"] = json.dumps(partition_id)
 
     update = Update(extras={"metrics": metrics})
     rdict = ctx.serde.to_flwr(update)

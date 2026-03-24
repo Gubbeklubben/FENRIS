@@ -124,7 +124,21 @@ class Strategy:
             self.evaluate(grid)
             self._eventbus.emit(RoundCompleted(curr_round, num_rounds))
 
-        return self._get_and_check_global_state(), self._per_client_metrics
+        return self._get_and_check_global_state(), self._sorted_per_client_metrics()
+
+    def _sorted_per_client_metrics(self) -> dict[int, Any]:
+        """Sort per-client metrics by partition_id for cross-run determinism.
+
+        Flower assigns random node IDs each run, so reply arrival order is
+        non-deterministic.  Sorting by the client-reported ``__partition_id__``
+        ensures evaluator aggregation sees a stable ordering.
+        """
+        return dict(
+            sorted(
+                self._per_client_metrics.items(),
+                key=lambda kv: kv[1].get("__partition_id__", kv[0]),
+            )
+        )
 
     def _send_and_receive(
         self,
