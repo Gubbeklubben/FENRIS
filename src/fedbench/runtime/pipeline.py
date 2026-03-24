@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import json
 import math
 from collections.abc import Iterable
@@ -16,6 +18,7 @@ from fedbench.runtime.component_factory import (
     create_partitioner,
     create_synthesizer,
 )
+from fedbench.runtime.platform_info import collect_platform_info
 from fedbench.runtime.registry_builder import (
     build_algorithm_registry,
     build_evaluator_registries,
@@ -114,19 +117,33 @@ def write_artifacts(ctx: RunContext) -> None:
     outputdir = Path(ctx.config.outputdir).joinpath(ctx.run_id)
     outputdir.mkdir(parents=True, exist_ok=False)
 
-    pairs = [
+    # Config snapshot
+    with outputdir.joinpath("config_snapshot.json").open("w") as f:
+        json.dump(json.loads(ctx.config.jsons()), f, indent=4)
+
+    # Experiment + platform metadata
+    metadata: dict[str, str | int | float | None] = {
+        "experiment.seed": ctx.config.seed.master,
+        "experiment.num_rounds": ctx.config.num_rounds,
+        "experiment.num_clients": ctx.config.num_clients,
+        "experiment.generator_type": ctx.config.algorithm,
+        **collect_platform_info(),
+    }
+    with outputdir.joinpath("metadata.json").open("w") as f:
+        json.dump(metadata, f, indent=4, allow_nan=False)
+
+    for name, metrics in [
         ("federated", ctx.aggregated_metrics),
         ("centralized", ctx.centralized_metrics),
-    ]
-
-    for name, metrics in pairs:
+    ]:
+        clean = {
+            k: (None if isinstance(v, float) and math.isnan(v) else v)
+            for k, v in metrics.items()
+        }
         with outputdir.joinpath(f"metrics.{name}.json").open("w") as f:
-            clean_metrics = {
-                k: (None if isinstance(v, float) and math.isnan(v) else float(v))
-                for k, v in metrics.items()
-            }
-            json.dump(clean_metrics, f, indent=4, allow_nan=False)
+            json.dump(clean, f, indent=4, allow_nan=False)
 
+    # Synthetic data
     ctx.synthetic_df.to_csv(outputdir.joinpath("synthetic.csv"), index=False)
 
     log_info(__name__, f"Benchmark artifacts written to {outputdir}.")
