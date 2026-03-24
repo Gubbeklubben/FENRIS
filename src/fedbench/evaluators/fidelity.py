@@ -44,9 +44,7 @@ from fedbench.core.data import TableSchema
 from fedbench.core.eval import Evaluator, LocalEvalContext
 from fedbench.core.eval.evalcontext import GlobalEvalContext
 from fedbench.core.logger import log_debug
-from fedbench.util.metrics import (
-    get_nominal_columns,
-    get_numeric_columns,
+from fedbench.evaluators._helpers import (
     safe_nanmean,
     sanitize_numeric_df,
     weighted_mean_metrics,
@@ -115,7 +113,7 @@ class MomentReductionMetricsEvaluator(Evaluator):
             "std_abs_diff": math.nan,
         }
 
-        numeric_columns = get_numeric_columns(ctx.holdout_df, ctx.schema)
+        numeric_columns = ctx.schema.numeric_columns(ctx.holdout_df)
         if not numeric_columns:
             return nan_result
 
@@ -137,7 +135,7 @@ class MomentReductionMetricsEvaluator(Evaluator):
     def local_evaluate(
         self, ctx: LocalEvalContext
     ) -> dict[str, dict[str, _MomentReductionResult]]:
-        numeric_columns = get_numeric_columns(ctx.train_df, ctx.schema)
+        numeric_columns = ctx.schema.numeric_columns(ctx.train_df)
         payload: dict[str, dict[str, _MomentReductionResult]] = {}
         for col in numeric_columns:
             payload[col] = {
@@ -237,7 +235,7 @@ class DistributionSimilarityMetricsEvaluator(Evaluator):
             "t_stat_mean_abs": math.nan,
         }
 
-        numeric_columns = get_numeric_columns(real_df, schema)
+        numeric_columns = schema.numeric_columns(real_df)
         if not numeric_columns:
             return nan_result, 0
 
@@ -319,7 +317,7 @@ class CategoricalTvMeanEvaluator(Evaluator):
         syn_df: pd.DataFrame,
         schema: TableSchema,
     ) -> dict[str, dict[str, dict[str, int]]]:
-        nominal_cols = get_nominal_columns(real_df, schema)
+        nominal_cols = schema.nominal_columns(real_df)
 
         def cat_counts(series: pd.Series) -> dict[str, int]:
             return {
@@ -393,7 +391,7 @@ class CorrFroDiffEvaluator(Evaluator):
     """
 
     def global_evaluate(self, ctx: GlobalEvalContext) -> dict[str, float]:
-        numeric_columns = get_numeric_columns(ctx.holdout_df, ctx.schema)
+        numeric_columns = ctx.schema.numeric_columns(ctx.holdout_df)
         if len(numeric_columns) < 2:
             return {"corr_fro_diff": math.nan}
 

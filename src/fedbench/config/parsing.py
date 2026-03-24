@@ -1,5 +1,4 @@
 import inspect
-import re
 from types import UnionType
 from typing import Any, Callable, Literal, Union, get_args, get_origin
 
@@ -136,7 +135,3 @@ def parse_for_function(
                 )
 
     return parsed
-
-
-def to_snake_case(text: str) -> str:
-    return re.sub(r"[^a-z_]+", "_", text.lower())

@@ -27,7 +27,7 @@ from typing import Iterable
 
 from fedbench.core.eval.evalcontext import GlobalEvalContext, LocalEvalContext
 from fedbench.core.eval.evaluator import Evaluator
-from fedbench.util.metrics import weighted_mean
+from fedbench.evaluators._helpers import weighted_mean
 
 
 class ScalabilityEvaluator(Evaluator):

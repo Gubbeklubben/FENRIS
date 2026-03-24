@@ -1,38 +1,22 @@
+"""Shared helpers for evaluator implementations.
+
+These functions are used by multiple evaluator modules (fidelity, utility,
+privacy, fairness, scalability) but are not part of the public evaluator API.
+"""
+
+from __future__ import annotations
+
 import math
-from typing import Iterable, Literal, Mapping
+import re
+from typing import Iterable, Mapping
 
 import numpy as np
 import pandas as pd
-from flwr.app import RecordDict
 from sklearn.base import BaseEstimator
 from sklearn.compose import ColumnTransformer
 from sklearn.impute import SimpleImputer
 from sklearn.pipeline import Pipeline
 from sklearn.preprocessing import OneHotEncoder, StandardScaler
-
-from fedbench.core.data import TableSchema
-
-type TaskType = Literal[
-    "binary_classification", "multiclass_classification", "regression"
-]
-
-
-def count_rdict_bytes(rdict: RecordDict) -> int:
-    """
-    Count the uncompressed model-parameter payload bytes in a RecordDict.
-
-    Counts only array_records (which carry both real tensors and
-    pickle-serialized objects). Excludes metric_records and config_records,
-    which carry only scalar values and JSON strings, not model parameters.
-
-    Each Array.data is the raw bytes as stored; shape[0] equals len(data)
-    for both numpy arrays (raw buffer) and pickle objects (uint8 encoding).
-    """
-    total = 0
-    for record in rdict.array_records.values():
-        for arr in record.values():
-            total += len(arr.data)
-    return total
 
 
 def make_tabular_preprocessor(df: pd.DataFrame) -> ColumnTransformer:
@@ -75,30 +59,6 @@ def fit_tabular_model(X: pd.DataFrame, y: pd.Series, model: BaseEstimator) -> Pi
     pipe = Pipeline([("pre", preprocessor), ("model", model)])
     pipe.fit(X, y)
     return pipe
-
-
-def get_numeric_columns(df: pd.DataFrame, schema: TableSchema) -> list[str]:
-    """Return schema columns with kind 'continuous' or 'integer' present in df."""
-    df_cols = set(df.columns)
-    return [
-        c.name
-        for c in schema.columns
-        if c.kind in ("continuous", "integer") and c.name in df_cols
-    ]
-
-
-def get_nominal_columns(df: pd.DataFrame, schema: TableSchema) -> list[str]:
-    """Return schema columns with kind 'categorical' or 'binary' present in df.
-
-    These are unordered discrete columns for which arithmetic operations
-    are not meaningful.
-    """
-    df_cols = set(df.columns)
-    return [
-        c.name
-        for c in schema.columns
-        if c.kind in ("categorical", "binary") and c.name in df_cols
-    ]
 
 
 def sanitize_numeric_df(
@@ -177,3 +137,7 @@ def weighted_mean_metrics(
         key: weighted_mean(pairs)  # nofmt
         for key, pairs in acc.items()
     }
+
+
+def to_snake_case(text: str) -> str:
+    return re.sub(r"[^a-z_]+", "_", text.lower())

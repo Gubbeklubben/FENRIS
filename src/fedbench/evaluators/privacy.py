@@ -52,13 +52,12 @@ from fedbench.core.data import TableSchema
 from fedbench.core.eval import Evaluator, LocalEvalContext
 from fedbench.core.eval.evalcontext import CentralizedEvalContext, GlobalEvalContext
 from fedbench.core.logger import log_debug
-from fedbench.util.metrics import (
+from fedbench.evaluators._helpers import (
     fit_tabular_model,
-    get_numeric_columns,
     sanitize_numeric_df,
+    to_snake_case,
     weighted_mean,
 )
-from fedbench.util.parsing import to_snake_case
 
 # ---------------------------------------------------------------------------
 # Direct overlap evaluator
@@ -270,7 +269,7 @@ class MIANearestNeighborAttackEvaluator(Evaluator):
         if len(syn_df) == 0:
             return nan_result
 
-        numeric_cols = get_numeric_columns(train_df, schema)
+        numeric_cols = schema.numeric_columns(train_df)
         if not numeric_cols:
             return nan_result
 

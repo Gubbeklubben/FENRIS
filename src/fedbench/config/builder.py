@@ -12,11 +12,11 @@ from fedbench.config.config import (
     MetricsConfig,
     SeedConfig,
 )
+from fedbench.config.parsing import parse_for_function
 from fedbench.core.algorithm import Algorithm
 from fedbench.core.data import Partitioner
 from fedbench.core.eval import Category
 from fedbench.runtime.registry import FactoryRegistry
-from fedbench.util.parsing import parse_for_function
 
 
 def build_config(
