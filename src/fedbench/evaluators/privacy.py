@@ -55,12 +55,12 @@ from fedbench.core.eval.evaluator import (
     EvaluationMode,
     EvaluatorDescriptor,
     MetricDescriptor,
+    normalize_key,
 )
 from fedbench.core.logger import log_debug
 from fedbench.evaluators._helpers import (
     fit_tabular_model,
     sanitize_numeric_df,
-    to_snake_case,
     weighted_mean,
 )
 
@@ -537,7 +537,7 @@ class AIASupervisedAttackEvaluator(Evaluator):
         payload: dict[str, _AIAResult] = {}
 
         for sensitive_column in sensitive_columns or []:
-            key = to_snake_case(sensitive_column)
+            key = normalize_key(sensitive_column)
 
             payload[key] = self._compute_column(
                 test_df,

@@ -24,9 +24,10 @@ from fedbench.core.eval.evaluator import (
     EvaluationMode,
     EvaluatorDescriptor,
     MetricDescriptor,
+    normalize_key,
 )
 from fedbench.core.logger import log_debug
-from fedbench.evaluators._helpers import fit_tabular_model, to_snake_case
+from fedbench.evaluators._helpers import fit_tabular_model
 
 
 @dataclass
@@ -279,7 +280,7 @@ class FairnessEvaluator(Evaluator):
             )
 
             result = self._fairness_metrics_from_counts(group_counts)
-            key = to_snake_case(sensitive_column)
+            key = normalize_key(sensitive_column)
 
             metrics[f"demographic_parity_diff.{key}"] = result.demographic_parity_diff
             metrics[f"equalized_odds_diff.{key}"] = result.equalized_odds_diff
@@ -346,7 +347,7 @@ class FairnessEvaluator(Evaluator):
             }
 
             result = self._fairness_metrics_from_counts(valid_counts)
-            key = to_snake_case(sensitive_column)
+            key = normalize_key(sensitive_column)
 
             metrics[f"demographic_parity_diff.{key}"] = result.demographic_parity_diff
             metrics[f"equalized_odds_diff.{key}"] = result.equalized_odds_diff

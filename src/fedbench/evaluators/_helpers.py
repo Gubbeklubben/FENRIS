@@ -7,7 +7,6 @@ privacy, fairness, scalability) but are not part of the public evaluator API.
 from __future__ import annotations
 
 import math
-import re
 from typing import Iterable, Mapping
 
 import numpy as np
@@ -137,7 +136,3 @@ def weighted_mean_metrics(
         key: weighted_mean(pairs)  # nofmt
         for key, pairs in acc.items()
     }
-
-
-def to_snake_case(text: str) -> str:
-    return re.sub(r"[^a-z_]+", "_", text.lower())

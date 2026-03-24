@@ -1,9 +1,14 @@
+import re
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from enum import Flag, StrEnum, auto
 from typing import Any, Iterable, Literal
 
 from fedbench.core.eval.evalcontext import GlobalEvalContext, LocalEvalContext
+
+
+def normalize_key(text: str) -> str:
+    return re.sub(r"[^a-z_]+", "_", text.lower())
 
 
 class Category(StrEnum):
