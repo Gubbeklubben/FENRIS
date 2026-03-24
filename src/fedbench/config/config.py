@@ -74,6 +74,7 @@ class SeedConfig:
     master seed produces a genuinely different experiment.
     """
 
+    master: int
     partitioning: int  # s + 1
     init: int  # s + 2
     sampling: int  # s + 3
@@ -82,6 +83,7 @@ class SeedConfig:
     @classmethod
     def from_master(cls, seed: int = 42) -> SeedConfig:
         return cls(
+            master=seed,
             partitioning=seed + 1,
             init=seed + 2,
             sampling=seed + 3,
@@ -131,13 +133,15 @@ class Config:
         cfg = json.loads(jsons)
         data_cfg = cfg.pop("data")
         metrics_cfg = cfg.pop("metrics")
-        seed_cfg = cfg.pop("seed")
+        seed = cfg.pop("seed")
         return cls(
             **cfg,
             data=DataConfig(**data_cfg),
             metrics=MetricsConfig(**metrics_cfg),
-            seed=SeedConfig(**seed_cfg),
+            seed=SeedConfig.from_master(seed),
         )
 
     def jsons(self) -> str:
-        return json.dumps(asdict(self))
+        cfg = asdict(self)
+        cfg["seed"] = self.seed.master
+        return json.dumps(cfg)

@@ -6,6 +6,7 @@ from types import SimpleNamespace
 
 import pandas as pd
 
+from fedbench.config import SeedConfig
 from fedbench.config.config import Config, DataConfig
 from fedbench.runtime.pipeline import write_artifacts
 
@@ -15,7 +16,7 @@ def _make_config(tmp_path: Path) -> Config:
         algorithm="fed_hello",
         data=DataConfig(dataset="dummy.csv", partitioner="iid-partitioner"),
         outputdir=str(tmp_path),
-        seed=42,
+        seed=SeedConfig.from_master(42),
         num_rounds=3,
         num_clients=3,
     )

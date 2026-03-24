@@ -123,7 +123,7 @@ def write_artifacts(ctx: RunContext) -> None:
 
     # Metrics (with experiment + platform metadata)
     metadata: dict[str, str | int | float | None] = {
-        "experiment.seed": ctx.config.seed,
+        "experiment.seed": ctx.config.seed.master,
         "experiment.num_rounds": ctx.config.num_rounds,
         "experiment.num_clients": ctx.config.num_clients,
         "experiment.generator_type": ctx.config.algorithm,
