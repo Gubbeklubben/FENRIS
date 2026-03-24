@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from fedbench.util.platform_info import collect_platform_info
+from fedbench.runtime.platform_info import collect_platform_info
 
 EXPECTED_KEYS = {
     "platform.os",

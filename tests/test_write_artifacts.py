@@ -63,15 +63,11 @@ def test_experiment_metadata_in_metrics(tmp_path: Path) -> None:
     write_artifacts(ctx)  # type: ignore[arg-type]
 
     outdir = tmp_path / "test-run"
-    for name in ("federated", "centralized"):
-        data = json.loads(outdir.joinpath(f"metrics.{name}.json").read_text())
-        assert data["experiment.seed"] == 42
-        assert data["experiment.num_rounds"] == 3
-        assert data["experiment.num_clients"] == 3
-        assert data["experiment.generator_type"] == "fed_hello"
-        assert data["experiment.metric_focus"] is None
-        assert data["experiment.aggregation_variant"] is None
-        assert data["experiment.model_scope"] is None
+    data = json.loads(outdir.joinpath("metadata.json").read_text())
+    assert data["experiment.seed"] == 42
+    assert data["experiment.num_rounds"] == 3
+    assert data["experiment.num_clients"] == 3
+    assert data["experiment.generator_type"] == "fed_hello"
 
     fed = json.loads(outdir.joinpath("metrics.federated.json").read_text())
     assert fed["fidelity.mean_abs_diff"] == 0.5
@@ -85,11 +81,10 @@ def test_platform_metadata_in_metrics(tmp_path: Path) -> None:
     write_artifacts(ctx)  # type: ignore[arg-type]
 
     outdir = tmp_path / "test-run"
-    for name in ("federated", "centralized"):
-        data = json.loads(outdir.joinpath(f"metrics.{name}.json").read_text())
-        assert "platform.os" in data
-        assert "platform.python_version" in data
-        assert "platform.cpu_count" in data
+    data = json.loads(outdir.joinpath("metadata.json").read_text())
+    assert "platform.os" in data
+    assert "platform.python_version" in data
+    assert "platform.cpu_count" in data
 
 
 def test_nan_metrics_written_as_null(tmp_path: Path) -> None:

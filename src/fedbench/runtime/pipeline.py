@@ -18,13 +18,13 @@ from fedbench.runtime.component_factory import (
     create_partitioner,
     create_synthesizer,
 )
+from fedbench.runtime.platform_info import collect_platform_info
 from fedbench.runtime.registry_builder import (
     build_algorithm_registry,
     build_evaluator_registries,
     build_partitioner_registry,
 )
 from fedbench.runtime.runcontext import RunContext
-from fedbench.util.platform_info import collect_platform_info
 
 
 def create_components(ctx: RunContext) -> None:
@@ -119,29 +119,29 @@ def write_artifacts(ctx: RunContext) -> None:
 
     # Config snapshot
     with outputdir.joinpath("config_snapshot.json").open("w") as f:
-        json.dump(json.loads(ctx.config.jsons()), f, indent=2)
+        json.dump(json.loads(ctx.config.jsons()), f, indent=4)
 
-    # Metrics (with experiment + platform metadata)
+    # Experiment + platform metadata
     metadata: dict[str, str | int | float | None] = {
         "experiment.seed": ctx.config.seed.master,
         "experiment.num_rounds": ctx.config.num_rounds,
         "experiment.num_clients": ctx.config.num_clients,
         "experiment.generator_type": ctx.config.algorithm,
-        "experiment.metric_focus": None,
-        "experiment.aggregation_variant": None,
-        "experiment.model_scope": None,
         **collect_platform_info(),
     }
+    with outputdir.joinpath("metadata.json").open("w") as f:
+        json.dump(metadata, f, indent=4, allow_nan=False)
+
     for name, metrics in [
         ("federated", ctx.aggregated_metrics),
         ("centralized", ctx.centralized_metrics),
     ]:
         clean = {
-            k: (None if isinstance(v, float) and math.isnan(v) else float(v))
+            k: (None if isinstance(v, float) and math.isnan(v) else v)
             for k, v in metrics.items()
         }
         with outputdir.joinpath(f"metrics.{name}.json").open("w") as f:
-            json.dump({**metadata, **clean}, f, indent=2, allow_nan=False)
+            json.dump(clean, f, indent=4, allow_nan=False)
 
     # Synthetic data
     ctx.synthetic_df.to_csv(outputdir.joinpath("synthetic.csv"), index=False)

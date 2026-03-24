@@ -19,13 +19,13 @@ def collect_platform_info() -> dict[str, str | int | None]:
         "platform.os_version": platform.release(),
         "platform.cpu_model": _cpu_model(),
         "platform.cpu_count": os.cpu_count(),
+        "platform.gpu_model": _gpu_model(),
         "platform.ram_gb": _ram_gb(),
         "platform.python_version": platform.python_version(),
         "platform.torch_version": _optional_version("torch"),
         "platform.flwr_version": _optional_version("flwr"),
         "platform.numpy_version": _optional_version("numpy"),
         "platform.sklearn_version": _optional_version("scikit-learn"),
-        "platform.gpu_model": _gpu_model(),
     }
 
 
