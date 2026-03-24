@@ -1,3 +1,4 @@
+# ruff: noqa: E402
 """Unit and integration tests for the fed_tgan_alt algorithm module.
 
 Coverage:
@@ -27,7 +28,8 @@ from __future__ import annotations
 import numpy as np
 import pandas as pd
 import pytest
-import torch
+
+torch = pytest.importorskip("torch")
 
 from fedbench.algorithms import register_builtin_algorithms
 from fedbench.algorithms.fed_tgan_alt import FedTGANAlt
