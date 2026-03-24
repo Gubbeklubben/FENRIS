@@ -17,7 +17,7 @@ from sklearn.metrics import accuracy_score, mean_squared_error, roc_auc_score
 from fedbench.core.data import TableSchema
 from fedbench.core.eval import Evaluator, LocalEvalContext
 from fedbench.core.eval.evalcontext import GlobalEvalContext
-from fedbench.util.metrics import (
+from fedbench.evaluators._helpers import (
     fit_tabular_model,
     weighted_mean_metrics,
 )

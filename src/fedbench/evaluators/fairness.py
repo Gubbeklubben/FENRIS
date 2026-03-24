@@ -21,8 +21,7 @@ from sklearn.linear_model import LogisticRegression
 from fedbench.core.eval import Evaluator, LocalEvalContext
 from fedbench.core.eval.evalcontext import GlobalEvalContext
 from fedbench.core.logger import log_debug
-from fedbench.util.metrics import fit_tabular_model
-from fedbench.util.parsing import to_snake_case
+from fedbench.evaluators._helpers import fit_tabular_model, to_snake_case
 
 
 @dataclass

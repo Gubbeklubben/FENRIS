@@ -20,9 +20,8 @@ from fedbench.core.events import (
 )
 from fedbench.core.update import Metrics, Update
 from fedbench.flwr.namespace import Namespace
-from fedbench.flwr.serde import FlwrSerde
+from fedbench.flwr.serde import FlwrSerde, count_rdict_bytes
 from fedbench.runtime.eventbus import EventBus
-from fedbench.util.metrics import count_rdict_bytes
 
 
 class Strategy:

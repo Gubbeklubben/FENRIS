@@ -35,6 +35,28 @@ class TableSchema:
     def kind_of(self, name: str) -> str:
         return self.lookup(name).kind
 
+    def numeric_columns(self, df: pd.DataFrame) -> list[str]:
+        """Return schema columns with kind 'continuous' or 'integer' present in *df*."""
+        df_cols = set(df.columns)
+        return [
+            c.name
+            for c in self.columns
+            if c.kind in ("continuous", "integer") and c.name in df_cols
+        ]
+
+    def nominal_columns(self, df: pd.DataFrame) -> list[str]:
+        """Return schema columns with kind 'categorical' or 'binary' present in *df*.
+
+        These are unordered discrete columns for which arithmetic operations
+        are not meaningful.
+        """
+        df_cols = set(df.columns)
+        return [
+            c.name
+            for c in self.columns
+            if c.kind in ("categorical", "binary") and c.name in df_cols
+        ]
+
 
 def infer_schema(df: pd.DataFrame) -> TableSchema:
     """Create a `TableSchema` from a pandas DataFrame.
