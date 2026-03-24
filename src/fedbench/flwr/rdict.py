@@ -1,8 +1,9 @@
 from collections.abc import Iterator, MutableMapping
 from typing import cast
 
-from flwr.common import ArrayRecord, ConfigRecord, MetricRecord
-from flwr.common.record.recorddict import RecordDict, RecordType
+from flwr.app import ArrayRecord, ConfigRecord, MetricRecord, RecordDict
+
+type RecordType = ArrayRecord | MetricRecord | ConfigRecord
 
 
 class _NamespaceView[T](MutableMapping[str, T]):

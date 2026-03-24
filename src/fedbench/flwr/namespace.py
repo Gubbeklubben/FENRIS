@@ -1,6 +1,6 @@
 from enum import StrEnum
 
-from flwr.common import RecordDict
+from flwr.app import RecordDict
 
 from fedbench.flwr.rdict import RDictNamespaceView
 

@@ -3,7 +3,7 @@ from typing import Iterable, Literal, Mapping
 
 import numpy as np
 import pandas as pd
-from flwr.common import RecordDict
+from flwr.app import RecordDict
 from sklearn.base import BaseEstimator
 from sklearn.compose import ColumnTransformer
 from sklearn.impute import SimpleImputer

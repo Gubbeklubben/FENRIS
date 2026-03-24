@@ -2,7 +2,7 @@ from collections.abc import Callable
 from dataclasses import dataclass
 from typing import cast
 
-from flwr.common import RecordDict
+from flwr.app import RecordDict
 
 from fedbench.config import Config
 from fedbench.core.algorithm import Synthesizer

@@ -3,7 +3,7 @@ from collections.abc import Callable
 
 import numpy as np
 import pytest
-from flwr.common import ArrayRecord, ConfigRecord, MetricRecord, RecordDict
+from flwr.app import ArrayRecord, ConfigRecord, MetricRecord, RecordDict
 
 from fedbench.core.update import Update
 from fedbench.flwr.rdict import RDictNamespaceView
