@@ -8,11 +8,11 @@ from pathlib import Path
 from fedbench.core.algorithm import GlobalInitArtifacts
 from fedbench.core.data import PartitionedDataset
 from fedbench.core.data.schemas import infer_schema as _infer_schema
-from fedbench.core.eval import CentralizedEvalContext
 from fedbench.core.logger import log_info
 from fedbench.runtime.command import Command
 from fedbench.runtime.component_factory import (
     create_algorithm,
+    create_centralized_eval_ctx,
     create_coordinator,
     create_df_loader,
     create_evaluation_suite,
@@ -113,15 +113,7 @@ def global_sample(ctx: RunContext) -> None:
 
 
 def global_evaluate(ctx: RunContext) -> None:
-    eval_ctx = CentralizedEvalContext(
-        synthetic_df=ctx.synthetic_df,
-        holdout_df=ctx.dataset.load_global_holdout(),
-        client_train_df=ctx.dataset.load_all_train_data(),  # only used by MIA
-        target_column=ctx.config.data.target_col,
-        sensitive_columns=ctx.config.data.sensitive_cols,
-        schema=ctx.dataset.schema,
-        seed=ctx.config.seed.evaluation,
-    )
+    eval_ctx = create_centralized_eval_ctx(ctx.config, ctx.dataset, ctx.synthetic_df)
     ctx.centralized_metrics = ctx.eval_suite.global_evaluate(eval_ctx)
 
 

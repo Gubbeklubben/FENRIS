@@ -18,9 +18,11 @@ from fedbench.core.events import (
     TrainEvalLoopCompleted,
     TrainEvalLoopStarted,
 )
+from fedbench.core.logger import log_info
 from fedbench.core.payload import Metrics, Payload
 from fedbench.flwr.namespace import Namespace
 from fedbench.flwr.serde import FlwrSerde, count_rdict_bytes
+from fedbench.runtime.early_stopping_monitor import EarlyStoppingMonitor
 from fedbench.runtime.eventbus import EventBus
 
 
@@ -33,15 +35,10 @@ class Strategy:
         serde: FlwrSerde,
         eventbus: EventBus,
         coordinator: Coordinator,
+        monitor: EarlyStoppingMonitor,
     ) -> Self:
 
-        return cls(
-            seed_config.init,
-            schema,
-            serde,
-            eventbus,
-            coordinator,
-        )
+        return cls(seed_config.init, schema, serde, eventbus, coordinator, monitor)
 
     def __init__(
         self,
@@ -50,6 +47,7 @@ class Strategy:
         serde: FlwrSerde,
         eventbus: EventBus,
         coordinator: Coordinator,
+        monitor: EarlyStoppingMonitor,
     ) -> None:
 
         self._init_seed = init_seed
@@ -57,6 +55,7 @@ class Strategy:
         self._serde = serde
         self._eventbus = eventbus
         self._coordinator = coordinator
+        self._monitor = monitor
         self._per_client_metrics: dict[int, Metrics] = {}
 
     def train(self, grid: Grid) -> None:
@@ -111,11 +110,17 @@ class Strategy:
         for curr_round in range(1, num_rounds + 1):
             self._eventbus.emit(RoundStarted(curr_round, num_rounds))
             self.train(grid)
-            self.evaluate(grid)
             self._eventbus.emit(RoundCompleted(curr_round, num_rounds))
+            log_info(__name__, f"Training round {curr_round}/{num_rounds} completed")
+
+            # Check early stopping
+            if self._monitor.should_run(curr_round, num_rounds):
+                self._monitor.run(self._get_and_check_training_artifacts())
+                if self._monitor.early_stop_triggered:
+                    break
 
         self._eventbus.emit(TrainEvalLoopCompleted(curr_round))
-
+        self.evaluate(grid)
         return self._get_and_check_training_artifacts(), self._per_client_metrics
 
     def _send_and_receive(

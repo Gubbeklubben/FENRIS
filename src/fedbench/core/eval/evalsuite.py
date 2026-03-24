@@ -88,9 +88,12 @@ class EvaluationSuite:
             for key, value in raw_metrics.items()
         }
 
-    def global_evaluate(self, ctx: GlobalEvalContext) -> dict[str, float]:
+    # noinspection PyMethodMayBeStatic
+    def _global_evaluate(
+        self, ctx: GlobalEvalContext, evaluators: Iterable[Evaluator]
+    ) -> dict[str, float]:
         metrics: dict[str, float] = {}
-        for ev in self._evaluators:
+        for ev in evaluators:
             metrics.update(
                 self._prefix_and_verify_key_names(
                     ev,
@@ -100,6 +103,17 @@ class EvaluationSuite:
                 )
             )
         return metrics
+
+    def global_evaluate(self, ctx: GlobalEvalContext) -> dict[str, float]:
+        return self._global_evaluate(ctx, self._evaluators)
+
+    def global_evaluate_single(self, ctx: GlobalEvalContext, key: str) -> float:
+        """Run only the evaluator that owns `key`, return the single metric value."""
+        evaluator, _ = self.get_evaluator_for_metric_key(
+            key, ctx.target_column, ctx.sensitive_columns
+        )
+        metrics = self._global_evaluate(ctx, [evaluator])
+        return metrics[key]
 
     def local_evaluate(self, ctx: LocalEvalContext) -> dict[str, Any]:
         metrics: dict[str, Any] = {}
