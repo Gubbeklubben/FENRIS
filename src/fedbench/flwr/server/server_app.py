@@ -1,6 +1,5 @@
-from flwr.common import Context
-from flwr.server import Grid
-from flwr.serverapp import ServerApp
+from flwr.app import Context
+from flwr.serverapp import Grid, ServerApp
 
 from fedbench.core.events import ClientsConfigured
 from fedbench.flwr.serde import FlwrSerde, Pickle

@@ -3,8 +3,8 @@ import math
 import time
 from typing import cast
 
+from flwr.app import Context, Message, MetricRecord, RecordDict
 from flwr.clientapp import ClientApp
-from flwr.common import Context, Message, MetricRecord, RecordDict
 
 from fedbench.core.encoder import FedbenchEncoder
 from fedbench.core.eval import LocalEvalContext

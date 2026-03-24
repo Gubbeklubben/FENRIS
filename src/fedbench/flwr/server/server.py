@@ -3,8 +3,8 @@ import time
 from collections.abc import Generator, Iterable
 from typing import Any, Self, cast
 
-from flwr.common import ConfigRecord, Message, RecordDict
-from flwr.server import Grid
+from flwr.app import ConfigRecord, Message, RecordDict
+from flwr.serverapp import Grid
 
 from fedbench.config import Config, SeedConfig
 from fedbench.core.algorithm import Coordinator

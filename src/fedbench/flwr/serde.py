@@ -4,7 +4,7 @@ from collections.abc import Generator
 from contextlib import contextmanager
 from typing import Any, overload
 
-from flwr.common import (
+from flwr.app import (
     Array,
     ArrayRecord,
     ConfigRecord,
