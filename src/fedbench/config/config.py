@@ -34,9 +34,11 @@ class MetricsConfig:
 
     def __post_init__(self) -> None:
         if not self.early_stop:
+            if self.stop_metric:
+                raise ValueError(
+                    "early_stop must be enabled when stop_metric is specified"
+                )
             return
-        if not self.stop_metric:
-            raise ValueError("stop_metric must be specified when early_stop is enabled")
         if not self.stop_mode:
             raise ValueError(
                 "stop_mode must be specified (min or max) when early_stop is enabled"

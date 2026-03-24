@@ -2,7 +2,7 @@ from collections.abc import Iterable, Mapping
 from typing import Any, Self
 
 from fedbench.core.eval.evalcontext import GlobalEvalContext, LocalEvalContext
-from fedbench.core.eval.evaluator import Category, Evaluator
+from fedbench.core.eval.evaluator import Category, Evaluator, MetricDescriptor
 from fedbench.runtime.registry import FactoryRegistry
 
 
@@ -50,6 +50,23 @@ class EvaluationSuite:
                 if names and name not in names:
                     continue
             yield evaluator
+
+    def get_evaluator_for_metric_key(
+        self,
+        metric_key: str,
+        target_column: str | None,
+        sensitive_columns: tuple[str, ...] | None,
+    ) -> tuple[Evaluator, MetricDescriptor]:
+        for ev in self._evaluators:
+            for key, metric in ev.get_metric_descriptor_dict(
+                target_column, sensitive_columns
+            ).items():
+                if f"{ev.metadata.category}.{key}" == metric_key:
+                    return ev, metric
+        raise KeyError(
+            f"Specified metric key {metric_key} is not emitted "
+            f"by any evaluator in the current evaluation suite."
+        )
 
     # noinspection PyMethodMayBeStatic
     def _prefix_and_verify_key_names(

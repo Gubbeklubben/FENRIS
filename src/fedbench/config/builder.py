@@ -15,8 +15,10 @@ from fedbench.config.config import (
 from fedbench.config.parsing import parse_for_function
 from fedbench.core.algorithm import Algorithm
 from fedbench.core.data import Partitioner
-from fedbench.core.eval import Category
+from fedbench.core.eval import Category, EvaluationSuite
+from fedbench.core.eval.evaluator import EvaluationMode
 from fedbench.runtime.registry import FactoryRegistry
+from fedbench.runtime.registry_builder import build_evaluator_registry
 
 
 def build_config(
@@ -39,6 +41,7 @@ def build_config(
     validate_column_names(data_cfg)
     resolve_outputdir(cfg)
     resolve_run_categories(metrics_cfg)
+    validate_stop_metrics(metrics_cfg, data_cfg)
 
     parse_algorithm_kwargs(cfg, algorithm_registry)
     parse_partitioner_kwargs(cfg, data_cfg, seed_cfg, partitioner_registry)
@@ -107,6 +110,40 @@ def resolve_run_categories(metrics_cfg: dict[str, Any]) -> None:
         metrics_cfg["run_categories"] = tuple(
             Category(v) for v in metrics_cfg["run_categories"]
         )
+
+
+def validate_stop_metrics(
+    metrics_cfg: dict[str, Any], data_cfg: dict[str, Any]
+) -> None:
+    if not metrics_cfg.get("early_stop"):
+        return
+    if "stop_metric" not in metrics_cfg:
+        raise ValueError("stop_metric must be specified when early_stop is enabled")
+
+    eval_suite = EvaluationSuite.with_evaluator_categories(
+        build_evaluator_registry(),
+        metrics_cfg["run_categories"],
+    )
+
+    try:
+        evaluator, metric = eval_suite.get_evaluator_for_metric_key(
+            metrics_cfg["stop_metric"],
+            data_cfg["target_col"],
+            data_cfg["sensitive_cols"],
+        )
+    except KeyError as e:
+        raise ValueError(
+            f"Specified stop metric `{metrics_cfg['stop_metric']}` "
+            f"is not emitted by any evaluator in the current evaluation suite."
+        ) from e
+
+    if EvaluationMode.CENTRALIZED not in evaluator.metadata.eval_mode:
+        raise ValueError(
+            f"Metric `{metrics_cfg['stop_metric']}` does not support "
+            f"centralized evaluation and cannot be used as a stop metric"
+        )
+    if "stop_mode" not in metrics_cfg:
+        metrics_cfg["stop_mode"] = metric.default_stop_mode
 
 
 def parse_algorithm_kwargs(
