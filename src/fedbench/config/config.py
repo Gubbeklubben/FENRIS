@@ -26,11 +26,44 @@ class MetricsConfig:
     early_stop: bool = False
     stop_metric: str | None = None
     stop_mode: Literal["min", "max"] | None = None
-    stop_epsilon: float | None = None
-    stop_patience: int | None = None
-    stop_min_rounds: int | None = None
-    stop_eval_every: int | None = None
+    stop_epsilon: float = 1e-3
+    stop_patience: int = 3
+    stop_min_rounds: int = 1
+    stop_eval_every: int = 1
     stop_synthetic_rows: int | None = None
+
+    def __post_init__(self) -> None:
+        if not self.early_stop:
+            return
+        if not self.stop_metric:
+            raise ValueError("stop_metric must be specified when early_stop is enabled")
+        if not self.stop_mode:
+            raise ValueError(
+                "stop_mode must be specified (min or max) when early_stop is enabled"
+            )
+        if self.stop_epsilon <= 0.0:
+            raise ValueError(
+                f"stop_epsilon must be a positive float (got {self.stop_epsilon})"
+            )
+        if self.stop_patience < 1:
+            raise ValueError(
+                f"stop_patience must be a positive integer (got {self.stop_patience})"
+            )
+        if self.stop_min_rounds < 1:
+            raise ValueError(
+                f"stop_min_rounds must be a positive integer "
+                f"(got {self.stop_min_rounds})"
+            )
+        if self.stop_eval_every < 1:
+            raise ValueError(
+                f"stop_eval_every must be a positive integer "
+                f"(got {self.stop_eval_every})"
+            )
+        if self.stop_synthetic_rows is not None and self.stop_synthetic_rows < 1:
+            raise ValueError(
+                f"stop_synthetic_rows must be a positive integer or None "
+                f"(got {self.stop_synthetic_rows})"
+            )
 
 
 @dataclass(frozen=True)
@@ -75,16 +108,22 @@ class Config:
 
     def __post_init__(self) -> None:
         if self.num_clients < 1:
-            raise ValueError(f"Number of clients {self.num_clients} is not supported")
+            raise ValueError(
+                f"num_clients must be a positive integer (got {self.num_clients})"
+            )
         if self.num_rounds < 1:
-            raise ValueError(f"Number of rounds {self.num_rounds} is not supported")
+            raise ValueError(
+                f"num_rounds must be a positive integer (got {self.num_rounds})"
+            )
         if self.test_size <= 0.0 or self.test_size >= 1.0:
             raise ValueError(
-                f"Test size {self.test_size} is not supported, must be between 0 and 1"
+                f"test_size must be between 0.0 and 1.0 exclusive "
+                f"(got {self.test_size})"
             )
         if self.num_synthetic_rows is not None and self.num_synthetic_rows < 1:
             raise ValueError(
-                f"Number of synthetic rows {self.num_synthetic_rows} is not supported"
+                f"num_synthetic_rows must be a positive integer or None "
+                f"(got {self.num_synthetic_rows})"
             )
 
     @classmethod

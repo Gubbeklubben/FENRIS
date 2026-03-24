@@ -75,9 +75,16 @@ def train(message: Message, flwr_context: Context) -> Message:
         reply = synthesizer.train(request, train_df)
         train_seconds = (time.perf_counter_ns() - start_time) / 1e9
 
-    ctx.framework_cache.metric_records.update(
-        {"metrics": MetricRecord({"prev-train-seconds": train_seconds})},
-    )
+    with ctx.serde.use_deserialized(ctx.framework_cache) as cache:
+        metrics = cast(
+            dict[str, float],
+            cache.metrics.setdefault(
+                "metrics", {"local_train_seconds": 0, "local_train_rounds": 0}
+            ),
+        )
+        metrics["local_train_seconds"] += train_seconds
+        metrics["local_train_rounds"] += 1
+
     rdict = ctx.serde.to_flwr(reply)
     return Message(content=rdict, reply_to=message)
 
@@ -111,12 +118,13 @@ def evaluate(message: Message, flwr_context: Context) -> Message:
             reply_to=message,
         )
 
-    cached_metrics = ctx.framework_cache.metric_records.get("metrics", MetricRecord())
     # noinspection PyUnnecessaryCast
-    local_train_seconds = cast(
-        float,
-        cached_metrics.get("prev-train-seconds", math.nan),
+    cached_metrics = cast(
+        dict[str, float],
+        ctx.serde.from_flwr(ctx.framework_cache).metrics.get("metrics", {}),
     )
+    local_train_seconds = cached_metrics.get("local_train_seconds", math.nan)
+    local_train_rounds = cached_metrics.get("local_train_rounds", math.nan)
 
     eval_ctx = LocalEvalContext(
         train_df=train_df,
@@ -126,7 +134,7 @@ def evaluate(message: Message, flwr_context: Context) -> Message:
         target_column=ctx.config.data.target_col,
         sensitive_columns=ctx.config.data.sensitive_cols,
         schema=ctx.dataset.schema,
-        local_train_seconds=local_train_seconds,
+        local_train_seconds=local_train_seconds / local_train_rounds,
     )
 
     metrics: Extras = {}

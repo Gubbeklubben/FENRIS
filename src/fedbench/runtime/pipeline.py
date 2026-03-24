@@ -92,7 +92,7 @@ def global_sample(ctx: RunContext) -> None:
     )
     ctx.synthetic_df = synthesizer.sample(
         ctx.aggregated_state,
-        ctx.config.num_synthetic_rows or 1000,
+        ctx.config.num_synthetic_rows or len(ctx.dataset.load_global_holdout()),
         ctx.config.seed.sampling,
     )
 
