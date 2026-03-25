@@ -125,16 +125,9 @@ def write_artifacts(ctx: RunContext) -> None:
     with outputdir.joinpath("config_snapshot.json").open("w") as f:
         json.dump(json.loads(ctx.config.jsons()), f, indent=4)
 
-    # Experiment + platform metadata
-    metadata: dict[str, str | int | float | None] = {
-        "experiment.seed": ctx.config.seed.master,
-        "experiment.num_rounds": ctx.config.num_rounds,
-        "experiment.num_clients": ctx.config.num_clients,
-        "experiment.generator_type": ctx.config.algorithm,
-        **collect_platform_info(),
-    }
+    # Platform metadata
     with outputdir.joinpath("metadata.json").open("w") as f:
-        json.dump(metadata, f, indent=4, allow_nan=False)
+        json.dump(collect_platform_info(), f, indent=4, allow_nan=False)
 
     for name, metrics in [
         ("federated", ctx.aggregated_metrics),
