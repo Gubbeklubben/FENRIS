@@ -213,9 +213,9 @@ class FairnessEvaluator(Evaluator):
             )
             return {}
 
-        X_syn = syn_df[feature_columns]
+        x_syn = syn_df[feature_columns]
         y_syn = syn_df[target_column]
-        X_real = train_df[feature_columns]
+        x_real = train_df[feature_columns]
         y_real = train_df[target_column]
         sens = train_df[sensitive_column]
 
@@ -238,7 +238,7 @@ class FairnessEvaluator(Evaluator):
 
         model = LogisticRegression(max_iter=1000, solver="lbfgs", random_state=seed)
         try:
-            pipe = fit_tabular_model(X_syn, pd.Series(y_syn_enc), model)
+            pipe = fit_tabular_model(x_syn, pd.Series(y_syn_enc), model)
         except ValueError as e:
             log_debug(
                 "Fairness",
@@ -248,7 +248,7 @@ class FairnessEvaluator(Evaluator):
             log_debug("Fairness", str(e))
             return {}
 
-        y_pred = pipe.predict(X_real)
+        y_pred = pipe.predict(x_real)
         return self._per_group_confusion(
             pd.Series(y_real_enc).to_numpy(),
             np.array(y_pred),
