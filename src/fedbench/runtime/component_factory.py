@@ -4,7 +4,7 @@ from collections.abc import Callable
 from pandas import DataFrame
 
 from fedbench.config import Config
-from fedbench.core.algorithm import Algorithm, Coordinator, Synthesizer
+from fedbench.core.algorithm import Algorithm, Synthesizer
 from fedbench.core.data import Partitioner, load_csv
 from fedbench.core.eval import EvaluationSuite, Evaluator
 from fedbench.core.payload import Payload
@@ -50,21 +50,6 @@ def create_evaluation_suite(
         registry,
         config.metrics.run_categories,
     )
-
-
-def create_coordinator(
-    factory: Callable[[], Coordinator],
-    artifacts: Payload | None,
-) -> Coordinator:
-
-    instance = factory()
-    if not isinstance(instance, Coordinator):
-        raise TypeError(f"{instance} is not a Coordinator.")
-
-    if artifacts is not None:
-        instance.attach_global_init_artifacts(artifacts)
-
-    return instance
 
 
 def create_synthesizer(

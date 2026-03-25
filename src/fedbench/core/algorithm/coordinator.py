@@ -1,7 +1,7 @@
 from abc import ABC, abstractmethod
 from collections.abc import Generator, Iterable
 
-from fedbench.core.payload import Payload, PayloadSchema
+from fedbench.core.payload import ArraysTarget, Payload, PayloadSchema
 
 
 class Coordinator(ABC):
@@ -12,28 +12,13 @@ class Coordinator(ABC):
 
     @property
     @abstractmethod
-    def payload_schema(self) -> PayloadSchema:
+    def arrays_target(self) -> ArraysTarget:
         pass
 
     @property
     @abstractmethod
-    def arrays_to_ml_framework_map(self) -> dict[str, str] | None:
-        return None
-
-    @property
-    def global_state(self) -> Payload | None:
-        """Current global state.
-
-        The returned value, if not None, will be injected into the sampling function
-        associated with the current Synthesizer.
-
-        Returns
-        -------
-        Payload | None
-            A representation of the current global state.
-        """
-
-        return None
+    def payload_schema(self) -> PayloadSchema:
+        pass
 
     def attach_global_init_artifacts(self, artifacts: Payload) -> None:
         """Attach globally computed preprocessing artifacts.
@@ -82,6 +67,13 @@ class Coordinator(ABC):
         """
 
         pass
+
+    @abstractmethod
+    def publish_training_artifacts(self) -> Payload:
+        """Publish training artifacts.
+
+        The returned Payload will be injected into the sample function associated
+        with the current Synthesizer."""
 
 
 class SingleStepCoordinator(Coordinator):

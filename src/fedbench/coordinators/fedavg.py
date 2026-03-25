@@ -6,31 +6,25 @@ from typing import Self, cast
 import torch
 
 from fedbench.core.algorithm import SingleStepCoordinator
-from fedbench.core.payload import Arrays, Payload, PayloadSchema
+from fedbench.core.payload import Arrays, ArraysTarget, Payload, PayloadSchema
 
 
 @dataclass(frozen=True)
 class GlobalState:
     state: Arrays
 
-    def encode(self) -> Payload:
-        return Payload(arrays={"state": self.state})
-
     @classmethod
     def decode(cls, payload: Payload) -> Self:
         return cls(payload.arrays["state"])
+
+    def encode(self) -> Payload:
+        return Payload(arrays={"state": self.state})
 
 
 @dataclass(frozen=True)
 class ClientUpdate:
     state: Arrays
     count: int
-
-    def encode(self) -> Payload:
-        return Payload(
-            arrays={"state": self.state},
-            metrics={"metrics": {"count": self.count}},
-        )
 
     @classmethod
     def decode(cls, payload: Payload) -> Self:
@@ -40,11 +34,21 @@ class ClientUpdate:
             count=cast(int, payload.metrics["metrics"]["count"]),
         )
 
+    def encode(self) -> Payload:
+        return Payload(
+            arrays={"state": self.state},
+            metrics={"metrics": {"count": self.count}},
+        )
+
 
 class FedAvg(SingleStepCoordinator):
     def __init__(self, weighted: bool = True) -> None:
         self._weighted = weighted
         self._state: dict[str, torch.Tensor] | None = None
+
+    @property
+    def arrays_target(self) -> ArraysTarget:
+        return ArraysTarget.TORCH
 
     @property
     def payload_schema(self) -> PayloadSchema:
@@ -54,10 +58,6 @@ class FedAvg(SingleStepCoordinator):
                 "client_update": ClientUpdate,
             }
         )
-
-    @property
-    def arrays_to_ml_framework_map(self) -> dict[str, str] | None:
-        return {"global_state": "torch"}
 
     def attach_global_init_artifacts(self, artifacts: Payload) -> None:
         # noinspection PyUnnecessaryCast
@@ -108,3 +108,8 @@ class FedAvg(SingleStepCoordinator):
                 aggr_state[key] = result
 
         self._state = aggr_state
+
+    def publish_training_artifacts(self) -> Payload:
+        if self._state is None:
+            raise ValueError("No global state, can not publish training artifacts.")
+        return GlobalState(self._state).encode()

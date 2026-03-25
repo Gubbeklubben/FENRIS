@@ -5,7 +5,7 @@ import math
 from collections.abc import Iterable
 from pathlib import Path
 
-from fedbench.core.algorithm import GlobalInitArtifacts
+from fedbench.core.algorithm import Coordinator, GlobalInitArtifacts
 from fedbench.core.data import PartitionedDataset
 from fedbench.core.data.schemas import infer_schema as _infer_schema
 from fedbench.core.eval import CentralizedEvalContext
@@ -19,6 +19,7 @@ from fedbench.runtime.component_factory import (
     create_synthesizer,
 )
 from fedbench.runtime.platform_info import collect_platform_info
+from fedbench.runtime.registry import FactoryRegistry
 from fedbench.runtime.registry_builder import (
     build_algorithm_registry,
     build_evaluator_registry,
@@ -34,6 +35,11 @@ def create_components(ctx: RunContext) -> None:
         ctx.config,
         build_algorithm_registry(),
     )
+    ctx.coordinator = FactoryRegistry[Coordinator](
+        group="fedbench.coordinators",
+        product_cls=Coordinator,  # type: ignore[type-abstract]
+    ).call("fedavg")
+
     ctx.partitioner = create_partitioner(
         ctx.config,
         build_partitioner_registry(),
@@ -64,6 +70,8 @@ def global_init(ctx: RunContext) -> None:
     )
     if artifacts is not None:
         ctx.global_init_artifacts = artifacts
+        if artifacts.coordinator is not None:
+            ctx.coordinator.attach_global_init_artifacts(artifacts.coordinator)
     else:
         ctx.global_init_artifacts = GlobalInitArtifacts(None, None)
 

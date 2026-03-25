@@ -6,21 +6,21 @@ from pandas import DataFrame
 
 from fedbench.core.algorithm.synthesizer import Synthesizer
 from fedbench.core.data import TableSchema
-from fedbench.core.payload import Payload
+from fedbench.core.payload import ArraysTarget, Payload
 
 
 @dataclass(frozen=True)
 class ComponentSpec[T]:
     factory: Callable[[], T]
-    arrays_to_ml_framework_map: dict[str, str] | None = None
+    arrays_target: ArraysTarget | None = None
 
 
 def synthesizer_spec(
     factory: Callable[[], Synthesizer],
-    arrays_to_ml_framework_map: dict[str, str] | None = None,
+    arrays_target: ArraysTarget | None = None,
 ) -> ComponentSpec[Synthesizer]:
 
-    return ComponentSpec[Synthesizer](factory, arrays_to_ml_framework_map)
+    return ComponentSpec[Synthesizer](factory, arrays_target)
 
 
 @dataclass(frozen=True)

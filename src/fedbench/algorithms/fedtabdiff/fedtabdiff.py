@@ -10,17 +10,16 @@ from sklearn.preprocessing import LabelEncoder, QuantileTransformer
 from fedbench.core.algorithm import (
     Algorithm,
     ComponentSpec,
-    Coordinator,
     GlobalInitArtifacts,
     Synthesizer,
-    coordinator_spec,
     synthesizer_spec,
 )
 from fedbench.core.data import TableSchema
-from fedbench.core.payload import Payload
+from fedbench.core.payload import ArraysTarget, Payload
+
+from ...coordinators.fedavg import GlobalState
 
 # Relative imports for algorithm specifics.
-from .coordinator import FedTabDiffCoordinator
 from .diffuser import Diffuser
 from .mlpsynthesizer import MLPSynthesizer
 from .synthesizer import FedTabDiffSynthesizer, prefix_columns
@@ -115,14 +114,12 @@ class FedTabDiff(Algorithm):
         )
 
     @property
-    def coordinator_spec(self) -> ComponentSpec[Coordinator]:
-        return coordinator_spec(
-            FedTabDiffCoordinator, {"initial-state": "torch", "state": "torch"}
-        )
+    def supports_coordinators(self) -> set[str]:
+        return set("fedavg")
 
     @property
     def synthesizer_spec(self) -> ComponentSpec[Synthesizer]:
-        return synthesizer_spec(self._synth_factory, {"state": "torch"})
+        return synthesizer_spec(self._synth_factory, ArraysTarget.TORCH)
 
     def global_init(
         self, seed: int, schema: TableSchema, dataset: DataFrame
@@ -170,6 +167,6 @@ class FedTabDiff(Algorithm):
         mlp_synth = self._mlp_synth_factory(encoded_dim, n_cat_tokens)
 
         return GlobalInitArtifacts(
-            coordinator=Payload(arrays={"initial-state": mlp_synth.state_dict()}),
+            coordinator=GlobalState(mlp_synth.state_dict()).encode(),
             synthesizer=synth_artifacts,
         )

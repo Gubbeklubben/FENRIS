@@ -1,29 +1,24 @@
 import functools
-from collections.abc import Iterable
 from typing import Any, Callable, cast
 
 import numpy as np
 import pandas as pd
 import torch
 from sklearn.preprocessing import LabelEncoder, MinMaxScaler
-from torch import Tensor
 
 from fedbench.algorithms.fed_tgan.discriminator import Discriminator
 from fedbench.algorithms.fed_tgan.generator import Generator
 from fedbench.algorithms.fed_tgan.training import discriminator_step, generator_step
+from fedbench.coordinators.fedavg import ClientUpdate, GlobalState
 from fedbench.core.algorithm import (
     Algorithm,
     ComponentSpec,
-    Coordinator,
     GlobalInitArtifacts,
-    SingleStepCoordinator,
     Synthesizer,
-    coordinator_spec,
     synthesizer_spec,
 )
 from fedbench.core.data import TableSchema
-from fedbench.core.logger import ELBOW, log_warning
-from fedbench.core.payload import Payload
+from fedbench.core.payload import ArraysTarget, Extras, Objects, Payload
 
 
 def split_cat_num(schema: TableSchema) -> tuple[list[str], list[str]]:
@@ -43,7 +38,7 @@ class FedTGAN(Algorithm):
         num_server_rounds: int = 10,
         local_epochs: int = 5,
         latent_dim: int = 64,
-    ):
+    ) -> None:
 
         if batch_size < 1:
             raise ValueError("Expecting batch_size >= 1.")
@@ -83,14 +78,12 @@ class FedTGAN(Algorithm):
         )
 
     @property
-    def coordinator_spec(self) -> ComponentSpec[Coordinator]:
-        return coordinator_spec(
-            FedTGANCoordinator, {"initial-state": "torch", "state": "torch"}
-        )
+    def supports_coordinators(self) -> set[str]:
+        return set("fedavg")
 
     @property
     def synthesizer_spec(self) -> ComponentSpec[Synthesizer]:
-        return synthesizer_spec(self._synth_factory, {"state": "torch"})
+        return synthesizer_spec(self._synth_factory, ArraysTarget.TORCH)
 
     def global_init(
         self, seed: int, schema: TableSchema, dataset: pd.DataFrame
@@ -157,92 +150,10 @@ class FedTGAN(Algorithm):
             "latent-dim": latent_dim,
         }
 
-        # Coordinator receives both model state and preprocessing artifacts
-        # to pass preprocessing to synthesizers in each round
-        coord_artifacts = Payload(arrays={"initial-state": packed_state})
-        coord_artifacts.objects["preproc-objects"] = synth_artifacts.objects[
-            "preproc-objects"
-        ]
-        coord_artifacts.extras["preproc-extras"] = synth_artifacts.extras[
-            "preproc-extras"
-        ]
-
         return GlobalInitArtifacts(
-            coordinator=coord_artifacts,
+            coordinator=GlobalState(packed_state).encode(),
             synthesizer=synth_artifacts,
         )
-
-
-class FedTGANCoordinator(SingleStepCoordinator):
-    def __init__(self) -> None:
-        self._state: dict[str, torch.Tensor] | None = None
-        self._preproc_objects: dict[str, Any] | None = None
-        self._preproc_extras: dict[str, Any] | None = None
-
-    @property
-    def global_state(self) -> Payload | None:
-        if self._state is None:
-            return None
-        return self._create_update()
-
-    def attach_global_init_artifacts(self, artifacts: Payload) -> None:
-        """Receive initial state and preprocessing artifacts from global_init."""
-        self._state = cast(dict[str, Tensor], artifacts.arrays["initial-state"])
-        self._preproc_objects = artifacts.objects["preproc-objects"]
-        self._preproc_extras = artifacts.extras["preproc-extras"]
-
-    def aggregate_train(self, replies: Iterable[tuple[int, Payload]]) -> None:
-        """Aggregate generator, discriminator using FedAvg weighted by num_samples."""
-        if not replies:
-            raise ValueError("No replies, can not aggregate.")
-
-        num_samples: list[int] = []
-        state_dicts: list[dict[str, Tensor]] = []
-
-        for _, reply in replies:
-            # noinspection PyUnnecessaryCast
-            num_samples.append(cast(int, reply.metrics["metrics"]["num-samples"]))
-            # noinspection PyUnnecessaryCast
-            state_dicts.append(cast(dict[str, Tensor], reply.arrays["state"]))
-
-        total = sum(num_samples)
-        if total <= 0:
-            log_warning(str(self), f"Total number of samples: {total}")
-            log_warning("", f"\t{ELBOW} Skipping aggregation.")
-            return
-
-        weights = tuple(float(n) / total for n in num_samples)
-        keys = tuple(state_dicts[0].keys())
-        aggr_state: dict[str, Tensor] = {}
-
-        with torch.no_grad():
-            for key in keys:
-                result: Tensor | None = None
-
-                for state_dict, weight in zip(state_dicts, weights, strict=True):
-                    tensor = state_dict[key].detach().cpu()
-                    if result is None:
-                        result = tensor * weight
-                    else:
-                        result = result + tensor * weight
-
-                aggr_state[key] = result
-
-        self._state = aggr_state
-
-    def _create_update(self) -> Payload:
-        """Create Update with the current global state and preprocessing artifacts."""
-        # _state is guaranteed non-None when this is called from global_state property
-        state = cast(dict[str, Tensor], self._state)
-        update = Payload(arrays={"state": state})
-
-        # Include preprocessing artifacts if available
-        if self._preproc_objects is not None:
-            update.objects["preproc-objects"] = self._preproc_objects
-        if self._preproc_extras is not None:
-            update.extras["preproc-extras"] = self._preproc_extras
-
-        return update
 
 
 class FedTGANSynthesizer(Synthesizer):
@@ -271,22 +182,19 @@ class FedTGANSynthesizer(Synthesizer):
         self._preproc_objects = artifacts.objects["preproc-objects"]
         self._preproc_extras = artifacts.extras["preproc-extras"]
 
+    # noinspection PyUnnecessaryCast
     def train(self, request: Payload, data: pd.DataFrame) -> Payload:
         """Train Generator and Discriminator on local data, alternating GAN training."""
 
-        # Extract preprocessing artifacts and model states from request
-        # noinspection PyUnnecessaryCast
-        received_state = cast(dict[str, Tensor], request.arrays["state"])
-        preproc_objects = request.objects["preproc-objects"]
-        preproc_extras = request.extras["preproc-extras"]
+        received_state = cast(
+            dict[str, torch.Tensor], GlobalState.decode(request).state
+        )
+        preproc_objects = cast(Objects, self._preproc_objects)
+        preproc_extras = cast(Extras, self._preproc_extras)
 
-        # noinspection PyUnnecessaryCast
         cat_attrs = cast(list[str], preproc_extras["cat-attrs"])
-        # noinspection PyUnnecessaryCast
         num_attrs = cast(list[str], preproc_extras["num-attrs"])
-        # noinspection PyUnnecessaryCast
         input_dim = cast(int, preproc_extras["input-dim"])
-        # noinspection PyUnnecessaryCast
         output_dim = cast(int, preproc_extras["output-dim"])
         label_encoders = preproc_objects["label-encoders"]
 
@@ -333,12 +241,12 @@ class FedTGANSynthesizer(Synthesizer):
 
         # Concatenate all features
         if processed_data:
-            X = np.hstack(processed_data).astype(np.float32)
+            x = np.hstack(processed_data).astype(np.float32)
         else:
             raise ValueError("No data to train on")
 
         # Convert to torch tensor and create DataLoader
-        dataset = torch.utils.data.TensorDataset(torch.from_numpy(X))
+        dataset = torch.utils.data.TensorDataset(torch.from_numpy(x))
         dataloader = torch.utils.data.DataLoader(
             dataset, batch_size=self._batch_size, shuffle=True
         )
@@ -411,21 +319,13 @@ class FedTGANSynthesizer(Synthesizer):
         for k, v in discriminator.state_dict().items():
             packed_state[f"discriminator.{k}"] = v
 
-        # Return update with both models
-        reply = Payload()
-        reply.arrays["state"] = packed_state
-        reply.metrics["metrics"] = {
-            "loss-discriminator": train_loss_discriminator / num_batches
-            if num_batches > 0
-            else 0.0,
-            "loss-generator": train_loss_generator / num_batches
-            if num_batches > 0
-            else 0.0,
-            "num-samples": len(dataset),
-        }
+        reply = ClientUpdate(
+            state=packed_state,
+            count=len(dataset),
+        )
+        return reply.encode()
 
-        return reply
-
+    # noinspection PyUnnecessaryCast
     def sample(self, request: Payload, num_rows: int, seed: int) -> pd.DataFrame:
         """Generate synthetic data using the trained generator."""
 
@@ -435,20 +335,14 @@ class FedTGANSynthesizer(Synthesizer):
         if torch.cuda.is_available():
             torch.cuda.manual_seed(seed)
 
-        # Extract model state and preprocessing artifacts from request
-        # noinspection PyUnnecessaryCast
-        packed_state = cast(dict[str, Tensor], request.arrays["state"])
-        preproc_objects = request.objects["preproc-objects"]
-        preproc_extras = request.extras["preproc-extras"]
+        packed_state = cast(dict[str, torch.Tensor], GlobalState.decode(request).state)
+        preproc_objects = cast(Objects, self._preproc_objects)
+        preproc_extras = cast(Extras, self._preproc_extras)
 
-        # noinspection PyUnnecessaryCast
         cat_attrs = cast(list[str], preproc_extras["cat-attrs"])
-        # noinspection PyUnnecessaryCast
         num_attrs = cast(list[str], preproc_extras["num-attrs"])
-        # noinspection PyUnnecessaryCast
-        output_dim = cast(int, preproc_extras["output-dim"])
-        # noinspection PyUnnecessaryCast
         latent_dim = cast(int, preproc_extras["latent-dim"])
+        output_dim = cast(int, preproc_extras["output-dim"])
         label_encoders = preproc_objects["label-encoders"]
 
         # Unpack generator state (only need generator for sampling)

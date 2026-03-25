@@ -12,7 +12,7 @@ from flwr.app import (
     RecordDict,
 )
 
-from fedbench.core.payload import Objects, Payload
+from fedbench.core.payload import ArraysTarget, Objects, Payload
 from fedbench.flwr.rdict import RDictNamespaceView
 
 
@@ -75,11 +75,11 @@ class FlwrSerde:
     def __init__(
         self,
         object_serde: ObjectSerde,
-        default_arrays_map: dict[str, str] | None = None,
+        default_arrays_target: ArraysTarget | None = None,
     ) -> None:
 
         self._object_serde = object_serde
-        self._default_arrays_map = default_arrays_map or {}
+        self._default_arrays_target = default_arrays_target or ArraysTarget.NUMPY
 
     @overload
     def to_flwr(self, payload: Payload) -> RecordDict: ...
@@ -115,18 +115,17 @@ class FlwrSerde:
     def from_flwr(
         self,
         rdict: RecordDict | RDictNamespaceView,
-        arrays_to_ml_framework_map: dict[str, str] | None = None,
+        arrays_target: ArraysTarget | None = None,
     ) -> Payload:
 
-        arrays_map = arrays_to_ml_framework_map or self._default_arrays_map
+        arrays_target = arrays_target or self._default_arrays_target
         payload = Payload()
 
         for key, arrays in rdict.array_records.items():
             if list(arrays.values())[0].stype == self._object_serde.stype:
                 payload.objects[key] = self._deserialize_objects(arrays)
             else:
-                ml_framework = arrays_map.get(key, "numpy")
-                if ml_framework == "torch":
+                if arrays_target == ArraysTarget.TORCH:
                     payload.arrays[key] = arrays.to_torch_state_dict()
                 else:
                     payload.arrays[key] = arrays.to_numpy_ndarrays()
@@ -143,10 +142,10 @@ class FlwrSerde:
     def use_deserialized(
         self,
         target: RecordDict | RDictNamespaceView,
-        arrays_to_ml_framework_map: dict[str, str] | None = None,
+        arrays_target: ArraysTarget | None = None,
     ) -> Generator[Payload, None, None]:
 
-        payload = self.from_flwr(target, arrays_to_ml_framework_map)
+        payload = self.from_flwr(target, arrays_target)
         try:
             yield payload
         finally:

@@ -63,11 +63,11 @@ class Strategy:
 
     def evaluate(self, grid: Grid) -> None:
         msg_type = "evaluate"
-        global_state = self._get_and_check_global_state()
+        artifacts = self._get_and_check_training_artifacts()
         requests = []
 
         for dst_id in grid.get_node_ids():
-            rdict = self._serde.to_flwr(global_state)
+            rdict = self._serde.to_flwr(artifacts)
             requests.append(
                 Message(content=rdict, message_type=msg_type, dst_node_id=dst_id)
             )
@@ -110,7 +110,7 @@ class Strategy:
             self.evaluate(grid)
             self._eventbus.emit(RoundCompleted(curr_round, num_rounds))
 
-        return self._get_and_check_global_state(), self._per_client_metrics
+        return self._get_and_check_training_artifacts(), self._per_client_metrics
 
     def _send_and_receive(
         self,
@@ -162,14 +162,14 @@ class Strategy:
                     )
                 )
 
-    def _get_and_check_global_state(self) -> Payload:
-        global_state = self._coordinator.global_state
-        if not isinstance(global_state, Payload):
+    def _get_and_check_training_artifacts(self) -> Payload:
+        artifacts = self._coordinator.publish_training_artifacts()
+        if not isinstance(artifacts, Payload):
             raise TypeError(
-                f"{self._coordinator}.global_state returned"
-                f"{type(global_state)}, expected {Payload}"
+                f"{self._coordinator}.publish_training_artifacts() returned"
+                f"{type(artifacts)}, expected {Payload}"
             )
-        return global_state
+        return artifacts
 
 
 def configure_clients(
