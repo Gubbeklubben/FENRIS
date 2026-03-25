@@ -38,6 +38,10 @@ class PartitionedDataset:
     def num_partitions(self) -> int:
         return self._partitioner.num_partitions
 
+    @property
+    def global_holdout_size(self) -> int:
+        return len(self._global_holdout)
+
     def load_global_holdout(self) -> pd.DataFrame:
         return self._global_holdout.copy()
 

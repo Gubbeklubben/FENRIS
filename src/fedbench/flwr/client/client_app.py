@@ -84,7 +84,7 @@ def evaluate(message: Message, flwr_context: Context) -> Message:
         )
         synthetic_df = synthesizer.sample(
             request,
-            len(train_df),
+            ctx.config.num_synthetic_rows or ctx.dataset.global_holdout_size,
             ctx.config.seed.sampling,
         )
 
