@@ -123,7 +123,7 @@ def write_artifacts(ctx: RunContext) -> None:
 
     # Config snapshot
     with outputdir.joinpath("config_snapshot.json").open("w") as f:
-        json.dump(json.loads(ctx.config.jsons()), f, indent=4)
+        json.dump(ctx.config.jsondict(), f, indent=4)
 
     # Platform metadata
     with outputdir.joinpath("metadata.json").open("w") as f:
