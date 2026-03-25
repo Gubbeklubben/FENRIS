@@ -2,7 +2,6 @@ from fedbench.core.algorithm.algorithm import (
     Algorithm,
     ComponentSpec,
     GlobalInitArtifacts,
-    coordinator_spec,
     synthesizer_spec,
 )
 from fedbench.core.algorithm.coordinator import Coordinator, SingleStepCoordinator
@@ -15,6 +14,5 @@ __all__ = [
     "Coordinator",
     "SingleStepCoordinator",
     "Synthesizer",
-    "coordinator_spec",
     "synthesizer_spec",
 ]

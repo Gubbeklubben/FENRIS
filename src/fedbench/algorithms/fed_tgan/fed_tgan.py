@@ -23,7 +23,7 @@ from fedbench.core.algorithm import (
 )
 from fedbench.core.data import TableSchema
 from fedbench.core.logger import ELBOW, log_warning
-from fedbench.core.update import Update
+from fedbench.core.payload import Payload
 
 
 def split_cat_num(schema: TableSchema) -> tuple[list[str], list[str]]:
@@ -143,7 +143,7 @@ class FedTGAN(Algorithm):
             num_scaler.fit(dataset[num_attrs].values)
 
         # Prepare artifacts for synthesizers
-        synth_artifacts = Update()
+        synth_artifacts = Payload()
         synth_artifacts.objects["preproc-objects"] = {
             "label-encoders": label_encoders,
             "num-scaler": num_scaler,
@@ -159,7 +159,7 @@ class FedTGAN(Algorithm):
 
         # Coordinator receives both model state and preprocessing artifacts
         # to pass preprocessing to synthesizers in each round
-        coord_artifacts = Update(arrays={"initial-state": packed_state})
+        coord_artifacts = Payload(arrays={"initial-state": packed_state})
         coord_artifacts.objects["preproc-objects"] = synth_artifacts.objects[
             "preproc-objects"
         ]
@@ -180,18 +180,18 @@ class FedTGANCoordinator(SingleStepCoordinator):
         self._preproc_extras: dict[str, Any] | None = None
 
     @property
-    def global_state(self) -> Update | None:
+    def global_state(self) -> Payload | None:
         if self._state is None:
             return None
         return self._create_update()
 
-    def attach_global_init_artifacts(self, artifacts: Update) -> None:
+    def attach_global_init_artifacts(self, artifacts: Payload) -> None:
         """Receive initial state and preprocessing artifacts from global_init."""
         self._state = cast(dict[str, Tensor], artifacts.arrays["initial-state"])
         self._preproc_objects = artifacts.objects["preproc-objects"]
         self._preproc_extras = artifacts.extras["preproc-extras"]
 
-    def aggregate_train(self, replies: Iterable[tuple[int, Update]]) -> None:
+    def aggregate_train(self, replies: Iterable[tuple[int, Payload]]) -> None:
         """Aggregate generator, discriminator using FedAvg weighted by num_samples."""
         if not replies:
             raise ValueError("No replies, can not aggregate.")
@@ -230,11 +230,11 @@ class FedTGANCoordinator(SingleStepCoordinator):
 
         self._state = aggr_state
 
-    def _create_update(self) -> Update:
+    def _create_update(self) -> Payload:
         """Create Update with the current global state and preprocessing artifacts."""
         # _state is guaranteed non-None when this is called from global_state property
         state = cast(dict[str, Tensor], self._state)
-        update = Update(arrays={"state": state})
+        update = Payload(arrays={"state": state})
 
         # Include preprocessing artifacts if available
         if self._preproc_objects is not None:
@@ -266,12 +266,12 @@ class FedTGANSynthesizer(Synthesizer):
         self._preproc_objects: dict[str, Any] | None = None
         self._preproc_extras: dict[str, Any] | None = None
 
-    def attach_global_init_artifacts(self, artifacts: Update) -> None:
+    def attach_global_init_artifacts(self, artifacts: Payload) -> None:
         """Receive preprocessing artifacts from global_init."""
         self._preproc_objects = artifacts.objects["preproc-objects"]
         self._preproc_extras = artifacts.extras["preproc-extras"]
 
-    def train(self, request: Update, data: pd.DataFrame) -> Update:
+    def train(self, request: Payload, data: pd.DataFrame) -> Payload:
         """Train Generator and Discriminator on local data, alternating GAN training."""
 
         # Extract preprocessing artifacts and model states from request
@@ -412,7 +412,7 @@ class FedTGANSynthesizer(Synthesizer):
             packed_state[f"discriminator.{k}"] = v
 
         # Return update with both models
-        reply = Update()
+        reply = Payload()
         reply.arrays["state"] = packed_state
         reply.metrics["metrics"] = {
             "loss-discriminator": train_loss_discriminator / num_batches
@@ -426,7 +426,7 @@ class FedTGANSynthesizer(Synthesizer):
 
         return reply
 
-    def sample(self, request: Update, num_rows: int, seed: int) -> pd.DataFrame:
+    def sample(self, request: Payload, num_rows: int, seed: int) -> pd.DataFrame:
         """Generate synthetic data using the trained generator."""
 
         # Set random seed for reproducibility

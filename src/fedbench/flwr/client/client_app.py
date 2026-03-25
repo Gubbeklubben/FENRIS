@@ -9,7 +9,7 @@ from flwr.clientapp import ClientApp
 from fedbench.core.encoder import FedbenchEncoder
 from fedbench.core.eval import LocalEvalContext
 from fedbench.core.logger import log_warning
-from fedbench.core.update import Extras, Update
+from fedbench.core.payload import Extras, Payload
 from fedbench.flwr.client.context import build_client_context
 from fedbench.flwr.namespace import Namespace
 from fedbench.runtime.component_factory import create_synthesizer
@@ -123,6 +123,6 @@ def evaluate(message: Message, flwr_context: Context) -> Message:
                 f"Could not encode metric {key} with value {value}."
             ) from e
 
-    update = Update(extras={"metrics": metrics})
+    update = Payload(extras={"metrics": metrics})
     rdict = ctx.serde.to_flwr(update)
     return Message(content=rdict, reply_to=message)

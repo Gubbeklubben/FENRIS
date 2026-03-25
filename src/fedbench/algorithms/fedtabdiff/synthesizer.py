@@ -12,7 +12,7 @@ from fedbench.algorithms.fedtabdiff.diffuser import Diffuser
 from fedbench.algorithms.fedtabdiff.mlpsynthesizer import MLPSynthesizer
 from fedbench.core.algorithm import Synthesizer
 from fedbench.core.logger import ELBOW, log_info
-from fedbench.core.update import Update
+from fedbench.core.payload import Payload
 
 
 class FedTabDiffSynthesizer(Synthesizer):
@@ -47,7 +47,7 @@ class FedTabDiffSynthesizer(Synthesizer):
         self._device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
     # noinspection PyUnnecessaryCast
-    def attach_global_init_artifacts(self, artifacts: Update) -> None:
+    def attach_global_init_artifacts(self, artifacts: Payload) -> None:
         extras = artifacts.extras["preproc-extras"]
         objects = artifacts.objects["preproc-objects"]
 
@@ -62,7 +62,7 @@ class FedTabDiffSynthesizer(Synthesizer):
         self._label_encoder = objects["label-encoder"]
 
     # noinspection PyUnnecessaryCast
-    def train(self, request: Update, data: DataFrame) -> Update:
+    def train(self, request: Payload, data: DataFrame) -> Payload:
         log_info(str(self), "Start training...")
 
         # init loss function
@@ -155,7 +155,7 @@ class FedTabDiffSynthesizer(Synthesizer):
         # average of rec errors
         loss = np.mean(np.array(total_losses)).item()
 
-        reply = Update()
+        reply = Payload()
         reply.arrays["state"] = mlp_synth.state_dict()
         reply.metrics["metrics"] = {"loss": loss, "num-samples": num_samples}
 
@@ -164,7 +164,7 @@ class FedTabDiffSynthesizer(Synthesizer):
 
         return reply
 
-    def sample(self, request: Update, num_rows: int, seed: int) -> DataFrame:
+    def sample(self, request: Payload, num_rows: int, seed: int) -> DataFrame:
         torch.manual_seed(seed)
         if torch.cuda.is_available():
             torch.cuda.manual_seed(seed)

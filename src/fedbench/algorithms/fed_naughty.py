@@ -29,7 +29,7 @@ from fedbench.core.algorithm import (
 )
 from fedbench.core.data import TableSchema
 from fedbench.core.logger import log_info
-from fedbench.core.update import Update
+from fedbench.core.payload import Payload
 
 _LOG_SRC = __name__
 
@@ -94,12 +94,12 @@ def _do_crash(config: _NaughtyConfig, point: str) -> None:
     raise exc_cls(f"Naughty: {config.exception} at {point}")
 
 
-def _do_corrupt_update(point: str) -> Update:
+def _do_corrupt_update(point: str) -> Payload:
     """Return an Update filled with NaN/inf values."""
     log_info(_LOG_SRC, f"Returning corrupt Update at {point}")
     nan_arr: NDArray[Any] = np.full((4, 4), np.nan)
     inf_arr: NDArray[Any] = np.full((4, 4), np.inf)
-    return Update(
+    return Payload(
         arrays={"corrupt-nan": [nan_arr], "corrupt-inf": [inf_arr]},
         metrics={"corrupt": {"nan": float("nan"), "inf": float("inf")}},
     )
@@ -111,16 +111,16 @@ def _do_corrupt_update(point: str) -> Update:
 class FedNaughtyCoordinator(SingleStepCoordinator):
     def __init__(self, config: _NaughtyConfig) -> None:
         self._config = config
-        self._state: Update = Update()
+        self._state: Payload = Payload()
 
     @property
-    def global_state(self) -> Update:
+    def global_state(self) -> Payload:
         return self._state
 
-    def aggregate_train(self, replies: Iterable[tuple[int, Update]]) -> None:
+    def aggregate_train(self, replies: Iterable[tuple[int, Payload]]) -> None:
         if self._config.point == "coord_train":
             result = self._trigger("coord_train")
-            if isinstance(result, Update):
+            if isinstance(result, Payload):
                 self._state = result
                 return
             # wrong_type leaves _state unchanged (keeps previous or empty initial).
@@ -144,8 +144,8 @@ class FedNaughtyCoordinator(SingleStepCoordinator):
         elif scenario == "wrong_type":
             return None
         elif scenario == "empty":
-            self._state = Update()
-            return Update()
+            self._state = Payload()
+            return Payload()
         return None
 
 
@@ -158,20 +158,20 @@ class FedNaughtySynthesizer(Synthesizer):
 
     def train(
         self,
-        request: Update,
+        request: Payload,
         data: DataFrame,
-    ) -> Update:
+    ) -> Payload:
 
         if self._config.point == "synth_train":
             result = self._trigger("synth_train")
             if result is not None:
                 return result  # type: ignore[no-any-return]
 
-        return Update()
+        return Payload()
 
     def sample(
         self,
-        request: Update,
+        request: Payload,
         num_rows: int,
         seed: int,
     ) -> DataFrame:
@@ -197,7 +197,7 @@ class FedNaughtySynthesizer(Synthesizer):
         elif scenario == "wrong_type":
             return "THIS_IS_NOT_AN_UPDATE"
         elif scenario == "empty":
-            return Update()
+            return Payload()
         return None
 
     def _trigger_sample(self, point: str, num_rows: int, seed: int) -> Any:
@@ -279,6 +279,6 @@ class FedNaughty(Algorithm):
             log_info(_LOG_SRC, "Returning wrong type from global_init")
             return "NOT_ARTIFACTS"  # type: ignore[return-value]
         elif scenario == "empty":
-            return GlobalInitArtifacts(coordinator=Update(), synthesizer=Update())
+            return GlobalInitArtifacts(coordinator=Payload(), synthesizer=Payload())
 
         return None

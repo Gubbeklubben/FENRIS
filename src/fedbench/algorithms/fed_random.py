@@ -11,23 +11,23 @@ from fedbench.core.algorithm import (
     synthesizer_spec,
 )
 from fedbench.core.logger import ELBOW, TEE, log_info
-from fedbench.core.update import Update
+from fedbench.core.payload import Payload
 
 
 class FedRandomCoordinator(Coordinator):
     @property
-    def global_state(self) -> Update | None:
-        return Update(objects={"objects": {"state": object()}})
+    def global_state(self) -> Payload | None:
+        return Payload(objects={"objects": {"state": object()}})
 
     def train(
         self, client_ids: Iterable[int]
     ) -> Generator[
-        Iterable[tuple[int, Update]],
-        Iterable[tuple[int, Update]],
+        Iterable[tuple[int, Payload]],
+        Iterable[tuple[int, Payload]],
         None,
     ]:
         rnd = 0
-        update = Update(extras={"federation": {"client_ids": list(client_ids)}})
+        update = Payload(extras={"federation": {"client_ids": list(client_ids)}})
         dst = next(iter(client_ids))
 
         while True:
@@ -53,7 +53,7 @@ class FedRandomCoordinator(Coordinator):
             log_info("", f"\t{TEE} To: {dst}")
             log_info("", f"\t{ELBOW} End internal round: {rnd}")
 
-            update = Update(
+            update = Payload(
                 extras={
                     "federation": {
                         "client_ids": list(client_ids),
@@ -64,7 +64,7 @@ class FedRandomCoordinator(Coordinator):
 
 
 class FedRandomSynthesizer(Synthesizer):
-    def train(self, request: Update, data: DataFrame) -> Update:
+    def train(self, request: Payload, data: DataFrame) -> Payload:
         try:
             # noinspection PyUnnecessaryCast
             message = cast(str, request.extras["federation"]["message"])
@@ -79,12 +79,12 @@ class FedRandomSynthesizer(Synthesizer):
         message = random.choice(("Hello!", "Hi!", "What?", "Ok"))
         abort = random.choice((True, False, False, False, False))
 
-        update = Update(extras={"federation": {"dst": dst, "message": message}})
+        update = Payload(extras={"federation": {"dst": dst, "message": message}})
         if abort:
             update.extras["federation"]["abort"] = abort
         return update
 
-    def sample(self, request: Update, num_rows: int, seed: int) -> DataFrame:
+    def sample(self, request: Payload, num_rows: int, seed: int) -> DataFrame:
         return DataFrame()
 
 

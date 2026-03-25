@@ -11,7 +11,7 @@ from fedbench.algorithms.fed_naughty import (
     _NaughtyConfig,
 )
 from fedbench.core.data.schemas import ColumnSchema, TableSchema
-from fedbench.core.update import Update
+from fedbench.core.payload import Payload
 
 # ── Fixtures ─────────────────────────────────────────────────────────
 
@@ -73,17 +73,17 @@ class TestFedChaos:
             _make_config(scenario="crash", point="coord_train")
         )
         with pytest.raises(Exception):
-            coord.aggregate_train([(0, Update())])
+            coord.aggregate_train([(0, Payload())])
 
     def test_synthesizer_crash(self) -> None:
         synth = FedNaughtySynthesizer(
             _make_config(scenario="crash", point="synth_train")
         )
         with pytest.raises(Exception):
-            synth.train(Update(), pd.DataFrame({"a": [1]}))
+            synth.train(Payload(), pd.DataFrame({"a": [1]}))
 
     def test_no_trigger_when_point_differs(self) -> None:
         synth = FedNaughtySynthesizer(_make_config(point="global_init"))
-        result = synth.sample(Update(), num_rows=5, seed=42)
+        result = synth.sample(Payload(), num_rows=5, seed=42)
         assert isinstance(result, pd.DataFrame)
         assert len(result) == 5

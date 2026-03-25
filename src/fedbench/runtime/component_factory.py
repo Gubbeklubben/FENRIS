@@ -7,7 +7,7 @@ from fedbench.config import Config
 from fedbench.core.algorithm import Algorithm, Coordinator, Synthesizer
 from fedbench.core.data import Partitioner, load_csv
 from fedbench.core.eval import EvaluationSuite, Evaluator
-from fedbench.core.update import Update
+from fedbench.core.payload import Payload
 from fedbench.runtime.registry import FactoryRegistry
 
 
@@ -54,7 +54,7 @@ def create_evaluation_suite(
 
 def create_coordinator(
     factory: Callable[[], Coordinator],
-    artifacts: Update | None,
+    artifacts: Payload | None,
 ) -> Coordinator:
 
     instance = factory()
@@ -69,8 +69,8 @@ def create_coordinator(
 
 def create_synthesizer(
     factory: Callable[[], Synthesizer],
-    artifacts: Update | None,
-    client_cache: Update | None,
+    artifacts: Payload | None,
+    client_cache: Payload | None,
 ) -> Synthesizer:
 
     instance = factory()

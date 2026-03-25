@@ -16,7 +16,7 @@ from fedbench.core.events import (
     RoundStarted,
     ServerRequest,
 )
-from fedbench.core.update import Metrics, Update
+from fedbench.core.payload import Metrics, Payload
 from fedbench.flwr.namespace import Namespace
 from fedbench.flwr.serde import FlwrSerde, count_rdict_bytes
 from fedbench.runtime.eventbus import EventBus
@@ -102,7 +102,7 @@ class Strategy:
         self,
         grid: Grid,
         num_rounds: int,
-    ) -> tuple[Update, dict[int, Any]]:
+    ) -> tuple[Payload, dict[int, Any]]:
 
         for curr_round in range(1, num_rounds + 1):
             self._eventbus.emit(RoundStarted(curr_round, num_rounds))
@@ -116,15 +116,15 @@ class Strategy:
         self,
         grid: Grid,
         generator: Generator[
-            Iterable[tuple[int, Update]],
-            Iterable[tuple[int, Update]],
+            Iterable[tuple[int, Payload]],
+            Iterable[tuple[int, Payload]],
             None,
         ],
         msg_type: str,
     ) -> None:
 
         internal_msg_type = msg_type.split(".")[-1]
-        replies: Iterable[tuple[int, Update]] | None = None
+        replies: Iterable[tuple[int, Payload]] | None = None
 
         while True:
             try:
@@ -136,8 +136,8 @@ class Strategy:
                 return
 
             requests = []
-            for dst_id, update in batch:
-                rdict = self._serde.to_flwr(update)
+            for dst_id, payload in batch:
+                rdict = self._serde.to_flwr(payload)
                 requests.append(
                     Message(content=rdict, message_type=msg_type, dst_node_id=dst_id)
                 )
@@ -162,19 +162,19 @@ class Strategy:
                     )
                 )
 
-    def _get_and_check_global_state(self) -> Update:
+    def _get_and_check_global_state(self) -> Payload:
         global_state = self._coordinator.global_state
-        if not isinstance(global_state, Update):
+        if not isinstance(global_state, Payload):
             raise TypeError(
                 f"{self._coordinator}.global_state returned"
-                f"{type(global_state)}, expected {Update}"
+                f"{type(global_state)}, expected {Payload}"
             )
         return global_state
 
 
 def configure_clients(
     config: Config,
-    artifacts: Update | None,
+    artifacts: Payload | None,
     serde: FlwrSerde,
     grid: Grid,
 ) -> None:

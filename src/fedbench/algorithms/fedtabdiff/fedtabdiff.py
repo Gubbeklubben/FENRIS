@@ -17,7 +17,7 @@ from fedbench.core.algorithm import (
     synthesizer_spec,
 )
 from fedbench.core.data import TableSchema
-from fedbench.core.update import Update
+from fedbench.core.payload import Payload
 
 # Relative imports for algorithm specifics.
 from .coordinator import FedTabDiffCoordinator
@@ -153,7 +153,7 @@ class FedTabDiff(Algorithm):
         cat_dim = self._n_cat_emb * len(cat_attrs)
         encoded_dim = cat_dim + len(num_attrs)
 
-        synth_artifacts = Update()
+        synth_artifacts = Payload()
 
         synth_artifacts.objects["preproc-objects"] = {
             "num-scaler": num_scaler,
@@ -170,6 +170,6 @@ class FedTabDiff(Algorithm):
         mlp_synth = self._mlp_synth_factory(encoded_dim, n_cat_tokens)
 
         return GlobalInitArtifacts(
-            coordinator=Update(arrays={"initial-state": mlp_synth.state_dict()}),
+            coordinator=Payload(arrays={"initial-state": mlp_synth.state_dict()}),
             synthesizer=synth_artifacts,
         )

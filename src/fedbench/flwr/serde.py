@@ -12,7 +12,7 @@ from flwr.app import (
     RecordDict,
 )
 
-from fedbench.core.update import Objects, Update
+from fedbench.core.payload import Objects, Payload
 from fedbench.flwr.rdict import RDictNamespaceView
 
 
@@ -82,32 +82,32 @@ class FlwrSerde:
         self._default_arrays_map = default_arrays_map or {}
 
     @overload
-    def to_flwr(self, update: Update) -> RecordDict: ...
+    def to_flwr(self, payload: Payload) -> RecordDict: ...
 
     @overload
-    def to_flwr(self, update: Update, target: None) -> RecordDict: ...
+    def to_flwr(self, payload: Payload, target: None) -> RecordDict: ...
 
     @overload
     def to_flwr[T: (RecordDict, RDictNamespaceView)](
-        self, update: Update, target: T
+        self, payload: Payload, target: T
     ) -> T: ...
 
     def to_flwr(
-        self, update: Update, target: RecordDict | RDictNamespaceView | None = None
+        self, payload: Payload, target: RecordDict | RDictNamespaceView | None = None
     ) -> RecordDict | RDictNamespaceView:
 
         out = target if target is not None else RecordDict()
 
-        for key, arrays in update.arrays.items():
+        for key, arrays in payload.arrays.items():
             out[key] = ArrayRecord(arrays)
 
-        for key, objects in update.objects.items():
+        for key, objects in payload.objects.items():
             out[key] = ArrayRecord(self._serialize_objects(objects))
 
-        for key, metrics in update.metrics.items():
+        for key, metrics in payload.metrics.items():
             out[key] = MetricRecord(metrics)
 
-        for key, extras in update.extras.items():
+        for key, extras in payload.extras.items():
             out[key] = ConfigRecord(extras)
 
         return out
@@ -116,41 +116,41 @@ class FlwrSerde:
         self,
         rdict: RecordDict | RDictNamespaceView,
         arrays_to_ml_framework_map: dict[str, str] | None = None,
-    ) -> Update:
+    ) -> Payload:
 
         arrays_map = arrays_to_ml_framework_map or self._default_arrays_map
-        update = Update()
+        payload = Payload()
 
         for key, arrays in rdict.array_records.items():
             if list(arrays.values())[0].stype == self._object_serde.stype:
-                update.objects[key] = self._deserialize_objects(arrays)
+                payload.objects[key] = self._deserialize_objects(arrays)
             else:
                 ml_framework = arrays_map.get(key, "numpy")
                 if ml_framework == "torch":
-                    update.arrays[key] = arrays.to_torch_state_dict()
+                    payload.arrays[key] = arrays.to_torch_state_dict()
                 else:
-                    update.arrays[key] = arrays.to_numpy_ndarrays()
+                    payload.arrays[key] = arrays.to_numpy_ndarrays()
 
         for key, metrics in rdict.metric_records.items():
-            update.metrics[key] = dict(metrics)
+            payload.metrics[key] = dict(metrics)
 
         for key, extras in rdict.config_records.items():
-            update.extras[key] = dict(extras)
+            payload.extras[key] = dict(extras)
 
-        return update
+        return payload
 
     @contextmanager
     def use_deserialized(
         self,
         target: RecordDict | RDictNamespaceView,
         arrays_to_ml_framework_map: dict[str, str] | None = None,
-    ) -> Generator[Update, None, None]:
+    ) -> Generator[Payload, None, None]:
 
-        update = self.from_flwr(target, arrays_to_ml_framework_map)
+        payload = self.from_flwr(target, arrays_to_ml_framework_map)
         try:
-            yield update
+            yield payload
         finally:
-            target.update(self.to_flwr(update))
+            target.update(self.to_flwr(payload))
 
     def _serialize_objects(self, objects: Objects) -> dict[str, Array]:
         arrays = {}

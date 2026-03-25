@@ -6,10 +6,10 @@ from typing import Any, Mapping, cast, overload
 from pandas import DataFrame
 
 from fedbench.config import Config
-from fedbench.core.algorithm import Algorithm, GlobalInitArtifacts
+from fedbench.core.algorithm import Algorithm, Coordinator, GlobalInitArtifacts
 from fedbench.core.data import PartitionedDataset, Partitioner
 from fedbench.core.eval import EvaluationSuite
-from fedbench.core.update import Update
+from fedbench.core.payload import Payload
 from fedbench.runtime.eventbus import EventBus
 from fedbench.runtime.scalability_collector import ScalabilityCollector
 
@@ -64,12 +64,13 @@ class _RunCtxField[T]:
 class RunContext:
     # fmt: off
     algorithm             = _RunCtxField[Algorithm]()
+    coordinator           = _RunCtxField[Coordinator]()
     df_loader             = _RunCtxField[Callable[[], DataFrame]]()
     partitioner           = _RunCtxField[Partitioner]()
     eval_suite            = _RunCtxField[EvaluationSuite]()
     dataset               = _RunCtxField[PartitionedDataset]()
     global_init_artifacts = _RunCtxField[GlobalInitArtifacts]()
-    aggregated_state      = _RunCtxField[Update]()
+    aggregated_state      = _RunCtxField[Payload]()
     per_client_metrics    = _RunCtxField[Mapping[int, Mapping[str, Any]]]()
     aggregated_metrics    = _RunCtxField[Mapping[str, float]]()
     centralized_metrics   = _RunCtxField[Mapping[str, float]]()

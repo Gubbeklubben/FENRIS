@@ -4,7 +4,6 @@ from flwr.serverapp import Grid, ServerApp
 from fedbench.core.events import ClientsConfigured
 from fedbench.flwr.serde import FlwrSerde, Pickle
 from fedbench.flwr.server.server import Strategy, configure_clients
-from fedbench.runtime.component_factory import create_coordinator
 from fedbench.runtime.runcontext import RunContext
 
 
@@ -15,7 +14,7 @@ def make_server_app(ctx: RunContext) -> ServerApp:
     def main(grid: Grid, _: Context) -> None:
         serde = FlwrSerde(
             object_serde=Pickle(disabled=ctx.config.disable_pickle),
-            default_arrays_map=ctx.algorithm.coordinator_spec.arrays_to_ml_framework_map,
+            default_arrays_map=ctx.coordinator.arrays_to_ml_framework_map,
         )
         configure_clients(
             config=ctx.config,
@@ -25,16 +24,12 @@ def make_server_app(ctx: RunContext) -> ServerApp:
         )
         ctx.eventbus.emit(ClientsConfigured())
 
-        coordinator = create_coordinator(
-            ctx.algorithm.coordinator_spec.factory,
-            artifacts=ctx.global_init_artifacts.coordinator,
-        )
         strategy = Strategy.from_seed_config(
             seed_config=ctx.config.seed,
             schema=ctx.dataset.schema,
             serde=serde,
             eventbus=ctx.eventbus,
-            coordinator=coordinator,
+            coordinator=ctx.coordinator,
         )
         state, metrics = strategy.run(grid, ctx.config.num_rounds)
         ctx.aggregated_state = state

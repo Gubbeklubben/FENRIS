@@ -1,7 +1,7 @@
 from abc import ABC, abstractmethod
-from typing import Generator, Iterable
+from collections.abc import Generator, Iterable
 
-from fedbench.core.update import Update
+from fedbench.core.payload import Payload, PayloadSchema
 
 
 class Coordinator(ABC):
@@ -11,7 +11,17 @@ class Coordinator(ABC):
         return f"<{self.__class__.__name__}>"
 
     @property
-    def global_state(self) -> Update | None:
+    @abstractmethod
+    def payload_schema(self) -> PayloadSchema:
+        pass
+
+    @property
+    @abstractmethod
+    def arrays_to_ml_framework_map(self) -> dict[str, str] | None:
+        return None
+
+    @property
+    def global_state(self) -> Payload | None:
         """Current global state.
 
         The returned value, if not None, will be injected into the sampling function
@@ -19,13 +29,13 @@ class Coordinator(ABC):
 
         Returns
         -------
-        Update | None
+        Payload | None
             A representation of the current global state.
         """
 
         return None
 
-    def attach_global_init_artifacts(self, artifacts: Update) -> None:
+    def attach_global_init_artifacts(self, artifacts: Payload) -> None:
         """Attach globally computed preprocessing artifacts.
 
         Called right after creating an instance if the global initialization step
@@ -33,7 +43,7 @@ class Coordinator(ABC):
 
         Parameters
         ----------
-        artifacts : Update
+        artifacts : Payload
             Output from calling the global_init function associated with the
             current Synthesizer.
         """
@@ -45,8 +55,8 @@ class Coordinator(ABC):
         self,
         client_ids: Iterable[int],
     ) -> Generator[
-        Iterable[tuple[int, Update]],
-        Iterable[tuple[int, Update]],
+        Iterable[tuple[int, Payload]],
+        Iterable[tuple[int, Payload]],
         None,
     ]:
         """Federated training.
@@ -75,28 +85,22 @@ class Coordinator(ABC):
 
 
 class SingleStepCoordinator(Coordinator):
+    @abstractmethod
     def configure_train(
         self, client_ids: Iterable[int]
-    ) -> Iterable[tuple[int, Update]]:
-
-        state = self.global_state
-        if state is None:
-            raise RuntimeError(
-                f"{self}: No global state, can not use default 'configure_train'"
-            )
-        for cid in client_ids:
-            yield cid, state
+    ) -> Iterable[tuple[int, Payload]]:
+        pass
 
     @abstractmethod
-    def aggregate_train(self, replies: Iterable[tuple[int, Update]]) -> None:
+    def aggregate_train(self, replies: Iterable[tuple[int, Payload]]) -> None:
         pass
 
     def train(
         self,
         client_ids: Iterable[int],
     ) -> Generator[
-        Iterable[tuple[int, Update]],
-        Iterable[tuple[int, Update]],
+        Iterable[tuple[int, Payload]],
+        Iterable[tuple[int, Payload]],
         None,
     ]:
         replies = yield self.configure_train(client_ids)

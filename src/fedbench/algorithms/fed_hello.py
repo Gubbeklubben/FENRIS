@@ -18,7 +18,7 @@ from fedbench.core.algorithm import (
 )
 from fedbench.core.data import TableSchema
 from fedbench.core.logger import log_info
-from fedbench.core.update import Update
+from fedbench.core.payload import Payload
 
 
 class FedHelloCoordinator(SingleStepCoordinator):
@@ -28,23 +28,23 @@ class FedHelloCoordinator(SingleStepCoordinator):
         self._df: pd.DataFrame | None = None
 
     @property
-    def global_state(self) -> Update | None:
+    def global_state(self) -> Payload | None:
         return self._create_update()
 
-    def attach_global_init_artifacts(self, artifacts: Update) -> None:
+    def attach_global_init_artifacts(self, artifacts: Payload) -> None:
         # noinspection PyUnnecessaryCast
         self._state = cast(list[NDArray[np.int_]], artifacts.arrays["state"])
 
-    def aggregate_train(self, replies: Iterable[tuple[int, Update]]) -> None:
+    def aggregate_train(self, replies: Iterable[tuple[int, Payload]]) -> None:
         replies = list(replies)
         reply = replies[0][1]
         self._df = reply.objects["objects"]["df"]
         log_info(str(self), f"Hello from aggregate_train, {self._name}!")
 
-    def _create_update(self) -> Update:
+    def _create_update(self) -> Payload:
         # noinspection PyUnnecessaryCast
         state = cast(list[NDArray[np.int_]], self._state)
-        update = Update(arrays={"state": state})
+        update = Payload(arrays={"state": state})
         if self._df is not None:
             update.objects["objects"] = {"df": self._df}
         return update
@@ -53,18 +53,18 @@ class FedHelloCoordinator(SingleStepCoordinator):
 class FedHelloSynthesizer(Synthesizer):
     def __init__(self, name: str) -> None:
         self._name = name
-        self._cache: Update | None = None
+        self._cache: Payload | None = None
 
-    def attach_client_cache(self, cache: Update) -> None:
+    def attach_client_cache(self, cache: Payload) -> None:
         self._cache = cache
         if "counters" not in self._cache.metrics:
             self._cache.metrics["counters"] = {"train": 0, "sample": 0}
 
     def train(
         self,
-        request: Update,
+        request: Payload,
         data: pd.DataFrame,
-    ) -> Update:
+    ) -> Payload:
 
         if self._cache is not None:
             self._cache.metrics["counters"]["train"] += 1  # type: ignore[operator]
@@ -73,11 +73,11 @@ class FedHelloSynthesizer(Synthesizer):
             count = None
 
         log_info(str(self), f"Hello {count} from train, {self._name}!")
-        return Update(arrays=request.arrays, objects={"objects": {"df": data}})
+        return Payload(arrays=request.arrays, objects={"objects": {"df": data}})
 
     def sample(
         self,
-        request: Update,
+        request: Payload,
         num_rows: int,
         seed: int,
     ) -> pd.DataFrame:
@@ -117,7 +117,7 @@ class FedHello(Algorithm):
 
         rng = np.random.default_rng(seed)
         return GlobalInitArtifacts(
-            coordinator=Update(
+            coordinator=Payload(
                 arrays={"state": [rng.integers(0, 100, (3, 3)) for _ in range(10)]},
             )
         )

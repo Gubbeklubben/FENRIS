@@ -5,7 +5,7 @@ from torch import Tensor
 
 from fedbench.core.algorithm import SingleStepCoordinator
 from fedbench.core.logger import ELBOW, log_warning
-from fedbench.core.update import Update
+from fedbench.core.payload import Payload
 
 
 class FedTabDiffCoordinator(SingleStepCoordinator):
@@ -13,16 +13,16 @@ class FedTabDiffCoordinator(SingleStepCoordinator):
         self._state: dict[str, Tensor] | None = None
 
     @property
-    def global_state(self) -> Update | None:
+    def global_state(self) -> Payload | None:
         if self._state is None:
             return None
-        return Update(arrays={"state": self._state})
+        return Payload(arrays={"state": self._state})
 
-    def attach_global_init_artifacts(self, artifacts: Update) -> None:
+    def attach_global_init_artifacts(self, artifacts: Payload) -> None:
         # noinspection PyUnnecessaryCast
         self._state = cast(dict[str, Tensor], artifacts.arrays["initial-state"])
 
-    def aggregate_train(self, replies: Iterable[tuple[int, Update]]) -> None:
+    def aggregate_train(self, replies: Iterable[tuple[int, Payload]]) -> None:
         if not replies:
             raise ValueError("No replies, can not aggregate.")
 
