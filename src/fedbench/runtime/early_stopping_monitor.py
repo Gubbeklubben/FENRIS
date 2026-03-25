@@ -43,8 +43,8 @@ class EarlyStoppingMonitor:
         rounds_since_first_run = current_round - self._config.stop_min_rounds
         return rounds_since_first_run % self._config.stop_eval_every == 0
 
-    def run(self, aggregated_state: Payload) -> None:
-        value = self._evaluate_fn(aggregated_state)
+    def run(self, train_artifacts: Payload) -> None:
+        value = self._evaluate_fn(train_artifacts)
 
         if math.isnan(value):
             # NaN counts as no improvement, but neither increments nor resets patience

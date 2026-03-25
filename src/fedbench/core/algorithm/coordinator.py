@@ -69,7 +69,7 @@ class Coordinator(ABC):
         pass
 
     @abstractmethod
-    def publish_training_artifacts(self) -> Payload:
+    def publish_train_artifacts(self) -> Payload:
         """Publish training artifacts.
 
         The returned Payload will be injected into the sample function associated

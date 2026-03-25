@@ -174,7 +174,7 @@ class Strategy:
                 )
 
     def _get_and_check_training_artifacts(self) -> Payload:
-        artifacts = self._coordinator.publish_training_artifacts()
+        artifacts = self._coordinator.publish_train_artifacts()
         if not isinstance(artifacts, Payload):
             raise TypeError(
                 f"{self._coordinator}.publish_training_artifacts() returned"

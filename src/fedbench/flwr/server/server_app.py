@@ -18,7 +18,7 @@ from fedbench.runtime.runcontext import RunContext
 def make_server_app(ctx: RunContext) -> ServerApp:
     app = ServerApp()
 
-    def _evaluate_fn(aggregated_state: Payload) -> float:
+    def _evaluate_fn(train_artifacts: Payload) -> float:
         # See also: pipeline.global_sample
         synthesizer = create_synthesizer(
             ctx.algorithm.synthesizer_spec.factory,
@@ -31,7 +31,7 @@ def make_server_app(ctx: RunContext) -> ServerApp:
             or len(ctx.dataset.load_global_holdout())
         )
         synthetic_df = synthesizer.sample(
-            aggregated_state, num_synthetic_rows, ctx.config.seed.sampling
+            train_artifacts, num_synthetic_rows, ctx.config.seed.sampling
         )
 
         eval_ctx = create_centralized_eval_ctx(ctx.config, ctx.dataset, synthetic_df)
@@ -63,7 +63,7 @@ def make_server_app(ctx: RunContext) -> ServerApp:
             monitor=EarlyStoppingMonitor(ctx.config.metrics, _evaluate_fn),
         )
         state, metrics = strategy.run(grid, ctx.config.num_rounds)
-        ctx.aggregated_state = state
+        ctx.train_artifacts = state
         ctx.per_client_metrics = metrics
 
     return app

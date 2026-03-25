@@ -70,7 +70,7 @@ class RunContext:
     eval_suite            = _RunCtxField[EvaluationSuite]()
     dataset               = _RunCtxField[PartitionedDataset]()
     global_init_artifacts = _RunCtxField[GlobalInitArtifacts]()
-    aggregated_state      = _RunCtxField[Payload]()
+    train_artifacts      = _RunCtxField[Payload]()
     per_client_metrics    = _RunCtxField[Mapping[int, Mapping[str, Any]]]()
     aggregated_metrics    = _RunCtxField[Mapping[str, float]]()
     centralized_metrics   = _RunCtxField[Mapping[str, float]]()
