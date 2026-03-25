@@ -1,3 +1,4 @@
+import torch
 import torch.nn.functional as F
 from torch import Tensor, nn
 
@@ -14,4 +15,7 @@ class Generator(nn.Module):  # type: ignore[misc]
     def forward(self, z: Tensor) -> Tensor:
         z = F.relu(self.fc1(z))
         z = F.relu(self.fc2(z))
-        return self.fc3(z)  # Output synthetic tabular data
+        z = self.fc3(z)
+        # Sigmoid activation to constrain output to [0, 1] range
+        # This matches our MinMaxScaler normalization
+        return torch.sigmoid(z)
