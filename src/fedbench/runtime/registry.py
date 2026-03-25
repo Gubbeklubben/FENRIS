@@ -1,26 +1,14 @@
-"""
-Plugin-aware factory registry.
-
-Provides :class:`FactoryRegistry`, a generic registry that maps string
-keys to callables (factories) and supports both built-in registrations
-and third-party plugins discovered via Python package entry points.
-"""
-
 import importlib
 import inspect
-import keyword
 from dataclasses import dataclass
 from importlib.metadata import entry_points
-from typing import Any, Iterator, Literal
-
-from fedbench.core.logger import log_warning
+from typing import Any, Iterator
 
 
 @dataclass(frozen=True)
 class Metadata:
     name: str
     locator: str
-    source: Literal["builtin", "plugin"]
 
 
 class FactoryRegistry[T]:
@@ -31,14 +19,14 @@ class FactoryRegistry[T]:
             raise TypeError("product_cls must be a type.")
         self._product_cls = product_cls
 
-        self._builtins: dict[str, str] = {}
         self._plugins: dict[str, importlib.metadata.EntryPoint] = {}
 
         for ep in entry_points(group=group):
             if ep.name in self._plugins:
-                log_warning(
-                    str(self),
-                    f"Ignoring duplicate plugin '{ep.name}' from '{ep.value}'",
+                raise ValueError(
+                    f"Duplicate component {ep.name} from {ep.value}. "
+                    f"{self} already contains {ep.name} from "
+                    f"{self._plugins[ep.name].value}"
                 )
             else:
                 self._plugins[ep.name] = ep
@@ -50,24 +38,14 @@ class FactoryRegistry[T]:
         )
 
     def __iter__(self) -> Iterator[str]:
-        yield from self._builtins.keys()
         yield from self._plugins.keys()
 
     def __contains__(self, name: str) -> bool:
-        return name in self._builtins or name in self._plugins
+        return name in self._plugins
 
     @property
     def group(self) -> str:
         return self._group
-
-    def add_builtin(self, name: str, locator: str) -> None:
-        if not _is_valid_factory_locator(locator):
-            raise ValueError(f"Invalid factory locator '{locator}'")
-
-        if name in self._builtins:
-            raise ValueError(f"Builtin factory '{name}' already registered.")
-
-        self._builtins[name] = locator
 
     def call(self, name: str, factory_kwargs: dict[str, Any] | None = None) -> T:
         factory_kwargs = factory_kwargs or {}
@@ -87,37 +65,14 @@ class FactoryRegistry[T]:
         return instance
 
     def metadata(self) -> Iterator[Metadata]:
-        for k, v in self._builtins.items():
-            yield Metadata(name=k, locator=v, source="builtin")
-
         for ep in self._plugins.values():
-            yield Metadata(name=ep.name, locator=ep.value, source="plugin")
+            yield Metadata(name=ep.name, locator=ep.value)
 
     def load(self, name: str) -> Any:
-        factory = self._load_builtin(name)
-
-        if factory is None:
-            factory = self._load_plugin(name)
+        factory = self._load_plugin(name)
 
         if factory is None:
             raise ValueError(f"No such factory: '{name}'.")
-
-        return factory
-
-    def _load_builtin(self, name: str) -> Any | None:
-        try:
-            locator = self._builtins[name]
-        except KeyError:
-            return None
-
-        module_name, _, qualifier = locator.partition(":")
-        module = importlib.import_module(module_name)
-
-        factory = module
-        for attr in qualifier.split("."):
-            if not hasattr(factory, attr):
-                raise ValueError(f"Bad locator '{locator}' in {self}")
-            factory = getattr(factory, attr)
 
         return factory
 
@@ -128,18 +83,3 @@ class FactoryRegistry[T]:
             return None
 
         return entry_point.load()
-
-
-def _is_valid_factory_locator(locator: str) -> bool:
-    module, _, qualifier = locator.partition(":")
-
-    def valid(s: str) -> bool:
-        return s.isidentifier() and not keyword.iskeyword(s)
-
-    if not all(valid(m) for m in module.split(".")):
-        return False
-
-    if not all(valid(q) for q in qualifier.split(".")):
-        return False
-
-    return True

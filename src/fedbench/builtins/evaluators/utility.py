@@ -13,6 +13,10 @@ import pandas as pd
 from sklearn.linear_model import LogisticRegression, Ridge
 from sklearn.metrics import accuracy_score, mean_squared_error, roc_auc_score
 
+from fedbench.builtins.evaluators._helpers import (
+    fit_tabular_model,
+    weighted_mean_metrics,
+)
 from fedbench.core.data import TableSchema
 from fedbench.core.eval import Category, Evaluator, LocalEvalContext
 from fedbench.core.eval.evalcontext import GlobalEvalContext
@@ -20,10 +24,6 @@ from fedbench.core.eval.evaluator import (
     EvaluationMode,
     EvaluatorDescriptor,
     MetricDescriptor,
-)
-from fedbench.evaluators._helpers import (
-    fit_tabular_model,
-    weighted_mean_metrics,
 )
 
 

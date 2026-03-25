@@ -4,38 +4,29 @@ from dataclasses import dataclass
 
 from pandas import DataFrame
 
-from fedbench.core.algorithm.coordinator import Coordinator
 from fedbench.core.algorithm.synthesizer import Synthesizer
 from fedbench.core.data import TableSchema
-from fedbench.core.update import Update
+from fedbench.core.payload import ArraysTarget, Payload
 
 
 @dataclass(frozen=True)
 class ComponentSpec[T]:
     factory: Callable[[], T]
-    arrays_to_ml_framework_map: dict[str, str] | None = None
-
-
-def coordinator_spec(
-    factory: Callable[[], Coordinator],
-    arrays_to_ml_framework_map: dict[str, str] | None = None,
-) -> ComponentSpec[Coordinator]:
-
-    return ComponentSpec[Coordinator](factory, arrays_to_ml_framework_map)
+    arrays_target: ArraysTarget | None = None
 
 
 def synthesizer_spec(
     factory: Callable[[], Synthesizer],
-    arrays_to_ml_framework_map: dict[str, str] | None = None,
+    arrays_target: ArraysTarget | None = None,
 ) -> ComponentSpec[Synthesizer]:
 
-    return ComponentSpec[Synthesizer](factory, arrays_to_ml_framework_map)
+    return ComponentSpec[Synthesizer](factory, arrays_target)
 
 
 @dataclass(frozen=True)
 class GlobalInitArtifacts:
-    coordinator: Update | None = None
-    synthesizer: Update | None = None
+    coordinator: Payload | None = None
+    synthesizer: Payload | None = None
 
 
 class Algorithm(ABC):
@@ -46,7 +37,7 @@ class Algorithm(ABC):
 
     @property
     @abstractmethod
-    def coordinator_spec(self) -> ComponentSpec[Coordinator]:
+    def supports_coordinators(self) -> set[str]:
         pass
 
     @property

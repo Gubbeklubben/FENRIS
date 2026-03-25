@@ -40,6 +40,11 @@ import numpy as np
 import pandas as pd
 import scipy
 
+from fedbench.builtins.evaluators._helpers import (
+    safe_nanmean,
+    sanitize_numeric_df,
+    weighted_mean_metrics,
+)
 from fedbench.core.data import TableSchema
 from fedbench.core.eval import Category, Evaluator, LocalEvalContext
 from fedbench.core.eval.evalcontext import GlobalEvalContext
@@ -49,11 +54,6 @@ from fedbench.core.eval.evaluator import (
     MetricDescriptor,
 )
 from fedbench.core.logger import log_debug
-from fedbench.evaluators._helpers import (
-    safe_nanmean,
-    sanitize_numeric_df,
-    weighted_mean_metrics,
-)
 
 # ---------------------------------------------------------------------------
 # Moment metrics  (mean / std)

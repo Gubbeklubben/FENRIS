@@ -7,13 +7,16 @@ import fedbench.runtime.runner as runner
 from fedbench.config.builder import build_config
 from fedbench.config.parsing import split_outside_brackets
 from fedbench.runtime.pipeline import pipeline
+from fedbench.runtime.registry import FactoryRegistry
 from fedbench.runtime.registry_builder import (
     build_algorithm_registry,
+    build_coordinator_registry,
     build_evaluator_registry,
     build_partitioner_registry,
 )
 
 algorithms = build_algorithm_registry()
+coordinators = build_coordinator_registry()
 partitioners = build_partitioner_registry()
 evaluators = build_evaluator_registry()
 
@@ -45,6 +48,7 @@ def new(name: str) -> None:
 
 class Component(StrEnum):
     ALGORITHMS = "algorithms"
+    COORDINATORS = "coordinators"
     PARTITIONERS = "partitioners"
     EVALUATORS = "evaluators"
 
@@ -76,29 +80,21 @@ def show(
 
     selected = components if components else list(Component)
 
-    if Component.ALGORITHMS in selected:
-        items = list(algorithms.metadata())
-        width = max(len(m.name) for m in items)
-        print("\n--- ALGORITHMS ---")
-        for metadata in items:
+    def maybe_show[T](component: Component, registry: FactoryRegistry[T]) -> None:
+        if component not in selected:
+            return
+
+        entries = list(registry.metadata())
+        width = max(len(e.name) for e in entries)
+        print(f"\n --- {component.value.upper()} ---")
+        for metadata in entries:
             print(f"  {metadata.name:<{width}}", end="")
             print(f"  {metadata.locator}" if include_locators else "")
 
-    if Component.PARTITIONERS in selected:
-        items = list(partitioners.metadata())
-        width = max(len(m.name) for m in items)
-        print("\n--- PARTITIONERS ---")
-        for metadata in items:
-            print(f"  {metadata.name:<{width}}", end="")
-            print(f"  {metadata.locator}" if include_locators else "")
-
-    if Component.EVALUATORS in selected:
-        items = list(evaluators.metadata())
-        width = max(len(m.name) for m in items)
-        print("\n--- EVALUATORS ---")
-        for metadata in items:
-            print(f"  {metadata.name:<{width}}", end="")
-            print(f"  {metadata.locator}" if include_locators else "")
+    maybe_show(Component.ALGORITHMS, algorithms)
+    maybe_show(Component.COORDINATORS, coordinators)
+    maybe_show(Component.PARTITIONERS, partitioners)
+    maybe_show(Component.EVALUATORS, evaluators)
 
     print()
 
@@ -106,12 +102,19 @@ def show(
 @app.command()
 def run(
     algorithm: Annotated[str, typer.Argument(help="Algorithm/Generator key.")],
+    coordinator: Annotated[str, typer.Argument(help="Coordinator key.")],
     partitioner: Annotated[str, typer.Argument(help="Partitioner key.")],
     dataset: Annotated[str, typer.Argument(help="Path to the dataset CSV.")],
     algorithm_kwargs: Annotated[
         str | None,
         typer.Option(
             callback=parse_kwargs, help="Kwargs for the algorithm (key=value)."
+        ),
+    ] = None,
+    coordinator_kwargs: Annotated[
+        str | None,
+        typer.Option(
+            callback=parse_kwargs, help="Kwargs for the coordinator (key=value)"
         ),
     ] = None,
     partitioner_kwargs: Annotated[

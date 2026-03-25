@@ -13,6 +13,7 @@ from fedbench.core.logger import log_info
 from fedbench.runtime.command import Command
 from fedbench.runtime.component_factory import (
     create_algorithm,
+    create_coordinator,
     create_df_loader,
     create_evaluation_suite,
     create_partitioner,
@@ -21,6 +22,7 @@ from fedbench.runtime.component_factory import (
 from fedbench.runtime.platform_info import collect_platform_info
 from fedbench.runtime.registry_builder import (
     build_algorithm_registry,
+    build_coordinator_registry,
     build_evaluator_registry,
     build_partitioner_registry,
 )
@@ -33,6 +35,10 @@ def create_components(ctx: RunContext) -> None:
     ctx.algorithm = create_algorithm(
         ctx.config,
         build_algorithm_registry(),
+    )
+    ctx.coordinator = create_coordinator(
+        ctx.config,
+        build_coordinator_registry(),
     )
     ctx.partitioner = create_partitioner(
         ctx.config,
@@ -64,6 +70,8 @@ def global_init(ctx: RunContext) -> None:
     )
     if artifacts is not None:
         ctx.global_init_artifacts = artifacts
+        if artifacts.coordinator is not None:
+            ctx.coordinator.attach_global_init_artifacts(artifacts.coordinator)
     else:
         ctx.global_init_artifacts = GlobalInitArtifacts(None, None)
 

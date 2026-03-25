@@ -52,16 +52,6 @@ class ClientsConfigured(Event):
 
 
 @dataclass(frozen=True)
-class FedInitStarted(Event):
-    pass
-
-
-@dataclass(frozen=True)
-class FedInitCompleted(Event):
-    pass
-
-
-@dataclass(frozen=True)
 class RoundStarted(Event):
     current: int
     total: int

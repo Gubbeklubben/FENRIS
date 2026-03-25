@@ -49,7 +49,7 @@ def build_client_context(flwr_cache: RecordDict) -> ClientContext:
     eval_suite = create_evaluation_suite(config, build_evaluator_registry())
     serde = FlwrSerde(
         object_serde=Pickle(disabled=config.disable_pickle),
-        default_arrays_map=algorithm.synthesizer_spec.arrays_to_ml_framework_map,
+        default_arrays_target=algorithm.synthesizer_spec.arrays_target,
     )
     return ClientContext(
         config,

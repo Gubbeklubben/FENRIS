@@ -8,11 +8,12 @@ from sklearn.preprocessing import LabelEncoder, QuantileTransformer
 from torch import Tensor, nn, optim
 from torch.utils.data import DataLoader, TensorDataset
 
-from fedbench.algorithms.fedtabdiff.diffuser import Diffuser
-from fedbench.algorithms.fedtabdiff.mlpsynthesizer import MLPSynthesizer
+from fedbench.builtins.algorithms.fedtabdiff.diffuser import Diffuser
+from fedbench.builtins.algorithms.fedtabdiff.mlpsynthesizer import MLPSynthesizer
+from fedbench.builtins.coordinators.fedavg import ClientUpdate, GlobalState
 from fedbench.core.algorithm import Synthesizer
-from fedbench.core.logger import ELBOW, log_info
-from fedbench.core.update import Update
+from fedbench.core.logger import log_info
+from fedbench.core.payload import Payload
 
 
 class FedTabDiffSynthesizer(Synthesizer):
@@ -47,7 +48,7 @@ class FedTabDiffSynthesizer(Synthesizer):
         self._device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
     # noinspection PyUnnecessaryCast
-    def attach_global_init_artifacts(self, artifacts: Update) -> None:
+    def attach_global_init_artifacts(self, artifacts: Payload) -> None:
         extras = artifacts.extras["preproc-extras"]
         objects = artifacts.objects["preproc-objects"]
 
@@ -62,12 +63,11 @@ class FedTabDiffSynthesizer(Synthesizer):
         self._label_encoder = objects["label-encoder"]
 
     # noinspection PyUnnecessaryCast
-    def train(self, request: Update, data: DataFrame) -> Update:
+    def train(self, request: Payload, data: DataFrame) -> Payload:
         log_info(str(self), "Start training...")
 
         # init loss function
         loss_fnc = nn.MSELoss()
-        total_losses = []
 
         cat_attrs = cast(list[str], self._cat_attrs)
         num_attrs = cast(list[str], self._num_attrs)
@@ -91,7 +91,7 @@ class FedTabDiffSynthesizer(Synthesizer):
             for cat, num in torch_loader:
                 yield cat, num, None
 
-        state_dict = request.arrays["state"]
+        state_dict = GlobalState.decode(request).state
 
         mlp_synth = self._mlp_synth_factory(
             cast(int, self._encoded_dim),
@@ -146,31 +146,22 @@ class FedTabDiffSynthesizer(Synthesizer):
             train_losses.backward()
             # optimize encoder and decoder parameters
             optimizer.step()
-            # collect rec error losses
-            total_losses.append(train_losses.detach().cpu().numpy())
 
             if idx + 1 >= self._max_batches:
                 break
 
-        # average of rec errors
-        loss = np.mean(np.array(total_losses)).item()
+        reply = ClientUpdate(
+            state=mlp_synth.state_dict(),
+            count=num_samples,
+        )
+        return reply.encode()
 
-        reply = Update()
-        reply.arrays["state"] = mlp_synth.state_dict()
-        reply.metrics["metrics"] = {"loss": loss, "num-samples": num_samples}
-
-        log_info(str(self), "Finished training.")
-        log_info("", f"\t{ELBOW} loss: {loss}.")
-
-        return reply
-
-    def sample(self, request: Update, num_rows: int, seed: int) -> DataFrame:
+    def sample(self, request: Payload, num_rows: int, seed: int) -> DataFrame:
         torch.manual_seed(seed)
         if torch.cuda.is_available():
             torch.cuda.manual_seed(seed)
-        log_info(str(self), "Start sampling...")
 
-        state_dict = request.arrays["state"]
+        state_dict = GlobalState.decode(request).state
         # noinspection PyUnnecessaryCast
         mlp_synth = self._mlp_synth_factory(
             cast(int, self._encoded_dim), cast(int, self._n_cat_tokens)
@@ -185,7 +176,6 @@ class FedTabDiffSynthesizer(Synthesizer):
             n_samples=num_rows,
             label=None,
         )
-        log_info(str(self), "Finished sampling.")
 
         return self._decode_samples(
             samples=tensor, embeddings=mlp_synth.get_embeddings()

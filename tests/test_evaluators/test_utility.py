@@ -18,7 +18,7 @@ import numpy as np
 import pandas as pd
 import pytest
 
-from fedbench.evaluators.utility import TSTREvaluator
+from fedbench.builtins.evaluators.utility import TSTREvaluator
 
 from .conftest import make_ctx, make_schema
 

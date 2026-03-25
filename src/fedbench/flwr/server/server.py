@@ -12,13 +12,11 @@ from fedbench.core.data import TableSchema
 from fedbench.core.encoder import FedbenchEncoder
 from fedbench.core.events import (
     ClientReply,
-    FedInitCompleted,
-    FedInitStarted,
     RoundCompleted,
     RoundStarted,
     ServerRequest,
 )
-from fedbench.core.update import Metrics, Update
+from fedbench.core.payload import Metrics, Payload
 from fedbench.flwr.namespace import Namespace
 from fedbench.flwr.serde import FlwrSerde, count_rdict_bytes
 from fedbench.runtime.eventbus import EventBus
@@ -59,25 +57,17 @@ class Strategy:
         self._coordinator = coordinator
         self._per_client_metrics: dict[int, Metrics] = {}
 
-    def fed_init(self, grid: Grid) -> None:
-        generator = self._coordinator.fed_init(
-            self._init_seed,
-            self._schema,
-            grid.get_node_ids(),
-        )
-        self._send_and_receive(grid, generator, msg_type="query.fed_init")
-
     def train(self, grid: Grid) -> None:
         generator = self._coordinator.train(grid.get_node_ids())
         self._send_and_receive(grid, generator, msg_type="train")
 
     def evaluate(self, grid: Grid) -> None:
         msg_type = "evaluate"
-        global_state = self._get_and_check_global_state()
+        artifacts = self._get_and_check_training_artifacts()
         requests = []
 
         for dst_id in grid.get_node_ids():
-            rdict = self._serde.to_flwr(global_state)
+            rdict = self._serde.to_flwr(artifacts)
             requests.append(
                 Message(content=rdict, message_type=msg_type, dst_node_id=dst_id)
             )
@@ -112,11 +102,7 @@ class Strategy:
         self,
         grid: Grid,
         num_rounds: int,
-    ) -> tuple[Update, dict[int, Any]]:
-
-        self._eventbus.emit(FedInitStarted())
-        self.fed_init(grid)
-        self._eventbus.emit(FedInitCompleted())
+    ) -> tuple[Payload, dict[int, Any]]:
 
         for curr_round in range(1, num_rounds + 1):
             self._eventbus.emit(RoundStarted(curr_round, num_rounds))
@@ -124,21 +110,21 @@ class Strategy:
             self.evaluate(grid)
             self._eventbus.emit(RoundCompleted(curr_round, num_rounds))
 
-        return self._get_and_check_global_state(), self._per_client_metrics
+        return self._get_and_check_training_artifacts(), self._per_client_metrics
 
     def _send_and_receive(
         self,
         grid: Grid,
         generator: Generator[
-            Iterable[tuple[int, Update]],
-            Iterable[tuple[int, Update]],
+            Iterable[tuple[int, Payload]],
+            Iterable[tuple[int, Payload]],
             None,
         ],
         msg_type: str,
     ) -> None:
 
         internal_msg_type = msg_type.split(".")[-1]
-        replies: Iterable[tuple[int, Update]] | None = None
+        replies: Iterable[tuple[int, Payload]] | None = None
 
         while True:
             try:
@@ -150,8 +136,8 @@ class Strategy:
                 return
 
             requests = []
-            for dst_id, update in batch:
-                rdict = self._serde.to_flwr(update)
+            for dst_id, payload in batch:
+                rdict = self._serde.to_flwr(payload)
                 requests.append(
                     Message(content=rdict, message_type=msg_type, dst_node_id=dst_id)
                 )
@@ -176,19 +162,19 @@ class Strategy:
                     )
                 )
 
-    def _get_and_check_global_state(self) -> Update:
-        global_state = self._coordinator.global_state
-        if not isinstance(global_state, Update):
+    def _get_and_check_training_artifacts(self) -> Payload:
+        artifacts = self._coordinator.publish_training_artifacts()
+        if not isinstance(artifacts, Payload):
             raise TypeError(
-                f"{self._coordinator}.global_state returned"
-                f"{type(global_state)}, expected {Update}"
+                f"{self._coordinator}.publish_training_artifacts() returned"
+                f"{type(artifacts)}, expected {Payload}"
             )
-        return global_state
+        return artifacts
 
 
 def configure_clients(
     config: Config,
-    artifacts: Update | None,
+    artifacts: Payload | None,
     serde: FlwrSerde,
     grid: Grid,
 ) -> None:

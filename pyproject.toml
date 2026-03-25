@@ -25,6 +25,39 @@ dependencies = [
 [project.scripts]
 fedbench = "fedbench.__main__:app"
 
+[project.entry-points."fedbench.algorithms"]
+fed_hello    = "fedbench.builtins.algorithms.fed_hello:FedHello"
+fed_tab_diff = "fedbench.builtins.algorithms.fedtabdiff:FedTabDiff"
+fed_tgan     = "fedbench.builtins.algorithms.fed_tgan:FedTGAN"
+
+[project.entry-points."fedbench.coordinators"]
+fedavg = "fedbench.builtins.coordinators.fedavg:FedAvg"
+
+[project.entry-points."fedbench.evaluators"]
+moment_reduction_metrics        = "fedbench.builtins.evaluators.fidelity:MomentReductionMetricsEvaluator"
+distribution_similarity_metrics = "fedbench.builtins.evaluators.fidelity:DistributionSimilarityMetricsEvaluator"
+categorical_tv_mean             = "fedbench.builtins.evaluators.fidelity:CategoricalTvMeanEvaluator"
+corr_fro_diff                   = "fedbench.builtins.evaluators.fidelity:CorrFroDiffEvaluator"
+
+tstr                        = "fedbench.builtins.evaluators.utility:TSTREvaluator"
+direct_overlap_diagnostic   = "fedbench.builtins.evaluators.privacy:DirectOverlapDiagnosticEvaluator"
+mia_nearest_neighbor_attack = "fedbench.builtins.evaluators.privacy:MIANearestNeighborAttackEvaluator"
+aia_supervised_attack       = "fedbench.builtins.evaluators.privacy:AIASupervisedAttackEvaluator"
+
+fairness    = "fedbench.builtins.evaluators.fairness:FairnessEvaluator"
+scalability = "fedbench.builtins.evaluators.scalability:ScalabilityEvaluator"
+
+[project.entry-points."fedbench.partitioners"]
+iid_partitioner          = "fedbench.builtins.partitioners.flwr_delegates:FlwrDelegatePartitioner.with_iid_partitioner"
+linear_partitioner       = "fedbench.builtins.partitioners.flwr_delegates:FlwrDelegatePartitioner.with_linear_partitioner"
+square_partitioner       = "fedbench.builtins.partitioners.flwr_delegates:FlwrDelegatePartitioner.with_square_partitioner"
+exponential_partitioner  = "fedbench.builtins.partitioners.flwr_delegates:FlwrDelegatePartitioner.with_exponential_partitioner"
+dirichlet_partitioner    = "fedbench.builtins.partitioners.flwr_delegates:FlwrDelegatePartitioner.with_dirichlet_partitioner"
+pathological_partitioner = "fedbench.builtins.partitioners.flwr_delegates:FlwrDelegatePartitioner.with_pathological_partitioner"
+shard_partitioner        = "fedbench.builtins.partitioners.flwr_delegates:FlwrDelegatePartitioner.with_shard_partitioner"
+continuous_partitioner   = "fedbench.builtins.partitioners.flwr_delegates:FlwrDelegatePartitioner.with_continuous_partitioner"
+
+
 [build-system]
 requires = ["poetry-core>=2.0.0,<3.0.0"]
 build-backend = "poetry.core.masonry.api"

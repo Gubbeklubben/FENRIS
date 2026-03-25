@@ -7,7 +7,7 @@ from fedbench.config import Config
 from fedbench.core.algorithm import Algorithm, Coordinator, Synthesizer
 from fedbench.core.data import Partitioner, load_csv
 from fedbench.core.eval import EvaluationSuite, Evaluator
-from fedbench.core.update import Update
+from fedbench.core.payload import Payload
 from fedbench.runtime.registry import FactoryRegistry
 
 
@@ -24,6 +24,17 @@ def create_algorithm(
     return registry.call(
         config.algorithm,
         config.algorithm_kwargs,
+    )
+
+
+def create_coordinator(
+    config: Config,
+    registry: FactoryRegistry[Coordinator],
+) -> Coordinator:
+
+    return registry.call(
+        config.coordinator,
+        config.coordinator_kwargs,
     )
 
 
@@ -52,25 +63,10 @@ def create_evaluation_suite(
     )
 
 
-def create_coordinator(
-    factory: Callable[[], Coordinator],
-    artifacts: Update | None,
-) -> Coordinator:
-
-    instance = factory()
-    if not isinstance(instance, Coordinator):
-        raise TypeError(f"{instance} is not a Coordinator.")
-
-    if artifacts is not None:
-        instance.attach_global_init_artifacts(artifacts)
-
-    return instance
-
-
 def create_synthesizer(
     factory: Callable[[], Synthesizer],
-    artifacts: Update | None,
-    client_cache: Update | None,
+    artifacts: Payload | None,
+    client_cache: Payload | None,
 ) -> Synthesizer:
 
     instance = factory()

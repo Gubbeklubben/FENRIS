@@ -24,6 +24,7 @@ from __future__ import annotations
 
 from typing import Iterable
 
+from fedbench.builtins.evaluators._helpers import weighted_mean
 from fedbench.core.eval import Category
 from fedbench.core.eval.evalcontext import GlobalEvalContext, LocalEvalContext
 from fedbench.core.eval.evaluator import (
@@ -32,7 +33,6 @@ from fedbench.core.eval.evaluator import (
     EvaluatorDescriptor,
     MetricDescriptor,
 )
-from fedbench.evaluators._helpers import weighted_mean
 
 
 class ScalabilityEvaluator(Evaluator):

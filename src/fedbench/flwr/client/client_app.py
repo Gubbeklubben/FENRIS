@@ -9,7 +9,7 @@ from flwr.clientapp import ClientApp
 from fedbench.core.encoder import FedbenchEncoder
 from fedbench.core.eval import LocalEvalContext
 from fedbench.core.logger import log_warning
-from fedbench.core.update import Extras, Update
+from fedbench.core.payload import Extras, Payload
 from fedbench.flwr.client.context import build_client_context
 from fedbench.flwr.namespace import Namespace
 from fedbench.runtime.component_factory import create_synthesizer
@@ -31,29 +31,6 @@ def configure(message: Message, flwr_context: Context) -> Message:
         Namespace.GLOBAL_INIT_ARTIFACTS.view(message.content),
     )
     return Message(content=RecordDict(), reply_to=message)
-
-
-@app.query("fed_init")
-def fed_init(message: Message, flwr_context: Context) -> Message:
-    ctx = build_client_context(flwr_context.state)
-    partition_id = get_partition_id(flwr_context)
-    train_df = ctx.dataset.load_train_partition(partition_id)
-
-    artifacts = ctx.serde.from_flwr(ctx.artifacts_cache)
-    request = ctx.serde.from_flwr(message.content)
-
-    with ctx.serde.use_deserialized(ctx.synthesizer_cache) as cache:
-        synthesizer = create_synthesizer(
-            ctx.synthesizer_factory,
-            artifacts=artifacts,
-            client_cache=cache,
-        )
-        reply = synthesizer.fed_init(
-            request, ctx.config.seed.init, ctx.dataset.schema, train_df
-        )
-
-    rdict = ctx.serde.to_flwr(reply)
-    return Message(content=rdict, reply_to=message)
 
 
 @app.train()
@@ -146,6 +123,6 @@ def evaluate(message: Message, flwr_context: Context) -> Message:
                 f"Could not encode metric {key} with value {value}."
             ) from e
 
-    update = Update(extras={"metrics": metrics})
+    update = Payload(extras={"metrics": metrics})
     rdict = ctx.serde.to_flwr(update)
     return Message(content=rdict, reply_to=message)

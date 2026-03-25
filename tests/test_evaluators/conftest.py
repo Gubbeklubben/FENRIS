@@ -22,15 +22,15 @@ import math
 import numpy as np
 import pandas as pd
 
+from fedbench.builtins.evaluators.fidelity import (
+    DistributionSimilarityMetricsEvaluator,
+    MomentReductionMetricsEvaluator,
+)
 from fedbench.core.data.schemas import ColumnSchema, TableSchema, infer_schema
 from fedbench.core.eval.evalcontext import (
     CentralizedEvalContext,
     GlobalEvalContext,
     LocalEvalContext,
-)
-from fedbench.evaluators.fidelity import (
-    DistributionSimilarityMetricsEvaluator,
-    MomentReductionMetricsEvaluator,
 )
 
 # ---------------------------------------------------------------------------

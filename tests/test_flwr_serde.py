@@ -5,7 +5,7 @@ import numpy as np
 import pytest
 from flwr.app import ArrayRecord, ConfigRecord, MetricRecord, RecordDict
 
-from fedbench.core.update import Update
+from fedbench.core.payload import Payload
 from fedbench.flwr.rdict import RDictNamespaceView
 from fedbench.flwr.serde import FlwrSerde, Pickle
 
@@ -31,7 +31,7 @@ def make_random_ndarrays() -> Callable[[], list[np.ndarray]]:
 
 
 def test_empty(serde):
-    orig = Update()
+    orig = Payload()
     rdict = serde.to_flwr(orig)
     deserialized = serde.from_flwr(rdict)
     assert orig.is_empty()
@@ -39,7 +39,7 @@ def test_empty(serde):
 
 
 def test_to_flwr_single_array_group(serde, make_random_ndarrays) -> None:
-    update = Update()
+    update = Payload()
     orig = make_random_ndarrays()
     update.arrays["test-arrays"] = orig
     rdict = serde.to_flwr(update)
@@ -58,7 +58,7 @@ def test_from_flwr_single_array_group(serde, make_random_ndarrays) -> None:
 
 
 def test_to_flwr_multiple_array_groups(serde, make_random_ndarrays) -> None:
-    update = Update()
+    update = Payload()
     orig1 = make_random_ndarrays()
     orig2 = make_random_ndarrays()
     update.arrays["test-arrays1"] = orig1
@@ -98,7 +98,7 @@ def test_from_flwr_multiple_array_groups(serde, make_random_ndarrays) -> None:
 def test_round_trip_combined(serde, make_random_ndarrays) -> None:
     """Update with arrays, metrics, and extras all populated simultaneously."""
 
-    update = Update()
+    update = Payload()
     update.arrays["weights"] = make_random_ndarrays()
     update.metrics["train-metrics"] = {"loss": 0.42, "acc": 0.91}
     update.extras["meta"] = {"round": 3, "tag": "combined", "flag": True}
@@ -124,7 +124,7 @@ class PickleMe:
 
 def test_single_object_pickle():
     serde = FlwrSerde(object_serde=Pickle())
-    update = Update()
+    update = Payload()
     orig = PickleMe("Some Name")
     update.objects["test-objects"] = {"pickle-me": orig}
     rdict = serde.to_flwr(update)
@@ -137,7 +137,7 @@ def test_single_object_pickle():
 
 
 def test_metrics_single_group_all_types(serde):
-    update = Update()
+    update = Payload()
     metrics = {
         "int": 1,
         "float": 1.1,
@@ -151,7 +151,7 @@ def test_metrics_single_group_all_types(serde):
 
 
 def test_extras_single_group_all_types(serde):
-    update = Update()
+    update = Payload()
     extras = {
         "int": 1,
         "float": 1.1,
@@ -194,7 +194,7 @@ def test_deserialize_rdict_view(serde, make_random_ndarrays):
 
 def test_disable_pickle_raises():
     serde = FlwrSerde(Pickle(disabled=True))
-    update = Update()
+    update = Payload()
     update.objects["test-objects"] = {"pickle-me": None}
     with pytest.raises(TypeError):
         serde.to_flwr(update)
