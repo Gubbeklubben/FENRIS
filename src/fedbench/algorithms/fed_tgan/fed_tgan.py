@@ -105,15 +105,13 @@ class FedTGAN(Algorithm):
         # Split schema into categorical and numerical columns
         cat_attrs, num_attrs = split_cat_num(schema)
 
-        # Build global vocabulary for categorical columns
-        vocab_classes: set[str] = set()
+        # Create separate label encoder for each categorical column
+        label_encoders = {}
         for col in cat_attrs:
-            unique_vals = dataset[col].astype(str).unique()
-            vocab_classes.update(unique_vals)
-
-        # Create label encoder with full vocabulary
-        vocab_sorted = sorted(vocab_classes)
-        label_encoder = LabelEncoder().fit(vocab_sorted)
+            unique_vals = sorted(dataset[col].astype(str).unique())
+            le = LabelEncoder()
+            le.fit(unique_vals)
+            label_encoders[col] = le
 
         # Calculate dimensions
         n_cat_features = len(cat_attrs)
@@ -143,7 +141,7 @@ class FedTGAN(Algorithm):
         # Prepare artifacts for synthesizers
         synth_artifacts = Update()
         synth_artifacts.objects["preproc-objects"] = {
-            "label-encoders": {col: label_encoder for col in cat_attrs},
+            "label-encoders": label_encoders,
             "num-scaler": num_scaler,
         }
         synth_artifacts.extras["preproc-extras"] = {
