@@ -23,6 +23,7 @@ class Category(StrEnum):
 class EvaluationMode(Flag):
     CENTRALIZED = auto()
     FEDERATED = auto()
+    # noinspection PyTypeChecker
     BOTH = CENTRALIZED | FEDERATED
 
 
