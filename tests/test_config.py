@@ -3,13 +3,13 @@ from typing import Any, Optional, Union
 
 import pytest
 
-from fedbench.algorithms import register_builtin_algorithms
+from fedbench.builtins.algorithms import register_builtin_algorithms
+from fedbench.builtins.partitioners import register_builtin_partitioners
 from fedbench.config.builder import build_config, parse_for_function
 from fedbench.config.parsing import coerce, is_optional
 from fedbench.core.algorithm import Algorithm
 from fedbench.core.data import Partitioner
 from fedbench.core.eval import Category
-from fedbench.partitioners import register_builtin_partitioners
 from fedbench.runtime.registry import FactoryRegistry
 
 

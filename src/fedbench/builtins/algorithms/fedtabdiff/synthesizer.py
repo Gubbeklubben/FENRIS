@@ -8,9 +8,9 @@ from sklearn.preprocessing import LabelEncoder, QuantileTransformer
 from torch import Tensor, nn, optim
 from torch.utils.data import DataLoader, TensorDataset
 
-from fedbench.algorithms.fedtabdiff.diffuser import Diffuser
-from fedbench.algorithms.fedtabdiff.mlpsynthesizer import MLPSynthesizer
-from fedbench.coordinators.fedavg import ClientUpdate, GlobalState
+from fedbench.builtins.algorithms.fedtabdiff.diffuser import Diffuser
+from fedbench.builtins.algorithms.fedtabdiff.mlpsynthesizer import MLPSynthesizer
+from fedbench.builtins.coordinators.fedavg import ClientUpdate, GlobalState
 from fedbench.core.algorithm import Synthesizer
 from fedbench.core.logger import log_info
 from fedbench.core.payload import Payload

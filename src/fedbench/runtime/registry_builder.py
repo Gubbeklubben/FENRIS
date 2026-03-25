@@ -1,9 +1,9 @@
-from fedbench.algorithms import register_builtin_algorithms
+from fedbench.builtins.algorithms import register_builtin_algorithms
+from fedbench.builtins.evaluators import register_builtin_evaluators
+from fedbench.builtins.partitioners import register_builtin_partitioners
 from fedbench.core.algorithm import Algorithm
 from fedbench.core.data import Partitioner
 from fedbench.core.eval import Evaluator
-from fedbench.evaluators import register_builtin_evaluators
-from fedbench.partitioners import register_builtin_partitioners
 from fedbench.runtime.registry import FactoryRegistry
 
 

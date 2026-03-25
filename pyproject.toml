@@ -26,7 +26,7 @@ dependencies = [
 fedbench = "fedbench.__main__:app"
 
 [project.entry-points."fedbench.coordinators"]
-fedavg = "fedbench.coordinators.fedavg:FedAvg"
+fedavg = "fedbench.builtins.coordinators.fedavg:FedAvg"
 
 [build-system]
 requires = ["poetry-core>=2.0.0,<3.0.0"]

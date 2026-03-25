@@ -1,10 +1,10 @@
 import pandas as pd
 import pytest
 
+from fedbench.builtins.partitioners import register_builtin_partitioners
+from fedbench.builtins.partitioners.flwr_delegates import FlwrDelegatePartitioner
 from fedbench.core.data import PartitionedDataset, Partitioner, load_csv
 from fedbench.core.data.schemas import infer_schema
-from fedbench.partitioners import register_builtin_partitioners
-from fedbench.partitioners.flwr_delegates import FlwrDelegatePartitioner
 from fedbench.runtime.registry import FactoryRegistry
 
 

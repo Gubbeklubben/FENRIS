@@ -6,10 +6,13 @@ import pandas as pd
 import torch
 from sklearn.preprocessing import LabelEncoder, MinMaxScaler
 
-from fedbench.algorithms.fed_tgan.discriminator import Discriminator
-from fedbench.algorithms.fed_tgan.generator import Generator
-from fedbench.algorithms.fed_tgan.training import discriminator_step, generator_step
-from fedbench.coordinators.fedavg import ClientUpdate, GlobalState
+from fedbench.builtins.algorithms.fed_tgan.discriminator import Discriminator
+from fedbench.builtins.algorithms.fed_tgan.generator import Generator
+from fedbench.builtins.algorithms.fed_tgan.training import (
+    discriminator_step,
+    generator_step,
+)
+from fedbench.builtins.coordinators.fedavg import ClientUpdate, GlobalState
 from fedbench.core.algorithm import (
     Algorithm,
     ComponentSpec,

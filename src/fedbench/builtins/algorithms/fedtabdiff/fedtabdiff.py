@@ -7,6 +7,7 @@ import torch
 from pandas import DataFrame
 from sklearn.preprocessing import LabelEncoder, QuantileTransformer
 
+from fedbench.builtins.coordinators.fedavg import GlobalState
 from fedbench.core.algorithm import (
     Algorithm,
     ComponentSpec,
@@ -16,8 +17,6 @@ from fedbench.core.algorithm import (
 )
 from fedbench.core.data import TableSchema
 from fedbench.core.payload import ArraysTarget, Payload
-
-from ...coordinators.fedavg import GlobalState
 
 # Relative imports for algorithm specifics.
 from .diffuser import Diffuser

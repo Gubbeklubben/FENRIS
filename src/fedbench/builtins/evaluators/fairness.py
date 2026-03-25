@@ -18,6 +18,7 @@ import numpy as np
 import pandas as pd
 from sklearn.linear_model import LogisticRegression
 
+from fedbench.builtins.evaluators._helpers import fit_tabular_model
 from fedbench.core.eval import Category, Evaluator, LocalEvalContext
 from fedbench.core.eval.evalcontext import GlobalEvalContext
 from fedbench.core.eval.evaluator import (
@@ -27,7 +28,6 @@ from fedbench.core.eval.evaluator import (
     normalize_key,
 )
 from fedbench.core.logger import log_debug
-from fedbench.evaluators._helpers import fit_tabular_model
 
 
 @dataclass

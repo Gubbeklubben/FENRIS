@@ -1,8 +1,8 @@
 import pandas as pd
 from pandas import DataFrame
 
+from fedbench.builtins.partitioners.flwr_delegates import FlwrDelegatePartitioner
 from fedbench.core.data import Partitioner
-from fedbench.partitioners.flwr_delegates import FlwrDelegatePartitioner
 
 
 def make_dummy_dataset(n: int = 100) -> pd.DataFrame:

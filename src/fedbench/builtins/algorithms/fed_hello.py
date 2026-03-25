@@ -5,7 +5,7 @@ import numpy as np
 import pandas as pd
 from pandas import DataFrame
 
-from fedbench.coordinators.fedavg import ClientUpdate, GlobalState
+from fedbench.builtins.coordinators.fedavg import ClientUpdate, GlobalState
 from fedbench.core.algorithm import (
     Algorithm,
     ComponentSpec,

@@ -48,6 +48,11 @@ import pandas as pd
 from sklearn.linear_model import LogisticRegression, Ridge
 from sklearn.metrics import accuracy_score, mean_squared_error, roc_auc_score
 
+from fedbench.builtins.evaluators._helpers import (
+    fit_tabular_model,
+    sanitize_numeric_df,
+    weighted_mean,
+)
 from fedbench.core.data import TableSchema
 from fedbench.core.eval import Category, Evaluator, LocalEvalContext
 from fedbench.core.eval.evalcontext import CentralizedEvalContext, GlobalEvalContext
@@ -58,11 +63,6 @@ from fedbench.core.eval.evaluator import (
     normalize_key,
 )
 from fedbench.core.logger import log_debug
-from fedbench.evaluators._helpers import (
-    fit_tabular_model,
-    sanitize_numeric_df,
-    weighted_mean,
-)
 
 # ---------------------------------------------------------------------------
 # Direct overlap evaluator
