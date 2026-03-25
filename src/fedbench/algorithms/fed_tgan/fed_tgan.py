@@ -493,7 +493,9 @@ class FedTGANSynthesizer(Synthesizer):
         num_scaler = preproc_objects["num-scaler"]
         if num_attrs and num_scaler is not None:
             # Extract numerical columns
-            num_synthetic = synthetic_data[:, n_cat_features : n_cat_features + len(num_attrs)]
+            num_synthetic = synthetic_data[
+                :, n_cat_features : n_cat_features + len(num_attrs)
+            ]
             # Inverse transform to get back original scale
             num_original = num_scaler.inverse_transform(num_synthetic)
             # Add to decoded data
