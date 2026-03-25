@@ -1,20 +1,15 @@
 import pandas as pd
 import pytest
 
-from fedbench.builtins.partitioners import register_builtin_partitioners
 from fedbench.builtins.partitioners.flwr_delegates import FlwrDelegatePartitioner
-from fedbench.core.data import PartitionedDataset, Partitioner, load_csv
+from fedbench.core.data import PartitionedDataset, load_csv
 from fedbench.core.data.schemas import infer_schema
-from fedbench.runtime.registry import FactoryRegistry
+from tests.fake_components import FakePartitionerRegistry
 
 
 @pytest.fixture
-def built_in_partitioners():
-    registry = FactoryRegistry(
-        group=f"{__package__}.partitioners", product_cls=Partitioner
-    )
-    register_builtin_partitioners(registry)
-    return registry
+def partitioners():
+    return FakePartitionerRegistry()
 
 
 @pytest.fixture

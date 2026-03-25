@@ -1,36 +1,30 @@
-from fedbench.builtins.algorithms import register_builtin_algorithms
-from fedbench.builtins.evaluators import register_builtin_evaluators
-from fedbench.builtins.partitioners import register_builtin_partitioners
 from fedbench.core.algorithm import Algorithm
 from fedbench.core.data import Partitioner
 from fedbench.core.eval import Evaluator
 from fedbench.runtime.registry import FactoryRegistry
 
+_ROOT_PKG = __package__.split(".")[0]
+
 
 def build_algorithm_registry() -> FactoryRegistry[Algorithm]:
-    registry: FactoryRegistry[Algorithm] = FactoryRegistry(
-        group=f"{__package__}.algorithms",
+    return FactoryRegistry(
+        group=f"{_ROOT_PKG}.algorithms",
         product_cls=Algorithm,  # type: ignore[type-abstract]
     )
-    register_builtin_algorithms(registry)
-    return registry
 
 
 def build_partitioner_registry() -> FactoryRegistry[Partitioner]:
-    registry: FactoryRegistry[Partitioner] = FactoryRegistry(
-        group=f"{__package__}.partitioners",
+    return FactoryRegistry(
+        group=f"{_ROOT_PKG}.partitioners",
         product_cls=Partitioner,  # type: ignore[type-abstract]
     )
-    register_builtin_partitioners(registry)
-    return registry
 
 
 def build_evaluator_registry() -> FactoryRegistry[Evaluator]:
     registry = FactoryRegistry(
-        group=f"{__package__}.evaluators",
+        group=f"{_ROOT_PKG}.evaluators",
         product_cls=Evaluator,  # type: ignore[type-abstract]
     )
-    register_builtin_evaluators(registry)
 
     existing_keys: dict[str, str] = {}
     for entry in registry.metadata():
