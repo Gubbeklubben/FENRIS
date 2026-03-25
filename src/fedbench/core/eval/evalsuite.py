@@ -2,7 +2,7 @@ from collections.abc import Iterable, Mapping
 from typing import Any, Self
 
 from fedbench.core.eval.evalcontext import GlobalEvalContext, LocalEvalContext
-from fedbench.core.eval.evaluator import Category, Evaluator
+from fedbench.core.eval.evaluator import Category, Evaluator, MetricDescriptor
 from fedbench.runtime.registry import FactoryRegistry
 
 
@@ -51,6 +51,23 @@ class EvaluationSuite:
                     continue
             yield evaluator
 
+    def get_evaluator_for_metric_key(
+        self,
+        metric_key: str,
+        target_column: str | None,
+        sensitive_columns: tuple[str, ...] | None,
+    ) -> tuple[Evaluator, MetricDescriptor]:
+        for ev in self._evaluators:
+            for key, metric in ev.get_metric_descriptor_dict(
+                target_column, sensitive_columns
+            ).items():
+                if f"{ev.metadata.category}.{key}" == metric_key:
+                    return ev, metric
+        raise KeyError(
+            f"Specified metric key {metric_key} is not emitted "
+            f"by any evaluator in the current evaluation suite."
+        )
+
     # noinspection PyMethodMayBeStatic
     def _prefix_and_verify_key_names(
         self,
@@ -71,9 +88,12 @@ class EvaluationSuite:
             for key, value in raw_metrics.items()
         }
 
-    def global_evaluate(self, ctx: GlobalEvalContext) -> dict[str, float]:
+    # noinspection PyMethodMayBeStatic
+    def _global_evaluate(
+        self, ctx: GlobalEvalContext, evaluators: Iterable[Evaluator]
+    ) -> dict[str, float]:
         metrics: dict[str, float] = {}
-        for ev in self._evaluators:
+        for ev in evaluators:
             metrics.update(
                 self._prefix_and_verify_key_names(
                     ev,
@@ -83,6 +103,17 @@ class EvaluationSuite:
                 )
             )
         return metrics
+
+    def global_evaluate(self, ctx: GlobalEvalContext) -> dict[str, float]:
+        return self._global_evaluate(ctx, self._evaluators)
+
+    def global_evaluate_single(self, ctx: GlobalEvalContext, key: str) -> float:
+        """Run only the evaluator that owns `key`, return the single metric value."""
+        evaluator, _ = self.get_evaluator_for_metric_key(
+            key, ctx.target_column, ctx.sensitive_columns
+        )
+        metrics = self._global_evaluate(ctx, [evaluator])
+        return metrics[key]
 
     def local_evaluate(self, ctx: LocalEvalContext) -> dict[str, Any]:
         metrics: dict[str, Any] = {}

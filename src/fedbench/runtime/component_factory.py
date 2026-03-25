@@ -5,8 +5,8 @@ from pandas import DataFrame
 
 from fedbench.config import Config
 from fedbench.core.algorithm import Algorithm, Coordinator, Synthesizer
-from fedbench.core.data import Partitioner, load_csv
-from fedbench.core.eval import EvaluationSuite, Evaluator
+from fedbench.core.data import PartitionedDataset, Partitioner, load_csv
+from fedbench.core.eval import CentralizedEvalContext, EvaluationSuite, Evaluator
 from fedbench.core.payload import Payload
 from fedbench.runtime.registry import FactoryRegistry
 
@@ -80,3 +80,19 @@ def create_synthesizer(
         instance.attach_client_cache(client_cache)
 
     return instance
+
+
+def create_centralized_eval_ctx(
+    config: Config,
+    dataset: PartitionedDataset,
+    synthetic_df: DataFrame,
+) -> CentralizedEvalContext:
+    return CentralizedEvalContext(
+        synthetic_df=synthetic_df,
+        holdout_df=dataset.load_global_holdout(),
+        client_train_df=dataset.load_all_train_data(),
+        target_column=config.data.target_col,
+        sensitive_columns=config.data.sensitive_cols,
+        schema=dataset.schema,
+        seed=config.seed.evaluation,
+    )

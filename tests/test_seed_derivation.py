@@ -70,7 +70,7 @@ def test_global_init_seed(ctx):
 
 
 def test_global_sample_seed(ctx):
-    ctx.aggregated_state = MagicMock()
+    ctx.train_artifacts = MagicMock()
     ctx.global_init_artifacts = GlobalInitArtifacts(None, None)
     ctx.algorithm = MagicMock()
 

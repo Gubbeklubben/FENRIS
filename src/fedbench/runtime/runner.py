@@ -7,12 +7,12 @@ from fedbench.core.events import (
     CommandCompleted,
     CommandStarted,
     Event,
-    RoundCompleted,
-    RoundStarted,
     RunCompleted,
     RunFailed,
     RunStarted,
     ServerRequest,
+    TrainEvalLoopCompleted,
+    TrainEvalLoopStarted,
 )
 from fedbench.core.logger import log_debug, log_error
 from fedbench.runtime.command import Command
@@ -30,8 +30,8 @@ def run(config: Config, commands: Iterable[Command]) -> None:
     eventbus.register(
         observer=collector,
         event_types=(
-            RoundStarted,
-            RoundCompleted,
+            TrainEvalLoopStarted,
+            TrainEvalLoopCompleted,
             ServerRequest,
             ClientReply,
         ),

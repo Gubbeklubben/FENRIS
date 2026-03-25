@@ -109,7 +109,7 @@ class FedAvg(SingleStepCoordinator):
 
         self._state = aggr_state
 
-    def publish_training_artifacts(self) -> Payload:
+    def publish_train_artifacts(self) -> Payload:
         if self._state is None:
             raise ValueError("No global state, can not publish training artifacts.")
         return GlobalState(self._state).encode()
