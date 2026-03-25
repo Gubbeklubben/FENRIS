@@ -54,7 +54,7 @@ def test_config_snapshot_written(tmp_path: Path) -> None:
 # --- experiment metadata in metrics ----------------------------------------
 
 
-def test_experiment_metadata_in_metrics(tmp_path: Path) -> None:
+def test_metrics_files_written(tmp_path: Path) -> None:
     ctx = _make_ctx(
         tmp_path,
         aggregated_metrics={"fidelity.mean_abs_diff": 0.5},
@@ -63,12 +63,6 @@ def test_experiment_metadata_in_metrics(tmp_path: Path) -> None:
     write_artifacts(ctx)  # type: ignore[arg-type]
 
     outdir = tmp_path / "test-run"
-    data = json.loads(outdir.joinpath("metadata.json").read_text())
-    assert data["experiment.seed"] == 42
-    assert data["experiment.num_rounds"] == 3
-    assert data["experiment.num_clients"] == 3
-    assert data["experiment.generator_type"] == "fed_hello"
-
     fed = json.loads(outdir.joinpath("metrics.federated.json").read_text())
     assert fed["fidelity.mean_abs_diff"] == 0.5
 

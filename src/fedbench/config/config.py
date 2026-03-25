@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import json
 from dataclasses import asdict, dataclass, field
-from typing import Literal, Self
+from typing import Any, Literal, Self
 
 from fedbench.core.eval import Category
 
@@ -141,7 +141,10 @@ class Config:
             seed=SeedConfig.from_master(seed),
         )
 
-    def jsons(self) -> str:
+    def jsondict(self) -> dict[str, Any]:
         cfg = asdict(self)
         cfg["seed"] = self.seed.master
-        return json.dumps(cfg)
+        return cfg
+
+    def jsons(self) -> str:
+        return json.dumps(self.jsondict())
