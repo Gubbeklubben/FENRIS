@@ -40,7 +40,7 @@ class FedTGAN(Algorithm):
         max_batches: int = 100,
         learning_rate: float = 1e-2,
         fraction_evaluate: float = 0.5,
-        num_server_rounds: int = 5,
+        num_server_rounds: int = 10,
         local_epochs: int = 5,
         latent_dim: int = 64,
     ):
@@ -106,12 +106,16 @@ class FedTGAN(Algorithm):
         cat_attrs, num_attrs = split_cat_num(schema)
 
         # Create separate label encoder for each categorical column
+        # and track max encoded value for normalization
         label_encoders = {}
+        cat_max_values = {}
         for col in cat_attrs:
             unique_vals = sorted(dataset[col].astype(str).unique())
             le = LabelEncoder()
             le.fit(unique_vals)
             label_encoders[col] = le
+            # Max encoded value = number of classes - 1
+            cat_max_values[col] = len(unique_vals) - 1
 
         # Calculate dimensions
         n_cat_features = len(cat_attrs)
@@ -143,6 +147,7 @@ class FedTGAN(Algorithm):
         synth_artifacts.objects["preproc-objects"] = {
             "label-encoders": label_encoders,
             "num-scaler": num_scaler,
+            "cat-max-values": cat_max_values,
         }
         synth_artifacts.extras["preproc-extras"] = {
             "cat-attrs": cat_attrs,
@@ -300,11 +305,20 @@ class FedTGANSynthesizer(Synthesizer):
         # Preprocess data: label-encode categoricals, concatenate with numericals
         processed_data = []
 
-        # Encode categorical columns
+        # Extract cat_max_values for normalization
+        cat_max_values = preproc_objects["cat-max-values"]
+
+        # Encode and normalize categorical columns
         for col in cat_attrs:
             if col in label_encoders:
                 encoded = label_encoders[col].transform(data[col].astype(str))
-                processed_data.append(encoded.reshape(-1, 1))
+                # Normalize to [0, 1] by dividing by max value
+                max_val = cat_max_values[col]
+                if max_val > 0:
+                    normalized = encoded / max_val
+                else:
+                    normalized = encoded  # Single-class column, stays 0
+                processed_data.append(normalized.reshape(-1, 1))
 
         # Add numerical columns (scaled)
         num_scaler = preproc_objects["num-scaler"]
@@ -458,16 +472,18 @@ class FedTGANSynthesizer(Synthesizer):
         # Reverse preproc: decode categorical features and extract numerical features
         decoded_data = {}
         n_cat_features = len(cat_attrs)
+        cat_max_values = preproc_objects["cat-max-values"]
 
         # Decode categorical columns
         for i, col in enumerate(cat_attrs):
             if col in label_encoders:
+                # Denormalize from [0, 1] back to integer range
+                max_val = cat_max_values[col]
+                denormalized = synthetic_data[:, i] * max_val
                 # Round to nearest integer for categorical encoding
-                encoded_values = np.round(synthetic_data[:, i]).astype(int)
+                encoded_values = np.round(denormalized).astype(int)
                 # Clip to valid range
-                encoded_values = np.clip(
-                    encoded_values, 0, len(label_encoders[col].classes_) - 1
-                )
+                encoded_values = np.clip(encoded_values, 0, max_val)
                 # Inverse transform to get original categorical values
                 decoded_data[col] = label_encoders[col].inverse_transform(
                     encoded_values
