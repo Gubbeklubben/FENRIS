@@ -26,7 +26,3 @@ def register_builtin_algorithms(registry: FactoryRegistry[Algorithm]) -> None:
         "fed_tgan",
         f"{__package__}.fed_tgan:FedTGAN",
     )
-    registry.add_builtin(
-        "fed_tgan_alt",
-        f"{__package__}.fed_tgan_alt:FedTGANAlt",
-    )
