@@ -53,10 +53,10 @@ def make_tabular_preprocessor(df: pd.DataFrame) -> ColumnTransformer:
     return preprocessor
 
 
-def fit_tabular_model(X: pd.DataFrame, y: pd.Series, model: BaseEstimator) -> Pipeline:
-    preprocessor = make_tabular_preprocessor(X)
+def fit_tabular_model(x: pd.DataFrame, y: pd.Series, model: BaseEstimator) -> Pipeline:
+    preprocessor = make_tabular_preprocessor(x)
     pipe = Pipeline([("pre", preprocessor), ("model", model)])
-    pipe.fit(X, y)
+    pipe.fit(x, y)
     return pipe
 
 
