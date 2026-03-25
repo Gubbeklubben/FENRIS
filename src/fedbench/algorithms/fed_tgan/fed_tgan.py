@@ -5,7 +5,7 @@ from typing import Any, Callable, cast
 import numpy as np
 import pandas as pd
 import torch
-from sklearn.preprocessing import LabelEncoder
+from sklearn.preprocessing import LabelEncoder, MinMaxScaler
 from torch import Tensor
 
 from fedbench.algorithms.fed_tgan.discriminator import Discriminator
@@ -40,8 +40,8 @@ class FedTGAN(Algorithm):
         max_batches: int = 100,
         learning_rate: float = 1e-2,
         fraction_evaluate: float = 0.5,
-        num_server_rounds: int = 3,
-        local_epochs: int = 3,
+        num_server_rounds: int = 5,
+        local_epochs: int = 5,
         latent_dim: int = 64,
     ):
 
@@ -134,11 +134,17 @@ class FedTGAN(Algorithm):
         for k, v in discriminator.state_dict().items():
             packed_state[f"discriminator.{k}"] = v
 
+        # Fit scaler on numerical features
+        num_scaler = None
+        if num_attrs:
+            num_scaler = MinMaxScaler()
+            num_scaler.fit(dataset[num_attrs].values)
+
         # Prepare artifacts for synthesizers
         synth_artifacts = Update()
         synth_artifacts.objects["preproc-objects"] = {
             "label-encoders": {col: label_encoder for col in cat_attrs},
-            "num-scaler": None,
+            "num-scaler": num_scaler,
         }
         synth_artifacts.extras["preproc-extras"] = {
             "cat-attrs": cat_attrs,
@@ -302,8 +308,14 @@ class FedTGANSynthesizer(Synthesizer):
                 encoded = label_encoders[col].transform(data[col].astype(str))
                 processed_data.append(encoded.reshape(-1, 1))
 
-        # Add numerical columns
-        if num_attrs:
+        # Add numerical columns (scaled)
+        num_scaler = preproc_objects["num-scaler"]
+        if num_attrs and num_scaler is not None:
+            num_data = data[num_attrs].values
+            num_scaled = num_scaler.transform(num_data)
+            processed_data.append(num_scaled)
+        elif num_attrs:
+            # Fallback if no scaler (shouldn't happen)
             num_data = data[num_attrs].values
             processed_data.append(num_data)
 
@@ -463,8 +475,19 @@ class FedTGANSynthesizer(Synthesizer):
                     encoded_values
                 )
 
-        # Extract numerical columns (no scaling applied currently)
-        for i, col in enumerate(num_attrs):
-            decoded_data[col] = synthetic_data[:, n_cat_features + i]
+        # Extract and inverse scale numerical columns
+        num_scaler = preproc_objects["num-scaler"]
+        if num_attrs and num_scaler is not None:
+            # Extract numerical columns
+            num_synthetic = synthetic_data[:, n_cat_features : n_cat_features + len(num_attrs)]
+            # Inverse transform to get back original scale
+            num_original = num_scaler.inverse_transform(num_synthetic)
+            # Add to decoded data
+            for i, col in enumerate(num_attrs):
+                decoded_data[col] = num_original[:, i]
+        elif num_attrs:
+            # Fallback if no scaler (shouldn't happen)
+            for i, col in enumerate(num_attrs):
+                decoded_data[col] = synthetic_data[:, n_cat_features + i]
 
         return pd.DataFrame(decoded_data)
