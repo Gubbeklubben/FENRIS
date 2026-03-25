@@ -24,6 +24,7 @@ SEEDS = SeedConfig.from_master(SEED)
 def config():
     return Config(
         algorithm="fed_hello",
+        coordinator="MISSING",
         data=DataConfig(dataset="/dev/null", partitioner="iid_partitioner"),
         seed=SeedConfig.from_master(SEED),
         num_synthetic_rows=20,

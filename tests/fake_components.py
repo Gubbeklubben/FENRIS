@@ -27,6 +27,7 @@ class FakeAlgorithm(Algorithm):
 
 
 class FakePartitioner(Partitioner):
+    # noinspection PyUnusedLocal
     def __init__(self, num_partitions: int):
         pass
 
@@ -48,29 +49,35 @@ class FakePartitioner(Partitioner):
 
 
 class FakeEntryPoint:
-    def __init__(self, name, value, group):
+    def __init__(self, name, value, group, product):
         self.name = name
         self.value = value
         self.group = group
-        self.product = None
+        self.product = product
 
     def load(self):
         return self.product
 
 
 class FakeAlgRegistry(FactoryRegistry[Algorithm]):
+    KEY = "test_algorithm"
+
     def __init__(self):
         super().__init__(f"{__package__}.algorithms", Algorithm)
         self._plugins = {
-            "test": FakeEntryPoint("test", "test", f"{__package__}.algorithms")
+            self.KEY: FakeEntryPoint(
+                self.KEY, "", f"{__package__}.algorithms", FakeAlgorithm
+            )
         }
-        self._plugins["test"].product = FakeAlgorithm
 
 
 class FakePartitionerRegistry(FactoryRegistry[Partitioner]):
+    KEY = "test_partitioner"
+
     def __init__(self):
         super().__init__(f"{__package__}.partitioners", Partitioner)
         self._plugins = {
-            "test": FakeEntryPoint("test", "test", f"{__package__}.partitioners")
+            self.KEY: FakeEntryPoint(
+                self.KEY, "", f"{__package__}.partitioners", FakePartitioner
+            )
         }
-        self._plugins["test"].product = FakePartitioner

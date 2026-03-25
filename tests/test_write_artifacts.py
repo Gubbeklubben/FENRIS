@@ -14,6 +14,7 @@ from fedbench.runtime.pipeline import write_artifacts
 def _make_config(tmp_path: Path) -> Config:
     return Config(
         algorithm="fed_hello",
+        coordinator="MISSING",
         data=DataConfig(dataset="dummy.csv", partitioner="iid-partitioner"),
         outputdir=str(tmp_path),
         seed=SeedConfig.from_master(42),

@@ -94,8 +94,13 @@ class SeedConfig:
 @dataclass(frozen=True)
 class Config:
     algorithm: str
+    coordinator: str
     data: DataConfig
     algorithm_kwargs: dict[
+        str,
+        None | bool | str | float | int,
+    ] = field(default_factory=dict)
+    coordinator_kwargs: dict[
         str,
         None | bool | str | float | int,
     ] = field(default_factory=dict)

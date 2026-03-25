@@ -29,8 +29,9 @@ def minimal_valid_cfg(tmp_path: Path, **overrides):
 
     base = {
         "dataset": str(dataset),
-        "algorithm": "test",
-        "partitioner": "test",
+        "algorithm": FakeAlgRegistry.KEY,
+        "coordinator": "MISSING",
+        "partitioner": FakePartitionerRegistry.KEY,
     }
     base.update(overrides)
     return base

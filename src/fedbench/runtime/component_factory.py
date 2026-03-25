@@ -4,7 +4,7 @@ from collections.abc import Callable
 from pandas import DataFrame
 
 from fedbench.config import Config
-from fedbench.core.algorithm import Algorithm, Synthesizer
+from fedbench.core.algorithm import Algorithm, Coordinator, Synthesizer
 from fedbench.core.data import Partitioner, load_csv
 from fedbench.core.eval import EvaluationSuite, Evaluator
 from fedbench.core.payload import Payload
@@ -24,6 +24,17 @@ def create_algorithm(
     return registry.call(
         config.algorithm,
         config.algorithm_kwargs,
+    )
+
+
+def create_coordinator(
+    config: Config,
+    registry: FactoryRegistry[Coordinator],
+) -> Coordinator:
+
+    return registry.call(
+        config.coordinator,
+        config.coordinator_kwargs,
     )
 
 
