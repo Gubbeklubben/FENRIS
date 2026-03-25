@@ -28,7 +28,7 @@ def make_server_app(ctx: RunContext) -> ServerApp:
         num_synthetic_rows = (
             ctx.config.metrics.stop_synthetic_rows
             or ctx.config.num_synthetic_rows
-            or len(ctx.dataset.load_global_holdout())
+            or ctx.dataset.global_holdout_size
         )
         synthetic_df = synthesizer.sample(
             train_artifacts, num_synthetic_rows, ctx.config.seed.sampling
