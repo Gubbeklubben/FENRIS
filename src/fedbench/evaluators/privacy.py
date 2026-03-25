@@ -145,9 +145,9 @@ class DirectOverlapDiagnosticEvaluator(Evaluator):
         return df.apply(hash_row, axis=1)
 
     def _count_matches(self, ctx: LocalEvalContext, cols: Iterable[str]) -> int:
-        H_train = set(self._canonical_row_hash(ctx.train_df[cols]))
-        H_syn = self._canonical_row_hash(ctx.synthetic_df[cols])
-        return int(sum(h in H_train for h in H_syn))
+        h_train = set(self._canonical_row_hash(ctx.train_df[cols]))
+        h_syn = self._canonical_row_hash(ctx.synthetic_df[cols])
+        return int(sum(h in h_train for h in h_syn))
 
     def global_evaluate(self, ctx: GlobalEvalContext) -> dict[str, float]:
         """Overlap must be checked against client training records (federated mode).
@@ -303,14 +303,14 @@ class MIANearestNeighborAttackEvaluator(Evaluator):
         if members_pool.empty or nonmembers_pool.empty or sx.empty:
             return nan_result
 
-        K = min(self.DEFAULT_MIA_K, len(members_pool), len(nonmembers_pool))
-        if K == 0:
+        k = min(self.DEFAULT_MIA_K, len(members_pool), len(nonmembers_pool))
+        if k == 0:
             return nan_result
 
-        members = members_pool.sample(n=K, random_state=seed)
-        nonmembers = nonmembers_pool.sample(n=K, random_state=seed)
+        members = members_pool.sample(n=k, random_state=seed)
+        nonmembers = nonmembers_pool.sample(n=k, random_state=seed)
 
-        X = pd.concat([members, nonmembers], ignore_index=True)
+        x = pd.concat([members, nonmembers], ignore_index=True)
         y = np.array([1] * len(members) + [0] * len(nonmembers))
 
         syn_mat = sx.to_numpy(dtype=float)
@@ -319,12 +319,12 @@ class MIANearestNeighborAttackEvaluator(Evaluator):
         syn_rng[syn_rng == 0] = 1.0
         syn_norm = (syn_mat - syn_min) / syn_rng
 
-        def nn_dist(x: np.ndarray) -> float:
-            x_norm = (x - syn_min) / syn_rng
+        def nn_dist(_x: np.ndarray) -> float:
+            x_norm = (_x - syn_min) / syn_rng
             d2 = np.sum((syn_norm - x_norm) ** 2, axis=1)
             return float(np.sqrt(np.min(d2)))
 
-        dists = np.array([nn_dist(v) for v in X.to_numpy(dtype=float)])
+        dists = np.array([nn_dist(v) for v in x.to_numpy(dtype=float)])
         scores = -dists
 
         finite = scores[np.isfinite(scores)]
@@ -334,7 +334,7 @@ class MIANearestNeighborAttackEvaluator(Evaluator):
 
         threshold = np.median(scores)
         return _MIAResult(
-            K=K,
+            K=k,
             mia_auc=roc_auc_score(y, scores),
             mia_accuracy=accuracy_score(y, scores > threshold),
             mia_advantage=float(
@@ -470,9 +470,9 @@ class AIASupervisedAttackEvaluator(Evaluator):
         ):
             return result
 
-        X_test = test_df[quasi_ids]
+        x_test = test_df[quasi_ids]
         y_test = test_df[sensitive_column]
-        X_syn = syn_df[quasi_ids]
+        x_syn = syn_df[quasi_ids]
         y_syn = syn_df[sensitive_column]
         result.n_test = len(test_df)
 
@@ -487,16 +487,16 @@ class AIASupervisedAttackEvaluator(Evaluator):
                 solver="lbfgs",
                 random_state=seed,
             )
-            pipe = fit_tabular_model(X_syn, y_syn, model)
-            y_pred = pipe.predict(X_test)
+            pipe = fit_tabular_model(x_syn, y_syn, model)
+            y_pred = pipe.predict(x_test)
             result.accuracy = accuracy_score(y_test, y_pred)
             if len(np.unique(y_syn)) == 2:
-                y_proba = pipe.predict_proba(X_test)[:, 1]
+                y_proba = pipe.predict_proba(x_test)[:, 1]
                 result.auc = roc_auc_score(y_test, y_proba)
         else:
             model = Ridge(random_state=seed)
-            pipe = fit_tabular_model(X_syn, y_syn, model)
-            y_pred = pipe.predict(X_test)
+            pipe = fit_tabular_model(x_syn, y_syn, model)
+            y_pred = pipe.predict(x_test)
             result.rmse = math.sqrt(mean_squared_error(y_test, y_pred))
 
         return result
