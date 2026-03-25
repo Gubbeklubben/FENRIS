@@ -7,7 +7,6 @@ privacy, fairness, scalability) but are not part of the public evaluator API.
 from __future__ import annotations
 
 import math
-import re
 from typing import Iterable, Mapping
 
 import numpy as np
@@ -54,10 +53,10 @@ def make_tabular_preprocessor(df: pd.DataFrame) -> ColumnTransformer:
     return preprocessor
 
 
-def fit_tabular_model(X: pd.DataFrame, y: pd.Series, model: BaseEstimator) -> Pipeline:
-    preprocessor = make_tabular_preprocessor(X)
+def fit_tabular_model(x: pd.DataFrame, y: pd.Series, model: BaseEstimator) -> Pipeline:
+    preprocessor = make_tabular_preprocessor(x)
     pipe = Pipeline([("pre", preprocessor), ("model", model)])
-    pipe.fit(X, y)
+    pipe.fit(x, y)
     return pipe
 
 
@@ -137,7 +136,3 @@ def weighted_mean_metrics(
         key: weighted_mean(pairs)  # nofmt
         for key, pairs in acc.items()
     }
-
-
-def to_snake_case(text: str) -> str:
-    return re.sub(r"[^a-z_]+", "_", text.lower())

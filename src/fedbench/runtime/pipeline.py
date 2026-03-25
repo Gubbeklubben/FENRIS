@@ -21,7 +21,7 @@ from fedbench.runtime.component_factory import (
 from fedbench.runtime.platform_info import collect_platform_info
 from fedbench.runtime.registry_builder import (
     build_algorithm_registry,
-    build_evaluator_registries,
+    build_evaluator_registry,
     build_partitioner_registry,
 )
 from fedbench.runtime.runcontext import RunContext
@@ -40,7 +40,7 @@ def create_components(ctx: RunContext) -> None:
     )
     ctx.eval_suite = create_evaluation_suite(
         ctx.config,
-        build_evaluator_registries(),
+        build_evaluator_registry(),
     )
 
 
@@ -82,7 +82,11 @@ def federated_train_eval_loop(ctx: RunContext) -> None:
 
 def aggregate_federated_metrics(ctx: RunContext) -> None:
     ctx.aggregated_metrics = {
-        **ctx.eval_suite.aggregate(ctx.per_client_metrics.values()),
+        **ctx.eval_suite.aggregate(
+            ctx.per_client_metrics.values(),
+            ctx.config.data.target_col,
+            ctx.config.data.sensitive_cols,
+        ),
         **ctx.scalability_collector.get_metrics(),
     }
 

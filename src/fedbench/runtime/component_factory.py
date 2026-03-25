@@ -1,5 +1,5 @@
 import functools
-from collections.abc import Callable, Mapping
+from collections.abc import Callable
 
 from pandas import DataFrame
 
@@ -40,14 +40,14 @@ def create_partitioner(
 
 def create_evaluation_suite(
     config: Config,
-    registries: Mapping[str, FactoryRegistry[Evaluator]],
+    registry: FactoryRegistry[Evaluator],
 ) -> EvaluationSuite:
 
     if not config.metrics.run_categories:
-        return EvaluationSuite.default(registries)
+        return EvaluationSuite.default(registry)
 
     return EvaluationSuite.with_evaluator_categories(
-        registries,
+        registry,
         config.metrics.run_categories,
     )
 

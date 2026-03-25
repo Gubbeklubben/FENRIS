@@ -22,11 +22,16 @@ Registered metric keys (spec §9)
 
 from __future__ import annotations
 
-import math
 from typing import Iterable
 
+from fedbench.core.eval import Category
 from fedbench.core.eval.evalcontext import GlobalEvalContext, LocalEvalContext
-from fedbench.core.eval.evaluator import Evaluator
+from fedbench.core.eval.evaluator import (
+    EvaluationMode,
+    Evaluator,
+    EvaluatorDescriptor,
+    MetricDescriptor,
+)
 from fedbench.evaluators._helpers import weighted_mean
 
 
@@ -38,6 +43,21 @@ class ScalabilityEvaluator(Evaluator):
     merged into aggregated_metrics outside the evaluator pipeline.
     """
 
+    @property
+    def metadata(self) -> EvaluatorDescriptor:
+        return EvaluatorDescriptor(
+            name="scalability",
+            category=Category.SCALABILITY,
+            eval_mode=EvaluationMode.FEDERATED,
+            metrics=[
+                MetricDescriptor("wall_clock_seconds", default_stop_mode=None),
+                MetricDescriptor("bytes_sent", default_stop_mode=None),
+                MetricDescriptor("bytes_received", default_stop_mode=None),
+                MetricDescriptor("rounds_to_converge", default_stop_mode=None),
+                MetricDescriptor("local_train_seconds_mean", default_stop_mode=None),
+            ],
+        )
+
     # ------------------------------------------------------------------
     # Centralized / global path
     # ------------------------------------------------------------------
@@ -46,13 +66,7 @@ class ScalabilityEvaluator(Evaluator):
         """Return NaN for all keys
         — scalability has no centralized analogue (spec §15.5).
         """
-        return {
-            "wall_clock_seconds": math.nan,
-            "bytes_sent": math.nan,
-            "bytes_received": math.nan,
-            "rounds_to_converge": math.nan,
-            "local_train_seconds_mean": math.nan,
-        }
+        return self._nan_result()
 
     # ------------------------------------------------------------------
     # Federated client-side path
@@ -72,8 +86,10 @@ class ScalabilityEvaluator(Evaluator):
         """Compute row-count-weighted mean of per-client ``local_train_seconds``.
 
         Clients whose value is NaN are excluded from the mean.
-        The four ScalabilityCollector keys are not emitted here.
+        The other ScalabilityCollector keys are emitted as NaN here.
+        Their proper values are injected during aggregate_federated_metrics.
         """
         return {
+            **self._nan_result(),
             "local_train_seconds_mean": weighted_mean(stats),
         }

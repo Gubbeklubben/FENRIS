@@ -18,10 +18,16 @@ import numpy as np
 import pandas as pd
 from sklearn.linear_model import LogisticRegression
 
-from fedbench.core.eval import Evaluator, LocalEvalContext
+from fedbench.core.eval import Category, Evaluator, LocalEvalContext
 from fedbench.core.eval.evalcontext import GlobalEvalContext
+from fedbench.core.eval.evaluator import (
+    EvaluationMode,
+    EvaluatorDescriptor,
+    MetricDescriptor,
+    normalize_key,
+)
 from fedbench.core.logger import log_debug
-from fedbench.evaluators._helpers import fit_tabular_model, to_snake_case
+from fedbench.evaluators._helpers import fit_tabular_model
 
 
 @dataclass
@@ -59,6 +65,19 @@ class FairnessEvaluator(Evaluator):
     * ``fairness.equalized_odds_diff.<column>``
     * ``fairness.equal_opportunity_diff.<column>``
     """
+
+    @property
+    def metadata(self) -> EvaluatorDescriptor:
+        return EvaluatorDescriptor(
+            name="fairness",
+            category=Category.FAIRNESS,
+            eval_mode=EvaluationMode.BOTH,
+            metrics=[
+                MetricDescriptor("demographic_parity_diff", suffix_type="sensitive"),
+                MetricDescriptor("equalized_odds_diff", suffix_type="sensitive"),
+                MetricDescriptor("equal_opportunity_diff", suffix_type="sensitive"),
+            ],
+        )
 
     MIN_GROUP_SIZE = 30
 
@@ -194,9 +213,9 @@ class FairnessEvaluator(Evaluator):
             )
             return {}
 
-        X_syn = syn_df[feature_columns]
+        x_syn = syn_df[feature_columns]
         y_syn = syn_df[target_column]
-        X_real = train_df[feature_columns]
+        x_real = train_df[feature_columns]
         y_real = train_df[target_column]
         sens = train_df[sensitive_column]
 
@@ -219,7 +238,7 @@ class FairnessEvaluator(Evaluator):
 
         model = LogisticRegression(max_iter=1000, solver="lbfgs", random_state=seed)
         try:
-            pipe = fit_tabular_model(X_syn, pd.Series(y_syn_enc), model)
+            pipe = fit_tabular_model(x_syn, pd.Series(y_syn_enc), model)
         except ValueError as e:
             log_debug(
                 "Fairness",
@@ -229,21 +248,13 @@ class FairnessEvaluator(Evaluator):
             log_debug("Fairness", str(e))
             return {}
 
-        y_pred = pipe.predict(X_real)
+        y_pred = pipe.predict(x_real)
         return self._per_group_confusion(
             pd.Series(y_real_enc).to_numpy(),
             np.array(y_pred),
             sens.to_numpy(),
             min_group_size=min_group_size,
         )
-
-    # noinspection PyMethodMayBeStatic
-    def _nan_result(self) -> dict[str, float]:
-        return {
-            "demographic_parity_diff": math.nan,
-            "equalized_odds_diff": math.nan,
-            "equal_opportunity_diff": math.nan,
-        }
 
     def global_evaluate(self, ctx: GlobalEvalContext) -> dict[str, float]:
         if not ctx.target_column:
@@ -261,7 +272,7 @@ class FairnessEvaluator(Evaluator):
             )
 
             result = self._fairness_metrics_from_counts(group_counts)
-            key = to_snake_case(sensitive_column)
+            key = normalize_key(sensitive_column)
 
             metrics[f"demographic_parity_diff.{key}"] = result.demographic_parity_diff
             metrics[f"equalized_odds_diff.{key}"] = result.equalized_odds_diff
@@ -328,7 +339,7 @@ class FairnessEvaluator(Evaluator):
             }
 
             result = self._fairness_metrics_from_counts(valid_counts)
-            key = to_snake_case(sensitive_column)
+            key = normalize_key(sensitive_column)
 
             metrics[f"demographic_parity_diff.{key}"] = result.demographic_parity_diff
             metrics[f"equalized_odds_diff.{key}"] = result.equalized_odds_diff

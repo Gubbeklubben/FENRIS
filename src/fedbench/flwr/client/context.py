@@ -20,7 +20,7 @@ from fedbench.runtime.component_factory import (
 )
 from fedbench.runtime.registry_builder import (
     build_algorithm_registry,
-    build_evaluator_registries,
+    build_evaluator_registry,
     build_partitioner_registry,
 )
 
@@ -46,7 +46,7 @@ def build_client_context(flwr_cache: RecordDict) -> ClientContext:
     dataset = _get_dataset(config)
 
     algorithm = create_algorithm(config, build_algorithm_registry())
-    eval_suite = create_evaluation_suite(config, build_evaluator_registries())
+    eval_suite = create_evaluation_suite(config, build_evaluator_registry())
     serde = FlwrSerde(
         object_serde=Pickle(disabled=config.disable_pickle),
         default_arrays_map=algorithm.synthesizer_spec.arrays_to_ml_framework_map,

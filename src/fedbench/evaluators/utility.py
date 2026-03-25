@@ -6,7 +6,6 @@ using a Train-on-Synthetic / Test-on-Real (TSTR) approach with
 logistic regression (classification) or ridge regression (regression).
 """
 
-import math
 from typing import Iterable, Mapping
 
 import numpy as np
@@ -15,8 +14,13 @@ from sklearn.linear_model import LogisticRegression, Ridge
 from sklearn.metrics import accuracy_score, mean_squared_error, roc_auc_score
 
 from fedbench.core.data import TableSchema
-from fedbench.core.eval import Evaluator, LocalEvalContext
+from fedbench.core.eval import Category, Evaluator, LocalEvalContext
 from fedbench.core.eval.evalcontext import GlobalEvalContext
+from fedbench.core.eval.evaluator import (
+    EvaluationMode,
+    EvaluatorDescriptor,
+    MetricDescriptor,
+)
 from fedbench.evaluators._helpers import (
     fit_tabular_model,
     weighted_mean_metrics,
@@ -24,31 +28,40 @@ from fedbench.evaluators._helpers import (
 
 
 class TSTREvaluator(Evaluator):
+    @property
+    def metadata(self) -> EvaluatorDescriptor:
+        return EvaluatorDescriptor(
+            name="tstr",
+            category=Category.UTILITY,
+            eval_mode=EvaluationMode.BOTH,
+            metrics=[
+                MetricDescriptor("tstr_auc", default_stop_mode="max"),
+                MetricDescriptor("tstr_accuracy", default_stop_mode="max"),
+                MetricDescriptor("tstr_rmse"),
+            ],
+        )
+
     # noinspection PyMethodMayBeStatic
     def _compute(
         self,
-        D_test: pd.DataFrame,
-        D_syn: pd.DataFrame,
+        d_test: pd.DataFrame,
+        d_syn: pd.DataFrame,
         y_col: str | None,
         schema: TableSchema,
         seed: int,
     ) -> dict[str, float]:
 
-        metrics = {
-            "tstr_auc": math.nan,
-            "tstr_accuracy": math.nan,
-            "tstr_rmse": math.nan,
-        }
+        metrics = self._nan_result()
 
-        if y_col is None or D_test is None:
+        if y_col is None or d_test is None:
             return metrics
 
-        X_syn = D_syn.drop(columns=[y_col])
-        y_syn = D_syn[y_col]
-        X_test = D_test.drop(columns=[y_col])
-        y_test = D_test[y_col]
+        x_syn = d_syn.drop(columns=[y_col])
+        y_syn = d_syn[y_col]
+        x_test = d_test.drop(columns=[y_col])
+        y_test = d_test[y_col]
 
-        if X_syn.empty:
+        if x_syn.empty:
             return metrics
 
         if schema.kind_of(y_col) in ["binary", "categorical"]:
@@ -62,27 +75,27 @@ class TSTREvaluator(Evaluator):
                 solver="lbfgs",
                 random_state=seed,
             )
-            pipe = fit_tabular_model(X_syn, y_syn, model)
+            pipe = fit_tabular_model(x_syn, y_syn, model)
 
             if schema.kind_of(y_col) == "binary":
-                y_proba = pipe.predict_proba(X_test)[:, 1]
+                y_proba = pipe.predict_proba(x_test)[:, 1]
                 metrics["tstr_auc"] = roc_auc_score(y_test, y_proba)
             else:
-                y_pred = pipe.predict(X_test)
+                y_pred = pipe.predict(x_test)
                 metrics["tstr_accuracy"] = accuracy_score(y_test, y_pred)
 
         else:
             model = Ridge(random_state=seed)
-            pipe = fit_tabular_model(X_syn, y_syn, model)
-            y_pred = pipe.predict(X_test)
+            pipe = fit_tabular_model(x_syn, y_syn, model)
+            y_pred = pipe.predict(x_test)
             metrics["tstr_rmse"] = np.sqrt(mean_squared_error(y_test, y_pred))
 
         return metrics
 
     def global_evaluate(self, ctx: GlobalEvalContext) -> dict[str, float]:
         return self._compute(
-            D_test=ctx.holdout_df,
-            D_syn=ctx.synthetic_df,
+            d_test=ctx.holdout_df,
+            d_syn=ctx.synthetic_df,
             y_col=ctx.target_column,
             schema=ctx.schema,
             seed=ctx.seed,
@@ -90,8 +103,8 @@ class TSTREvaluator(Evaluator):
 
     def local_evaluate(self, ctx: LocalEvalContext) -> tuple[dict[str, float], int]:
         return self._compute(
-            D_test=ctx.test_df,
-            D_syn=ctx.synthetic_df,
+            d_test=ctx.test_df,
+            d_syn=ctx.synthetic_df,
             y_col=ctx.target_column,
             schema=ctx.schema,
             seed=ctx.seed,
@@ -100,5 +113,4 @@ class TSTREvaluator(Evaluator):
     def aggregate(
         self, stats: Iterable[tuple[Mapping[str, float], int]]
     ) -> dict[str, float]:
-        keys = ("tstr_auc", "tstr_accuracy", "tstr_rmse")
-        return weighted_mean_metrics(stats, keys)
+        return weighted_mean_metrics(stats, self.get_metric_keys())
