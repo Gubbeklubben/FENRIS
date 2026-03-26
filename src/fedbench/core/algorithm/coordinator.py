@@ -1,7 +1,7 @@
 from abc import ABC, abstractmethod
 from collections.abc import Generator, Iterable
 
-from fedbench.core.payload import ArraysTarget, Payload, PayloadSchema
+from fedbench.core.payload import ArraysTarget, Payload
 
 
 class Coordinator(ABC):
@@ -13,11 +13,6 @@ class Coordinator(ABC):
     @property
     @abstractmethod
     def arrays_target(self) -> ArraysTarget:
-        pass
-
-    @property
-    @abstractmethod
-    def payload_schema(self) -> PayloadSchema:
         pass
 
     def attach_global_init_artifacts(self, artifacts: Payload) -> None:

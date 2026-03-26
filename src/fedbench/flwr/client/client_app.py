@@ -6,13 +6,13 @@ from typing import cast
 from flwr.app import Context, Message, MetricRecord, RecordDict
 from flwr.clientapp import ClientApp
 
+from fedbench.core.algorithm import SampleContext, TrainContext
 from fedbench.core.encoder import FedbenchEncoder
 from fedbench.core.eval import LocalEvalContext
 from fedbench.core.logger import log_warning
 from fedbench.core.payload import Extras, Payload
 from fedbench.flwr.client.context import build_client_context
 from fedbench.flwr.namespace import Namespace
-from fedbench.runtime.component_factory import create_synthesizer
 
 app = ClientApp()
 
@@ -43,13 +43,12 @@ def train(message: Message, flwr_context: Context) -> Message:
     request = ctx.serde.from_flwr(message.content)
 
     with ctx.serde.use_deserialized(ctx.synthesizer_cache) as cache:
-        synthesizer = create_synthesizer(
-            ctx.synthesizer_factory,
-            artifacts=artifacts,
+        train_ctx = TrainContext(
+            global_init_artifacts=artifacts,
             client_cache=cache,
         )
         start_time = time.perf_counter_ns()
-        reply = synthesizer.train(request, train_df)
+        reply = ctx.synthesizer.train(request, train_df, train_ctx)
         train_seconds = (time.perf_counter_ns() - start_time) / 1e9
 
     with ctx.serde.use_deserialized(ctx.framework_cache) as cache:
@@ -77,19 +76,16 @@ def evaluate(message: Message, flwr_context: Context) -> Message:
     request = ctx.serde.from_flwr(message.content)
 
     with ctx.serde.use_deserialized(ctx.synthesizer_cache) as cache:
-        synthesizer = create_synthesizer(
-            ctx.synthesizer_factory,
-            artifacts=artifacts,
+        sample_ctx = SampleContext(
+            global_init_artifacts=artifacts,
             client_cache=cache,
+            seed=ctx.config.seed.sampling,
+            num_rows=ctx.config.num_synthetic_rows or ctx.dataset.global_holdout_size,
         )
-        synthetic_df = synthesizer.sample(
-            request,
-            ctx.config.num_synthetic_rows or ctx.dataset.global_holdout_size,
-            ctx.config.seed.sampling,
-        )
+        synthetic_df = ctx.synthesizer.sample(request, sample_ctx)
 
     if synthetic_df.empty:
-        log_warning(__name__, f"Recv empty sample from {synthesizer}.")
+        log_warning(__name__, f"Recv empty sample from {ctx.synthesizer}.")
         return Message(
             content=RecordDict({"metrics": MetricRecord()}),
             reply_to=message,

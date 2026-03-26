@@ -4,10 +4,9 @@ from collections.abc import Callable
 from pandas import DataFrame
 
 from fedbench.config import Config
-from fedbench.core.algorithm import Algorithm, Coordinator, Synthesizer
+from fedbench.core.algorithm import Coordinator, Synthesizer
 from fedbench.core.data import PartitionedDataset, Partitioner, load_csv
 from fedbench.core.eval import CentralizedEvalContext, EvaluationSuite, Evaluator
-from fedbench.core.payload import Payload
 from fedbench.runtime.registry import FactoryRegistry
 
 
@@ -16,14 +15,14 @@ def create_df_loader(config: Config) -> Callable[[], DataFrame]:
     return functools.partial(load_csv, config.data.dataset)
 
 
-def create_algorithm(
+def create_synthesizer(
     config: Config,
-    registry: FactoryRegistry[Algorithm],
-) -> Algorithm:
+    registry: FactoryRegistry[Synthesizer],
+) -> Synthesizer:
 
     return registry.call(
-        config.algorithm,
-        config.algorithm_kwargs,
+        config.synthesizer,
+        config.synthesizer_kwargs,
     )
 
 
@@ -61,25 +60,6 @@ def create_evaluation_suite(
         registry,
         config.metrics.run_categories,
     )
-
-
-def create_synthesizer(
-    factory: Callable[[], Synthesizer],
-    artifacts: Payload | None,
-    client_cache: Payload | None,
-) -> Synthesizer:
-
-    instance = factory()
-    if not isinstance(instance, Synthesizer):
-        raise TypeError(f"{instance} is not a Synthesizer.")
-
-    if artifacts is not None:
-        instance.attach_global_init_artifacts(artifacts)
-
-    if client_cache is not None:
-        instance.attach_client_cache(client_cache)
-
-    return instance
 
 
 def create_centralized_eval_ctx(

@@ -3,13 +3,13 @@ from typing import cast
 from flwr.app import Context
 from flwr.serverapp import Grid, ServerApp
 
+from fedbench.core.algorithm import SampleContext
 from fedbench.core.events import ClientsConfigured
 from fedbench.core.payload import Payload
 from fedbench.flwr.serde import FlwrSerde, Pickle
 from fedbench.flwr.server.server import Strategy, configure_clients
 from fedbench.runtime.component_factory import (
     create_centralized_eval_ctx,
-    create_synthesizer,
 )
 from fedbench.runtime.early_stopping_monitor import EarlyStoppingMonitor
 from fedbench.runtime.runcontext import RunContext
@@ -20,19 +20,18 @@ def make_server_app(ctx: RunContext) -> ServerApp:
 
     def _evaluate_fn(train_artifacts: Payload) -> float:
         # See also: pipeline.global_sample
-        synthesizer = create_synthesizer(
-            ctx.algorithm.synthesizer_spec.factory,
-            artifacts=ctx.global_init_artifacts.synthesizer,
-            client_cache=None,
-        )
         num_synthetic_rows = (
             ctx.config.metrics.stop_synthetic_rows
             or ctx.config.num_synthetic_rows
             or ctx.dataset.global_holdout_size
         )
-        synthetic_df = synthesizer.sample(
-            train_artifacts, num_synthetic_rows, ctx.config.seed.sampling
+        sample_ctx = SampleContext(
+            global_init_artifacts=ctx.global_init_artifacts.synthesizer,
+            client_cache=None,
+            seed=ctx.config.seed.sampling,
+            num_rows=num_synthetic_rows,
         )
+        synthetic_df = ctx.synthesizer.sample(train_artifacts, sample_ctx)
 
         eval_ctx = create_centralized_eval_ctx(ctx.config, ctx.dataset, synthetic_df)
         # noinspection PyUnnecessaryCast

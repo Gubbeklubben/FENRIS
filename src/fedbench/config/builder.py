@@ -13,7 +13,7 @@ from fedbench.config.config import (
     SeedConfig,
 )
 from fedbench.config.parsing import parse_for_function
-from fedbench.core.algorithm import Algorithm
+from fedbench.core.algorithm import Synthesizer
 from fedbench.core.data import Partitioner
 from fedbench.core.eval import Category, EvaluationSuite
 from fedbench.core.eval.evaluator import EvaluationMode
@@ -23,7 +23,7 @@ from fedbench.runtime.registry_builder import build_evaluator_registry
 
 def build_config(
     cli_input: dict[str, Any],
-    algorithm_registry: FactoryRegistry[Algorithm],
+    synthesizer_registry: FactoryRegistry[Synthesizer],
     partitioner_registry: FactoryRegistry[Partitioner],
 ) -> Config:
     # Remove seed from cli_input so it doesn't become part of the cfg dict.
@@ -43,7 +43,7 @@ def build_config(
     resolve_run_categories(metrics_cfg)
     validate_stop_metrics(metrics_cfg, data_cfg)
 
-    parse_algorithm_kwargs(cfg, algorithm_registry)
+    parse_synthesizer_kwargs(cfg, synthesizer_registry)
     parse_partitioner_kwargs(cfg, data_cfg, seed_cfg, partitioner_registry)
 
     # Build complete config object
@@ -146,17 +146,19 @@ def validate_stop_metrics(
         metrics_cfg["stop_mode"] = metric.default_stop_mode
 
 
-def parse_algorithm_kwargs(
-    cfg: dict[str, Any], algorithm_registry: FactoryRegistry[Algorithm]
+def parse_synthesizer_kwargs(
+    cfg: dict[str, Any], synthesizer_registry: FactoryRegistry[Synthesizer]
 ) -> None:
-    # Check that specified algorithm is registered
-    if cfg["algorithm"] not in algorithm_registry:
-        raise ValueError(f"Algorithm {cfg['algorithm']} is not registered")
 
-    # Parse algorithm kwargs and map to correct types
-    cfg["algorithm_kwargs"] = parse_for_function(
-        algorithm_registry.load(cfg["algorithm"]),
-        cfg.get("algorithm_kwargs", {}),
+    name = cfg["synthesizer"]
+    # Check that specified synthesizer is registered
+    if name not in synthesizer_registry:
+        raise ValueError(f"Synthesizer {name} is not registered")
+
+    # Parse kwargs and map to correct types
+    cfg["synthesizer_kwargs"] = parse_for_function(
+        synthesizer_registry.load(name),
+        cfg.get("synthesizer_kwargs", {}),
     )
 
 

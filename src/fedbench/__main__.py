@@ -9,13 +9,13 @@ from fedbench.config.parsing import split_outside_brackets
 from fedbench.runtime.pipeline import pipeline
 from fedbench.runtime.registry import FactoryRegistry
 from fedbench.runtime.registry_builder import (
-    build_algorithm_registry,
     build_coordinator_registry,
     build_evaluator_registry,
     build_partitioner_registry,
+    build_synthesizer_registry,
 )
 
-algorithms = build_algorithm_registry()
+synthesizers = build_synthesizer_registry()
 coordinators = build_coordinator_registry()
 partitioners = build_partitioner_registry()
 evaluators = build_evaluator_registry()
@@ -47,7 +47,7 @@ def new(name: str) -> None:
 
 
 class Component(StrEnum):
-    ALGORITHMS = "algorithms"
+    SYNTHESIZERS = "synthesizers"
     COORDINATORS = "coordinators"
     PARTITIONERS = "partitioners"
     EVALUATORS = "evaluators"
@@ -70,12 +70,12 @@ def show(
     ] = False,
 ) -> None:
     """
-    Show available algorithms, partitioners, and/or evaluators.
+    Show available components.
 
     Examples:\n
       fedbench show\n
-      fedbench show algorithms\n
-      fedbench show algorithms partitioners --include-locators
+      fedbench show synthesizers\n
+      fedbench show synthesizers partitioners --include-locators
     """
 
     selected = components if components else list(Component)
@@ -91,7 +91,7 @@ def show(
             print(f"  {metadata.name:<{width}}", end="")
             print(f"  {metadata.locator}" if include_locators else "")
 
-    maybe_show(Component.ALGORITHMS, algorithms)
+    maybe_show(Component.SYNTHESIZERS, synthesizers)
     maybe_show(Component.COORDINATORS, coordinators)
     maybe_show(Component.PARTITIONERS, partitioners)
     maybe_show(Component.EVALUATORS, evaluators)
@@ -101,11 +101,11 @@ def show(
 
 @app.command()
 def run(
-    algorithm: Annotated[str, typer.Argument(help="Algorithm/Generator key.")],
-    coordinator: Annotated[str, typer.Argument(help="Coordinator key.")],
-    partitioner: Annotated[str, typer.Argument(help="Partitioner key.")],
+    synthesizer: Annotated[str, typer.Argument(help="Synthesizer name.")],
+    coordinator: Annotated[str, typer.Argument(help="Coordinator name.")],
+    partitioner: Annotated[str, typer.Argument(help="Partitioner name.")],
     dataset: Annotated[str, typer.Argument(help="Path to the dataset CSV.")],
-    algorithm_kwargs: Annotated[
+    synthesizer_kwargs: Annotated[
         str | None,
         typer.Option(
             callback=parse_kwargs, help="Kwargs for the algorithm (key=value)."
@@ -191,7 +191,7 @@ def run(
         for key, value in locals().items()
         if value is not None
     }
-    config = build_config(cli_input, algorithms, partitioners)
+    config = build_config(cli_input, synthesizers, partitioners)
     runner.run(config, pipeline())
 
 

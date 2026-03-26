@@ -5,13 +5,16 @@ import math
 from collections.abc import Iterable
 from pathlib import Path
 
-from fedbench.core.algorithm import GlobalInitArtifacts
+from fedbench.core.algorithm import (
+    GlobalInitArtifacts,
+    GlobalInitContext,
+    SampleContext,
+)
 from fedbench.core.data import PartitionedDataset
 from fedbench.core.data.schemas import infer_schema as _infer_schema
 from fedbench.core.logger import log_info
 from fedbench.runtime.command import Command
 from fedbench.runtime.component_factory import (
-    create_algorithm,
     create_centralized_eval_ctx,
     create_coordinator,
     create_df_loader,
@@ -21,10 +24,10 @@ from fedbench.runtime.component_factory import (
 )
 from fedbench.runtime.platform_info import collect_platform_info
 from fedbench.runtime.registry_builder import (
-    build_algorithm_registry,
     build_coordinator_registry,
     build_evaluator_registry,
     build_partitioner_registry,
+    build_synthesizer_registry,
 )
 from fedbench.runtime.runcontext import RunContext
 
@@ -32,9 +35,9 @@ from fedbench.runtime.runcontext import RunContext
 def create_components(ctx: RunContext) -> None:
     ctx.df_loader = create_df_loader(ctx.config)
 
-    ctx.algorithm = create_algorithm(
+    ctx.synthesizer = create_synthesizer(
         ctx.config,
-        build_algorithm_registry(),
+        build_synthesizer_registry(),
     )
     ctx.coordinator = create_coordinator(
         ctx.config,
@@ -63,17 +66,16 @@ def load_dataset(ctx: RunContext) -> None:
 
 
 def global_init(ctx: RunContext) -> None:
-    artifacts: GlobalInitArtifacts | None = ctx.algorithm.global_init(
-        ctx.config.seed.init,
-        ctx.dataset.schema,
-        ctx.dataset.load_all_train_data(),
+    df = ctx.dataset.load_all_train_data()
+    init_ctx = GlobalInitContext(
+        schema=ctx.dataset.schema,
+        seed=ctx.config.seed.init,
     )
-    if artifacts is not None:
-        ctx.global_init_artifacts = artifacts
-        if artifacts.coordinator is not None:
-            ctx.coordinator.attach_global_init_artifacts(artifacts.coordinator)
-    else:
-        ctx.global_init_artifacts = GlobalInitArtifacts(None, None)
+    artifacts: GlobalInitArtifacts = ctx.synthesizer.global_init(df, init_ctx)
+    ctx.global_init_artifacts = artifacts
+
+    if artifacts.coordinator is not None:
+        ctx.coordinator.attach_global_init_artifacts(artifacts.coordinator)
 
 
 def federated_train_eval_loop(ctx: RunContext) -> None:
@@ -100,16 +102,14 @@ def aggregate_federated_metrics(ctx: RunContext) -> None:
 
 
 def global_sample(ctx: RunContext) -> None:
-    synthesizer = create_synthesizer(
-        ctx.algorithm.synthesizer_spec.factory,
-        artifacts=ctx.global_init_artifacts.synthesizer,
+    sample_ctx = SampleContext(
+        global_init_artifacts=ctx.global_init_artifacts.synthesizer,
         client_cache=None,
+        seed=ctx.config.seed.sampling,
+        num_rows=ctx.config.num_synthetic_rows
+        or len(ctx.dataset.load_global_holdout()),
     )
-    ctx.synthetic_df = synthesizer.sample(
-        ctx.train_artifacts,
-        ctx.config.num_synthetic_rows or len(ctx.dataset.load_global_holdout()),
-        ctx.config.seed.sampling,
-    )
+    ctx.synthetic_df = ctx.synthesizer.sample(ctx.train_artifacts, sample_ctx)
 
 
 def global_evaluate(ctx: RunContext) -> None:

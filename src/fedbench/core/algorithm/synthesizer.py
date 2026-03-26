@@ -1,8 +1,20 @@
 from abc import ABC, abstractmethod
+from dataclasses import dataclass
 
 from pandas import DataFrame
 
-from fedbench.core.payload import Payload
+from fedbench.core.algorithm.context import (
+    GlobalInitContext,
+    SampleContext,
+    TrainContext,
+)
+from fedbench.core.payload import ArraysTarget, Payload
+
+
+@dataclass(frozen=True)
+class GlobalInitArtifacts:
+    coordinator: Payload | None = None
+    synthesizer: Payload | None = None
 
 
 class Synthesizer(ABC):
@@ -11,22 +23,22 @@ class Synthesizer(ABC):
     def __repr__(self) -> str:
         return f"<{self.__class__.__name__}>"
 
-    def attach_global_init_artifacts(self, artifacts: Payload) -> None:
-        """Attach globally computed preprocessing artifacts.
-
-        Override if you depend on global_init to do preprocessing. Always
-        called right after creating an instance.
-        """
-
+    @property
+    @abstractmethod
+    def arrays_target(self) -> ArraysTarget:
         pass
 
-    def attach_client_cache(self, cache: Payload) -> None:
-        """Attach client cache.
+    @property
+    @abstractmethod
+    def supports_coordinators(self) -> set[str]:
+        pass
 
-        Override if you need to a place to keep client local state beyond a
-        single request. Always called right after attach_global_init_artifacts.
-        """
-
+    @abstractmethod
+    def global_init(
+        self,
+        dataset: DataFrame,
+        context: GlobalInitContext,
+    ) -> GlobalInitArtifacts:
         pass
 
     @abstractmethod
@@ -34,6 +46,7 @@ class Synthesizer(ABC):
         self,
         request: Payload,
         data: DataFrame,
+        context: TrainContext,
     ) -> Payload:
         pass
 
@@ -41,7 +54,6 @@ class Synthesizer(ABC):
     def sample(
         self,
         request: Payload,
-        num_rows: int,
-        seed: int,
+        context: SampleContext,
     ) -> DataFrame:
         pass

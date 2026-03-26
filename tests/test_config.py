@@ -7,12 +7,12 @@ from fedbench.config.builder import build_config, parse_for_function
 from fedbench.config.parsing import coerce, is_optional
 from fedbench.core.eval import Category
 
-from .fake_components import FakeAlgRegistry, FakePartitionerRegistry
+from .fake_components import FakePartitionerRegistry, FakeSynthRegistry
 
 
 @pytest.fixture
-def algorithms():
-    return FakeAlgRegistry()
+def synthesizers():
+    return FakeSynthRegistry()
 
 
 @pytest.fixture
@@ -29,7 +29,7 @@ def minimal_valid_cfg(tmp_path: Path, **overrides):
 
     base = {
         "dataset": str(dataset),
-        "algorithm": FakeAlgRegistry.KEY,
+        "synthesizer": FakeSynthRegistry.KEY,
         "coordinator": "MISSING",
         "partitioner": FakePartitionerRegistry.KEY,
     }
@@ -40,41 +40,41 @@ def minimal_valid_cfg(tmp_path: Path, **overrides):
 # --- minimal config builder validation ------------------------------------
 
 
-def test_minimal_config(tmp_path, algorithms, partitioners):
+def test_minimal_config(tmp_path, synthesizers, partitioners):
     cfg_dict = minimal_valid_cfg(tmp_path)
 
-    cfg = build_config(cfg_dict, algorithms, partitioners)
+    cfg = build_config(cfg_dict, synthesizers, partitioners)
 
     assert cfg.data.dataset == str(Path(cfg_dict["dataset"]).resolve())
     assert cfg.data.partitioner == cfg_dict["partitioner"]
-    assert cfg.algorithm == cfg_dict["algorithm"]
+    assert cfg.synthesizer == cfg_dict["synthesizer"]
 
 
 # --- dataset path validation ----------------------------------------------
 
 
-def test_dataset_is_directory_raises(tmp_path, algorithms, partitioners):
+def test_dataset_is_directory_raises(tmp_path, synthesizers, partitioners):
 
     cfg = minimal_valid_cfg(tmp_path)
     cfg["dataset"] = str(tmp_path)
 
     with pytest.raises(IsADirectoryError):
-        build_config(cfg, algorithms, partitioners)
+        build_config(cfg, synthesizers, partitioners)
 
 
-def test_dataset_does_not_exist_raises(tmp_path, algorithms, partitioners):
+def test_dataset_does_not_exist_raises(tmp_path, synthesizers, partitioners):
 
     cfg = minimal_valid_cfg(tmp_path)
     cfg["dataset"] = str(tmp_path / "missing.csv")
 
     with pytest.raises(FileNotFoundError):
-        build_config(cfg, algorithms, partitioners)
+        build_config(cfg, synthesizers, partitioners)
 
 
 # --- metrics / category validation ----------------------------------------
 
 
-def test_unsupported_category_raises(tmp_path, algorithms, partitioners):
+def test_unsupported_category_raises(tmp_path, synthesizers, partitioners):
 
     cfg = minimal_valid_cfg(
         tmp_path,
@@ -83,97 +83,99 @@ def test_unsupported_category_raises(tmp_path, algorithms, partitioners):
     )
 
     with pytest.raises(ValueError):
-        build_config(cfg, algorithms, partitioners)
+        build_config(cfg, synthesizers, partitioners)
 
 
 # --- numeric config validation --------------------------------------------
 
 
 @pytest.mark.parametrize("num_rounds", [0, -5])
-def test_invalid_num_rounds_raises(tmp_path, num_rounds, algorithms, partitioners):
+def test_invalid_num_rounds_raises(tmp_path, num_rounds, synthesizers, partitioners):
 
     cfg = minimal_valid_cfg(tmp_path, num_rounds=num_rounds)
 
     with pytest.raises(ValueError):
-        build_config(cfg, algorithms, partitioners)
+        build_config(cfg, synthesizers, partitioners)
 
 
 @pytest.mark.parametrize("test_size", [0, 1, -0.1, 1.5])
-def test_invalid_test_size_raises(tmp_path, test_size, algorithms, partitioners):
+def test_invalid_test_size_raises(tmp_path, test_size, synthesizers, partitioners):
 
     cfg = minimal_valid_cfg(tmp_path, test_size=test_size)
 
     with pytest.raises(ValueError):
-        build_config(cfg, algorithms, partitioners)
+        build_config(cfg, synthesizers, partitioners)
 
 
-def test_invalid_num_synthetic_rows_raises(tmp_path, algorithms, partitioners):
+def test_invalid_num_synthetic_rows_raises(tmp_path, synthesizers, partitioners):
 
     cfg = minimal_valid_cfg(tmp_path, num_synthetic_rows=0)
 
     with pytest.raises(ValueError):
-        build_config(cfg, algorithms, partitioners)
+        build_config(cfg, synthesizers, partitioners)
 
 
 # --- outputdir behavior ----------------------------------------------------
 
 
-def test_default_outputdir_is_cwd_out(tmp_path, monkeypatch, algorithms, partitioners):
+def test_default_outputdir_is_cwd_out(
+    tmp_path, monkeypatch, synthesizers, partitioners
+):
 
     monkeypatch.chdir(tmp_path)
     cfg = minimal_valid_cfg(tmp_path)
 
-    config = build_config(cfg, algorithms, partitioners)
+    config = build_config(cfg, synthesizers, partitioners)
     assert config.outputdir == str(tmp_path / "out")
 
 
-def test_custom_outputdir_is_resolved(tmp_path, algorithms, partitioners):
+def test_custom_outputdir_is_resolved(tmp_path, synthesizers, partitioners):
 
     out = tmp_path / "results"
     cfg = minimal_valid_cfg(tmp_path, outputdir=str(out))
 
-    config = build_config(cfg, algorithms, partitioners)
+    config = build_config(cfg, synthesizers, partitioners)
     assert config.outputdir == str(out.resolve())
 
 
 # --- positive sanity checks ------------------------------------------------
 
 
-def test_valid_utility_category_with_target_col(tmp_path, algorithms, partitioners):
+def test_valid_utility_category_with_target_col(tmp_path, synthesizers, partitioners):
 
     cfg = minimal_valid_cfg(
         tmp_path,
         run_categories=(Category.UTILITY,),
         target_col="b",
     )
-    config = build_config(cfg, algorithms, partitioners)
+    config = build_config(cfg, synthesizers, partitioners)
     assert config.data.target_col == "b"
     assert Category.UTILITY in config.metrics.run_categories
 
 
-def test_unregistered_partitioner_raises(tmp_path, algorithms, partitioners):
+def test_unregistered_partitioner_raises(tmp_path, synthesizers, partitioners):
 
     cfg = minimal_valid_cfg(
         tmp_path,
         partitioner="definitely-not-registered",
     )
     with pytest.raises(ValueError):
-        build_config(cfg, algorithms, partitioners)
+        build_config(cfg, synthesizers, partitioners)
 
 
-def test_unregistered_algorithm_raises(tmp_path, algorithms, partitioners):
+def test_unregistered_synthesizer_raises(tmp_path, synthesizers, partitioners):
 
     cfg = minimal_valid_cfg(
         tmp_path,
-        algorithm="definitely-not-registered",
+        synthesizer="definitely-not-registered",
     )
     with pytest.raises(ValueError):
-        build_config(cfg, algorithms, partitioners)
+        build_config(cfg, synthesizers, partitioners)
 
 
-def test_static_defaults(tmp_path, algorithms, partitioners):
+def test_static_defaults(tmp_path, synthesizers, partitioners):
     cfg = minimal_valid_cfg(tmp_path)
-    config = build_config(cfg, algorithms, partitioners)
+    config = build_config(cfg, synthesizers, partitioners)
 
     assert config.data.target_col is None
     assert config.data.sensitive_cols == ()
@@ -201,40 +203,40 @@ def test_static_defaults(tmp_path, algorithms, partitioners):
 # --- column name validation ------------------------------------------------
 
 
-def test_invalid_target_col_raises(tmp_path, algorithms, partitioners):
+def test_invalid_target_col_raises(tmp_path, synthesizers, partitioners):
 
     cfg = minimal_valid_cfg(tmp_path, target_col="nonexistent")
 
     with pytest.raises(ValueError):
-        build_config(cfg, algorithms, partitioners)
+        build_config(cfg, synthesizers, partitioners)
 
 
-def test_invalid_sensitive_col_raises(tmp_path, algorithms, partitioners):
+def test_invalid_sensitive_col_raises(tmp_path, synthesizers, partitioners):
 
     cfg = minimal_valid_cfg(tmp_path, sensitive_cols=("nonexistent",))
 
     with pytest.raises(ValueError):
-        build_config(cfg, algorithms, partitioners)
+        build_config(cfg, synthesizers, partitioners)
 
 
-def test_valid_target_col_passes(tmp_path, algorithms, partitioners):
+def test_valid_target_col_passes(tmp_path, synthesizers, partitioners):
 
     cfg = minimal_valid_cfg(tmp_path, target_col="a")
-    config = build_config(cfg, algorithms, partitioners)
+    config = build_config(cfg, synthesizers, partitioners)
     assert config.data.target_col == "a"
 
 
-def test_valid_sensitive_cols_passes(tmp_path, algorithms, partitioners):
+def test_valid_sensitive_cols_passes(tmp_path, synthesizers, partitioners):
 
     cfg = minimal_valid_cfg(tmp_path, sensitive_cols=("a", "b"))
-    config = build_config(cfg, algorithms, partitioners)
+    config = build_config(cfg, synthesizers, partitioners)
     assert config.data.sensitive_cols == ("a", "b")
 
 
-def test_omitted_columns_no_error(tmp_path, algorithms, partitioners):
+def test_omitted_columns_no_error(tmp_path, synthesizers, partitioners):
     """Omitting target_col and sensitive_cols is valid (NaN-degradation path)."""
     cfg = minimal_valid_cfg(tmp_path)
-    config = build_config(cfg, algorithms, partitioners)
+    config = build_config(cfg, synthesizers, partitioners)
     assert config.data.target_col is None
     assert config.data.sensitive_cols == ()
 
@@ -485,7 +487,7 @@ def test_coerce_nested_structures():
 def test_dataset_path_expanduser(
     tmp_path,
     monkeypatch,
-    algorithms,
+    synthesizers,
     partitioners,
 ):
     """Test that dataset paths with ~ are expanded"""
@@ -499,7 +501,7 @@ def test_dataset_path_expanduser(
     real_path = cfg["dataset"]
 
     # Config should expand and resolve the path correctly
-    config = build_config(cfg, algorithms, partitioners)
+    config = build_config(cfg, synthesizers, partitioners)
 
     # Verify the path is resolved
     assert config.data.dataset == str(Path(real_path).resolve())
@@ -509,7 +511,7 @@ def test_dataset_path_expanduser(
 def test_outputdir_path_expanduser(
     tmp_path,
     monkeypatch,
-    algorithms,
+    synthesizers,
     partitioners,
 ):
     """Test that outputdir paths are expanded and resolved"""
@@ -519,7 +521,7 @@ def test_outputdir_path_expanduser(
     out = tmp_path / "results"
     cfg = minimal_valid_cfg(tmp_path, outputdir=str(out))
 
-    config = build_config(cfg, algorithms, partitioners)
+    config = build_config(cfg, synthesizers, partitioners)
 
     # Verify output directory is properly resolved
     assert config.outputdir == str(out.resolve())
@@ -531,21 +533,21 @@ def test_outputdir_path_expanduser(
 
 def test_categories_all_defaults_to_all_enum_members(
     tmp_path,
-    algorithms,
+    synthesizers,
     partitioners,
 ):
     """Test that no categories specified defaults to all Category enum members"""
     cfg = minimal_valid_cfg(tmp_path)
     # Don't specify run_categories
 
-    config = build_config(cfg, algorithms, partitioners)
+    config = build_config(cfg, synthesizers, partitioners)
 
     # Should include all Category enum members
     assert config.metrics.run_categories == tuple(Category)
     assert len(config.metrics.run_categories) > 0
 
 
-def test_single_category_parsing(tmp_path, algorithms, partitioners):
+def test_single_category_parsing(tmp_path, synthesizers, partitioners):
     """Test parsing a single category"""
     cfg = minimal_valid_cfg(
         tmp_path,
@@ -553,14 +555,14 @@ def test_single_category_parsing(tmp_path, algorithms, partitioners):
         target_col="b",
     )
 
-    config = build_config(cfg, algorithms, partitioners)
+    config = build_config(cfg, synthesizers, partitioners)
 
     assert config.metrics.run_categories == (Category.PRIVACY,)
 
 
 def test_multiple_categories_parsing(
     tmp_path,
-    algorithms,
+    synthesizers,
     partitioners,
 ):
     """Test parsing multiple categories"""
@@ -570,33 +572,33 @@ def test_multiple_categories_parsing(
         target_col="b",
     )
 
-    config = build_config(cfg, algorithms, partitioners)
+    config = build_config(cfg, synthesizers, partitioners)
 
     assert Category.UTILITY in config.metrics.run_categories
     assert Category.PRIVACY in config.metrics.run_categories
 
 
-# --- algorithm and partitioner kwargs parsing tests ----------------------
+# --- synthesizer and partitioner kwargs parsing tests ----------------------
 
 
-def test_algorithm_kwargs_empty(tmp_path, algorithms, partitioners):
-    """Test that empty algorithm_kwargs defaults to empty dict"""
+def test_synthesizer_kwargs_empty(tmp_path, synthesizers, partitioners):
+    """Test that empty synthesizer_kwargs defaults to empty dict"""
     cfg = minimal_valid_cfg(tmp_path)
 
-    config = build_config(cfg, algorithms, partitioners)
+    config = build_config(cfg, synthesizers, partitioners)
 
-    assert config.algorithm_kwargs == {}
+    assert config.synthesizer_kwargs == {}
 
 
 def test_partitioner_kwargs_preserved(
     tmp_path,
-    algorithms,
+    synthesizers,
     partitioners,
 ):
     """Test that partitioner_kwargs are preserved"""
     cfg = minimal_valid_cfg(tmp_path, num_clients=5)
 
-    config = build_config(cfg, algorithms, partitioners)
+    config = build_config(cfg, synthesizers, partitioners)
 
     assert "num_partitions" in config.data.partitioner_kwargs
     assert config.data.partitioner_kwargs["num_partitions"] == 5
@@ -686,7 +688,7 @@ def test_parse_for_function_untyped_missing_required_still_raises():
 
 def test_validate_partitioner_not_in_registry(
     tmp_path,
-    algorithms,
+    synthesizers,
     partitioners,
 ):
     """Test that unregistered partitioner raises ValueError"""
@@ -696,4 +698,4 @@ def test_validate_partitioner_not_in_registry(
     )
 
     with pytest.raises(ValueError):
-        build_config(cfg, algorithms, partitioners)
+        build_config(cfg, synthesizers, partitioners)

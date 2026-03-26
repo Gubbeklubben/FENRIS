@@ -95,10 +95,10 @@ class SeedConfig:
 
 @dataclass(frozen=True)
 class Config:
-    algorithm: str
+    synthesizer: str
     coordinator: str
     data: DataConfig
-    algorithm_kwargs: dict[
+    synthesizer_kwargs: dict[
         str,
         None | bool | str | float | int,
     ] = field(default_factory=dict)

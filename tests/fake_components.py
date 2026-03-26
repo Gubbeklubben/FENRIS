@@ -2,28 +2,39 @@ from typing import Literal
 
 from pandas import DataFrame
 
-from fedbench.core.algorithm import Algorithm, ComponentSpec, Synthesizer
+from fedbench.core.algorithm import (
+    GlobalInitArtifacts,
+    GlobalInitContext,
+    SampleContext,
+    Synthesizer,
+    TrainContext,
+)
 from fedbench.core.data import Partitioner
-from fedbench.core.payload import Payload
+from fedbench.core.payload import ArraysTarget, Payload
 from fedbench.runtime.registry import FactoryRegistry
 
 
 class FakeSynthesizer(Synthesizer):
-    def train(self, request: Payload, data: DataFrame) -> Payload:
-        return NotImplemented
+    @property
+    def arrays_target(self) -> ArraysTarget:
+        return ArraysTarget.NUMPY
 
-    def sample(self, request: Payload, num_rows: int, seed: int) -> DataFrame:
-        return NotImplemented
-
-
-class FakeAlgorithm(Algorithm):
     @property
     def supports_coordinators(self) -> set[str]:
         return set()
 
-    @property
-    def synthesizer_spec(self) -> ComponentSpec[Synthesizer]:
-        return NotImplemented
+    def global_init(
+        self, dataset: DataFrame, context: GlobalInitContext
+    ) -> GlobalInitArtifacts:
+        pass
+
+    def train(
+        self, request: Payload, data: DataFrame, context: TrainContext
+    ) -> Payload:
+        pass
+
+    def sample(self, request: Payload, context: SampleContext) -> DataFrame:
+        pass
 
 
 class FakePartitioner(Partitioner):
@@ -59,14 +70,14 @@ class FakeEntryPoint:
         return self.product
 
 
-class FakeAlgRegistry(FactoryRegistry[Algorithm]):
-    KEY = "test_algorithm"
+class FakeSynthRegistry(FactoryRegistry[Synthesizer]):
+    KEY = "test_synthesizer"
 
     def __init__(self):
-        super().__init__(f"{__package__}.algorithms", Algorithm)
+        super().__init__(f"{__package__}.synthesizers", Synthesizer)
         self._plugins = {
             self.KEY: FakeEntryPoint(
-                self.KEY, "", f"{__package__}.algorithms", FakeAlgorithm
+                self.KEY, "", f"{__package__}.synthesizers", FakeSynthesizer
             )
         }
 
