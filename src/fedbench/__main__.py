@@ -1,5 +1,8 @@
 from enum import StrEnum
 from typing import Annotated, Literal
+import json
+import shutil
+from pathlib import Path
 
 import typer
 
@@ -98,6 +101,113 @@ def show(
 
     print()
 
+@app.command()
+def configure() -> None:
+    """
+    Interactively configure a fedbench run and save it to a JSON file.
+    """
+    config = {}
+
+    # Show available components
+    typer.echo("\nAvailable synthesizers: " + ", ".join(m.name for m in synthesizers.metadata()))
+    typer.echo("Available coordinators: " + ", ".join(m.name for m in coordinators.metadata()))
+    typer.echo("Available partitioners: " + ", ".join(m.name for m in partitioners.metadata()))
+
+    # Required positional arguments
+    config["synthesizer"] = typer.prompt("\nSynthesizer")
+    config["coordinator"] = typer.prompt("Coordinator")
+    config["partitioner"] = typer.prompt("Partitioner")
+    config["dataset"] = typer.prompt("Dataset path")
+
+    # Optional kwargs
+    synthesizer_kwargs_str = typer.prompt("Synthesizer kwargs (key=value,...)", default="")
+    if synthesizer_kwargs_str:
+        config["synthesizer_kwargs"] = parse_kwargs(synthesizer_kwargs_str)
+
+    coordinator_kwargs_str = typer.prompt("Coordinator kwargs (key=value,...)", default="")
+    if coordinator_kwargs_str:
+        config["coordinator_kwargs"] = parse_kwargs(coordinator_kwargs_str)
+
+    partitioner_kwargs_str = typer.prompt("Partitioner kwargs (key=value,...)", default="")
+    if partitioner_kwargs_str:
+        config["partitioner_kwargs"] = parse_kwargs(partitioner_kwargs_str)
+
+    # Data options
+    target_col = typer.prompt("Target column (leave blank to skip)", default="")
+    if target_col:
+        config["target_col"] = target_col
+
+    sensitive_cols_str = typer.prompt("Sensitive columns (comma-separated, leave blank to skip)", default="")
+    if sensitive_cols_str:
+        config["sensitive_cols"] = sensitive_cols_str
+
+    # Metrics options
+    typer.echo("")
+    run_categories_str = typer.prompt(
+        "Run categories (comma-separated)",
+        default="fidelity,utility,privacy,fairness,scalability",
+    )
+    if run_categories_str != "fidelity,utility,privacy,fairness,scalability":
+        config["run_categories"] = run_categories_str
+
+    if typer.confirm("Enable early stopping?", default=False):
+        config["early_stop"] = True
+        config["stop_metric"] = typer.prompt("Stop metric")
+        config["stop_mode"] = typer.prompt("Stop mode (min/max)", default="min")
+        config["stop_epsilon"] = float(typer.prompt("Stop epsilon", default=0.01))
+        config["stop_patience"] = int(typer.prompt("Stop patience", default=5))
+        config["stop_min_rounds"] = int(typer.prompt("Stop min rounds", default=1))
+        config["stop_eval_every"] = int(typer.prompt("Stop eval every", default=1))
+        stop_synthetic_rows = typer.prompt("Stop synthetic rows (leave blank to skip)", default="")
+        if stop_synthetic_rows:
+            config["stop_synthetic_rows"] = int(stop_synthetic_rows)
+
+    # Run configuration
+    typer.echo("")
+    config["num_clients"] = int(typer.prompt("Number of clients", default=3))
+    config["num_rounds"] = int(typer.prompt("Number of rounds", default=3))
+    config["test_size"] = float(typer.prompt("Test size", default=0.2))
+    config["seed"] = int(typer.prompt("Seed", default=42))
+
+    outputdir = typer.prompt("Output directory (leave blank for default)", default="")
+    if outputdir:
+        config["outputdir"] = outputdir
+
+    num_synthetic_rows = typer.prompt("Num synthetic rows (leave blank to skip)", default="")
+    if num_synthetic_rows:
+        config["num_synthetic_rows"] = int(num_synthetic_rows)
+
+    if typer.confirm("Disable pickle?", default=False):
+        config["disable_pickle"] = True
+
+    # Validate
+    available_synthesizers = {m.name for m in synthesizers.metadata()}
+    available_coordinators = {m.name for m in coordinators.metadata()}
+    available_partitioners = {m.name for m in partitioners.metadata()}
+
+    if config["synthesizer"] not in available_synthesizers:
+        typer.echo(f"Error: unknown synthesizer '{config['synthesizer']}'.", err=True)
+        raise typer.Exit(code=1)
+
+    if config["coordinator"] not in available_coordinators:
+        typer.echo(f"Error: unknown coordinator '{config['coordinator']}'.", err=True)
+        raise typer.Exit(code=1)
+
+    if config["partitioner"] not in available_partitioners:
+        typer.echo(f"Error: unknown partitioner '{config['partitioner']}'.", err=True)
+        raise typer.Exit(code=1)
+
+    # Save
+    user_configs_dir = Path("user_configs")
+    user_configs_dir.mkdir(exist_ok=True)
+
+    output_path = typer.prompt("\nSave config as (e.g. config.json)")
+    output_path = user_configs_dir / output_path
+
+    with open(output_path, "w") as f:
+        json.dump(config, f, indent=4)
+    typer.echo(f"\nConfig saved to {output_path}")
+
 
 @app.command()
 def run(
@@ -194,6 +304,32 @@ def run(
     config = build_config(cli_input, synthesizers, partitioners)
     runner.run(config, pipeline())
 
+
+
+@app.command()
+def run_from_config(
+    config_file: Annotated[
+        str,
+        typer.Argument(help="Path to a JSON config file."),
+    ],
+) -> None:
+    """
+    Run a fedbench pipeline from a JSON config file.
+    """
+    with open(config_file) as f:
+        cli_input = json.load(f)
+
+    config = build_config(cli_input, synthesizers, partitioners)
+
+    output_dir = Path(config.outputdir)
+    output_dir.mkdir(parents=True, exist_ok=True)
+
+    src = Path(config_file).resolve()
+    dst = (output_dir / Path(config_file).name).resolve()
+    if src != dst:
+        shutil.copy(config_file, dst)
+
+    runner.run(config, pipeline())
 
 if __name__ == "__main__":
     app()
