@@ -1,4 +1,4 @@
-from fedbench.core.algorithm import Algorithm, Coordinator
+from fedbench.core.algorithm import Coordinator, Synthesizer
 from fedbench.core.data import Partitioner
 from fedbench.core.eval import Evaluator
 from fedbench.runtime.registry import FactoryRegistry
@@ -6,10 +6,10 @@ from fedbench.runtime.registry import FactoryRegistry
 _ROOT_PKG = __package__.split(".")[0]
 
 
-def build_algorithm_registry() -> FactoryRegistry[Algorithm]:
+def build_synthesizer_registry() -> FactoryRegistry[Synthesizer]:
     return FactoryRegistry(
-        group=f"{_ROOT_PKG}.algorithms",
-        product_cls=Algorithm,  # type: ignore[type-abstract]
+        group=f"{_ROOT_PKG}.synthesizers",
+        product_cls=Synthesizer,  # type: ignore[type-abstract]
     )
 
 

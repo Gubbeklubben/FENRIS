@@ -6,7 +6,7 @@ from typing import Any, Mapping, cast, overload
 from pandas import DataFrame
 
 from fedbench.config import Config
-from fedbench.core.algorithm import Algorithm, Coordinator, GlobalInitArtifacts
+from fedbench.core.algorithm import Coordinator, GlobalInitArtifacts, Synthesizer
 from fedbench.core.data import PartitionedDataset, Partitioner
 from fedbench.core.eval import EvaluationSuite
 from fedbench.core.payload import Payload
@@ -63,7 +63,7 @@ class _RunCtxField[T]:
 
 class RunContext:
     # fmt: off
-    algorithm             = _RunCtxField[Algorithm]()
+    synthesizer           = _RunCtxField[Synthesizer]()
     coordinator           = _RunCtxField[Coordinator]()
     df_loader             = _RunCtxField[Callable[[], DataFrame]]()
     partitioner           = _RunCtxField[Partitioner]()

@@ -1,27 +1,29 @@
-import functools
-from typing import Any, Callable, cast
+from collections.abc import Mapping
+from dataclasses import dataclass
+from typing import Self, cast
 
 import numpy as np
 import pandas as pd
 import torch
+from pandas import DataFrame
 from sklearn.preprocessing import LabelEncoder, MinMaxScaler
 
-from fedbench.builtins.algorithms.fed_tgan.discriminator import Discriminator
-from fedbench.builtins.algorithms.fed_tgan.generator import Generator
-from fedbench.builtins.algorithms.fed_tgan.training import (
+from fedbench.builtins.coordinators.fedavg import ClientUpdate, GlobalState
+from fedbench.builtins.synthesizers.fed_tgan.discriminator import Discriminator
+from fedbench.builtins.synthesizers.fed_tgan.generator import Generator
+from fedbench.builtins.synthesizers.fed_tgan.training import (
     discriminator_step,
     generator_step,
 )
-from fedbench.builtins.coordinators.fedavg import ClientUpdate, GlobalState
 from fedbench.core.algorithm import (
-    Algorithm,
-    ComponentSpec,
     GlobalInitArtifacts,
+    GlobalInitContext,
+    SampleContext,
     Synthesizer,
-    synthesizer_spec,
+    TrainContext,
 )
 from fedbench.core.data import TableSchema
-from fedbench.core.payload import ArraysTarget, Extras, Objects, Payload
+from fedbench.core.payload import ArraysTarget, Payload
 
 
 def split_cat_num(schema: TableSchema) -> tuple[list[str], list[str]]:
@@ -31,15 +33,58 @@ def split_cat_num(schema: TableSchema) -> tuple[list[str], list[str]]:
     return cat_attrs, num_attrs
 
 
-class FedTGAN(Algorithm):
+@dataclass(frozen=True)
+class _FedTGANArtifacts:
+    cat_attrs: list[str]
+    num_attrs: list[str]
+    input_dim: int
+    output_dim: int
+    cat_max_values: Mapping[str, int]
+    label_encoders: Mapping[str, LabelEncoder]
+    num_scaler: MinMaxScaler
+
+    # noinspection PyUnnecessaryCast
+    @classmethod
+    def decode(cls, payload: Payload) -> Self:
+        objects = payload.objects["objects"]
+        extras = payload.extras["extras"]
+        return cls(
+            cat_attrs=cast(list[str], extras["cat-attrs"]),
+            num_attrs=cast(list[str], extras["num-attrs"]),
+            input_dim=cast(int, extras["input-dim"]),
+            output_dim=cast(int, extras["output-dim"]),
+            cat_max_values=cast(Mapping[str, int], objects["cat-max-values"]),
+            label_encoders=cast(Mapping[str, LabelEncoder], objects["label-encoders"]),
+            num_scaler=cast(MinMaxScaler, objects["num-scaler"]),
+        )
+
+    def encode(self) -> Payload:
+        return Payload(
+            objects={
+                "objects": {
+                    "cat-max-values": self.cat_max_values,
+                    "label-encoders": self.label_encoders,
+                    "num-scaler": self.num_scaler,
+                }
+            },
+            extras={
+                "extras": {
+                    "cat-attrs": self.cat_attrs,
+                    "num-attrs": self.num_attrs,
+                    "input-dim": self.input_dim,
+                    "output-dim": self.output_dim,
+                }
+            },
+        )
+
+
+class FedTGAN(Synthesizer):
     def __init__(
         self,
         batch_size: int = 32,
         max_batches: int = 100,
-        learning_rate: float = 1e-2,
-        fraction_evaluate: float = 0.5,
-        num_server_rounds: int = 10,
         local_epochs: int = 5,
+        learning_rate: float = 1e-2,
         latent_dim: int = 64,
     ) -> None:
 
@@ -47,59 +92,39 @@ class FedTGAN(Algorithm):
             raise ValueError("Expecting batch_size >= 1.")
         if max_batches < 1:
             raise ValueError("Expecting max_batches >= 1.")
-        if fraction_evaluate < 0 or fraction_evaluate > 1:
-            raise ValueError("Expecting 0 <= fraction_evaluate <= 1.")
-        if num_server_rounds < 1:
-            raise ValueError("Expecting num_server_rounds >= 1.")
         if local_epochs < 1:
             raise ValueError("Expecting local_epochs >= 1.")
-        if latent_dim < 1:
-            raise ValueError("Expecting latent_dim >= 1.")
         if learning_rate <= 0 or learning_rate > 0.1:
             raise ValueError("Expecting 0 < learning_rate <= 0.1")
+        if latent_dim < 1:
+            raise ValueError("Expecting latent_dim >= 1.")
 
-        self._cfg = {
-            "batch-size": batch_size,
-            "max-batches": max_batches,
-            "learning-rate": learning_rate,
-            "fraction-evaluate": fraction_evaluate,
-            "num-server-rounds": num_server_rounds,
-            "local-epochs": local_epochs,
-            "latent-dim": latent_dim,
-            "device": torch.device("cuda" if torch.cuda.is_available() else "cpu"),
-        }
+        self._batch_size = batch_size
+        self._max_batches = max_batches
+        self._learning_rate = learning_rate
+        self._latent_dim = latent_dim
+        self._local_epochs = local_epochs
+        self._device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
-        # Create factory function for synthesizer
-        self._synth_factory: Callable[[], Synthesizer] = functools.partial(
-            FedTGANSynthesizer,
-            batch_size=batch_size,
-            max_batches=max_batches,
-            learning_rate=learning_rate,
-            latent_dim=latent_dim,
-            local_epochs=local_epochs,
-            device=self._cfg["device"],
-        )
+    @property
+    def arrays_target(self) -> ArraysTarget:
+        return ArraysTarget.TORCH
 
     @property
     def supports_coordinators(self) -> set[str]:
-        return set("fedavg")
-
-    @property
-    def synthesizer_spec(self) -> ComponentSpec[Synthesizer]:
-        return synthesizer_spec(self._synth_factory, ArraysTarget.TORCH)
+        return {"fedavg"}
 
     def global_init(
-        self, seed: int, schema: TableSchema, dataset: pd.DataFrame
-    ) -> GlobalInitArtifacts | None:
-        """Initialize preproc and models with access to full dataset and config."""
+        self, dataset: DataFrame, context: GlobalInitContext
+    ) -> GlobalInitArtifacts:
 
-        np.random.seed(seed)
-        torch.manual_seed(seed)
+        np.random.seed(context.seed)
+        torch.manual_seed(context.seed)
         if torch.cuda.is_available():
-            torch.cuda.manual_seed(seed)
+            torch.cuda.manual_seed(context.seed)
 
         # Split schema into categorical and numerical columns
-        cat_attrs, num_attrs = split_cat_num(schema)
+        cat_attrs, num_attrs = split_cat_num(context.schema)
 
         # Create separate label encoder for each categorical column
         # and track max encoded value for normalization
@@ -118,11 +143,8 @@ class FedTGAN(Algorithm):
         n_num_features = len(num_attrs)
         input_dim = output_dim = n_cat_features + n_num_features
 
-        # Use the configured latent_dim from algorithm initialization
-        latent_dim = self._cfg["latent-dim"]
-
         # Initialize models with correct dimensions
-        generator = Generator(latent_dim=latent_dim, output_dim=output_dim)
+        generator = Generator(latent_dim=self._latent_dim, output_dim=output_dim)
         discriminator = Discriminator(input_dim=input_dim)
 
         # Pack both models into a single state_dict with prefixed keys
@@ -138,86 +160,53 @@ class FedTGAN(Algorithm):
             num_scaler = MinMaxScaler()
             num_scaler.fit(dataset[num_attrs].values)
 
-        # Prepare artifacts for synthesizers
-        synth_artifacts = Payload()
-        synth_artifacts.objects["preproc-objects"] = {
-            "label-encoders": label_encoders,
-            "num-scaler": num_scaler,
-            "cat-max-values": cat_max_values,
-        }
-        synth_artifacts.extras["preproc-extras"] = {
-            "cat-attrs": cat_attrs,
-            "num-attrs": num_attrs,
-            "input-dim": input_dim,
-            "output-dim": output_dim,
-            "latent-dim": latent_dim,
-        }
-
+        artifacts = _FedTGANArtifacts(
+            cat_attrs=cat_attrs,
+            num_attrs=num_attrs,
+            input_dim=input_dim,
+            output_dim=output_dim,
+            cat_max_values=cat_max_values,
+            label_encoders=label_encoders,
+            num_scaler=num_scaler,
+        )
         return GlobalInitArtifacts(
             coordinator=GlobalState(packed_state).encode(),
-            synthesizer=synth_artifacts,
+            synthesizer=artifacts.encode(),
         )
 
+    def train(
+        self, request: Payload, data: DataFrame, context: TrainContext
+    ) -> Payload:
 
-class FedTGANSynthesizer(Synthesizer):
-    def __init__(
-        self,
-        batch_size: int,
-        max_batches: int,
-        learning_rate: float,
-        latent_dim: int,
-        local_epochs: int,
-        device: torch.device,
-    ) -> None:
-        self._batch_size = batch_size
-        self._max_batches = max_batches
-        self._learning_rate = learning_rate
-        self._latent_dim = latent_dim
-        self._local_epochs = local_epochs
-        self._device = device
+        # noinspection PyUnnecessaryCast
+        state = cast(dict[str, torch.Tensor], GlobalState.decode(request).state)
+        if context.global_init_artifacts is None:
+            raise RuntimeError("Missing preprocessing artifacts.")
 
-        # Will be populated by attach_global_init_artifacts
-        self._preproc_objects: dict[str, Any] | None = None
-        self._preproc_extras: dict[str, Any] | None = None
+        artifacts = _FedTGANArtifacts.decode(context.global_init_artifacts)
 
-    def attach_global_init_artifacts(self, artifacts: Payload) -> None:
-        """Receive preprocessing artifacts from global_init."""
-        self._preproc_objects = artifacts.objects["preproc-objects"]
-        self._preproc_extras = artifacts.extras["preproc-extras"]
-
-    # noinspection PyUnnecessaryCast
-    def train(self, request: Payload, data: pd.DataFrame) -> Payload:
-        """Train Generator and Discriminator on local data, alternating GAN training."""
-
-        received_state = cast(
-            dict[str, torch.Tensor], GlobalState.decode(request).state
-        )
-        preproc_objects = cast(Objects, self._preproc_objects)
-        preproc_extras = cast(Extras, self._preproc_extras)
-
-        cat_attrs = cast(list[str], preproc_extras["cat-attrs"])
-        num_attrs = cast(list[str], preproc_extras["num-attrs"])
-        input_dim = cast(int, preproc_extras["input-dim"])
-        output_dim = cast(int, preproc_extras["output-dim"])
-        label_encoders = preproc_objects["label-encoders"]
+        cat_attrs = artifacts.cat_attrs
+        num_attrs = artifacts.num_attrs
+        input_dim = artifacts.input_dim
+        output_dim = artifacts.output_dim
+        cat_max_values = artifacts.cat_max_values
+        label_encoders = artifacts.label_encoders
+        num_scaler = artifacts.num_scaler
 
         # Unpack generator and discriminator state_dicts from received state
         generator_state = {
             k.removeprefix("generator."): v
-            for k, v in received_state.items()
+            for k, v in state.items()
             if k.startswith("generator.")
         }
         discriminator_state = {
             k.removeprefix("discriminator."): v
-            for k, v in received_state.items()
+            for k, v in state.items()
             if k.startswith("discriminator.")
         }
 
         # Preprocess data: label-encode categoricals, concatenate with numericals
         processed_data = []
-
-        # Extract cat_max_values for normalization
-        cat_max_values = preproc_objects["cat-max-values"]
 
         # Encode and normalize categorical columns
         for col in cat_attrs:
@@ -232,7 +221,6 @@ class FedTGANSynthesizer(Synthesizer):
                 processed_data.append(normalized.reshape(-1, 1))
 
         # Add numerical columns (scaled)
-        num_scaler = preproc_objects["num-scaler"]
         if num_attrs and num_scaler is not None:
             num_data = data[num_attrs].values
             num_scaled = num_scaler.transform(num_data)
@@ -328,48 +316,47 @@ class FedTGANSynthesizer(Synthesizer):
         )
         return reply.encode()
 
-    # noinspection PyUnnecessaryCast
-    def sample(self, request: Payload, num_rows: int, seed: int) -> pd.DataFrame:
-        """Generate synthetic data using the trained generator."""
-
-        # Set random seed for reproducibility
-        np.random.seed(seed)
-        torch.manual_seed(seed)
+    def sample(self, request: Payload, context: SampleContext) -> DataFrame:
+        np.random.seed(context.seed)
+        torch.manual_seed(context.seed)
         if torch.cuda.is_available():
-            torch.cuda.manual_seed(seed)
+            torch.cuda.manual_seed(context.seed)
 
-        packed_state = cast(dict[str, torch.Tensor], GlobalState.decode(request).state)
-        preproc_objects = cast(Objects, self._preproc_objects)
-        preproc_extras = cast(Extras, self._preproc_extras)
+        # noinspection PyUnnecessaryCast
+        state = cast(dict[str, torch.Tensor], GlobalState.decode(request).state)
+        if context.global_init_artifacts is None:
+            raise RuntimeError("Missing preprocessing artifacts.")
 
-        cat_attrs = cast(list[str], preproc_extras["cat-attrs"])
-        num_attrs = cast(list[str], preproc_extras["num-attrs"])
-        latent_dim = cast(int, preproc_extras["latent-dim"])
-        output_dim = cast(int, preproc_extras["output-dim"])
-        label_encoders = preproc_objects["label-encoders"]
+        artifacts = _FedTGANArtifacts.decode(context.global_init_artifacts)
+
+        cat_attrs = artifacts.cat_attrs
+        num_attrs = artifacts.num_attrs
+        output_dim = artifacts.output_dim
+        cat_max_values = artifacts.cat_max_values
+        label_encoders = artifacts.label_encoders
+        num_scaler = artifacts.num_scaler
 
         # Unpack generator state (only need generator for sampling)
         generator_state = {
             k.removeprefix("generator."): v
-            for k, v in packed_state.items()
+            for k, v in state.items()
             if k.startswith("generator.")
         }
 
         # Initialize and load generator
-        generator = Generator(latent_dim=latent_dim, output_dim=output_dim)
+        generator = Generator(latent_dim=self._latent_dim, output_dim=output_dim)
         generator.load_state_dict(generator_state)
         generator.to(self._device)
         generator.eval()
 
         # Generate synthetic data
         with torch.no_grad():
-            noise = torch.randn(num_rows, latent_dim, device=self._device)
+            noise = torch.randn(context.num_rows, self._latent_dim, device=self._device)
             synthetic_data = generator(noise).cpu().numpy()
 
         # Reverse preproc: decode categorical features and extract numerical features
         decoded_data = {}
         n_cat_features = len(cat_attrs)
-        cat_max_values = preproc_objects["cat-max-values"]
 
         # Decode categorical columns
         for i, col in enumerate(cat_attrs):
@@ -386,8 +373,6 @@ class FedTGANSynthesizer(Synthesizer):
                     encoded_values
                 )
 
-        # Extract and inverse scale numerical columns
-        num_scaler = preproc_objects["num-scaler"]
         if num_attrs and num_scaler is not None:
             # Extract numerical columns
             num_synthetic = synthetic_data[

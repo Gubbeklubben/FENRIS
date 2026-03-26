@@ -1,4 +1,3 @@
-from collections.abc import Callable
 from dataclasses import dataclass
 from typing import cast
 
@@ -13,15 +12,15 @@ from fedbench.flwr.namespace import Namespace
 from fedbench.flwr.rdict import RDictNamespaceView
 from fedbench.flwr.serde import FlwrSerde, Pickle
 from fedbench.runtime.component_factory import (
-    create_algorithm,
     create_df_loader,
     create_evaluation_suite,
     create_partitioner,
+    create_synthesizer,
 )
 from fedbench.runtime.registry_builder import (
-    build_algorithm_registry,
     build_evaluator_registry,
     build_partitioner_registry,
+    build_synthesizer_registry,
 )
 
 _config: Config | None = None
@@ -32,7 +31,7 @@ _dataset: PartitionedDataset | None = None
 class ClientContext:
     config: Config
     dataset: PartitionedDataset
-    synthesizer_factory: Callable[[], Synthesizer]
+    synthesizer: Synthesizer
     eval_suite: EvaluationSuite
     serde: FlwrSerde
     framework_cache: RDictNamespaceView
@@ -45,16 +44,16 @@ def build_client_context(flwr_cache: RecordDict) -> ClientContext:
     config = _get_config(framework_cache)
     dataset = _get_dataset(config)
 
-    algorithm = create_algorithm(config, build_algorithm_registry())
+    synthesizer = create_synthesizer(config, build_synthesizer_registry())
     eval_suite = create_evaluation_suite(config, build_evaluator_registry())
     serde = FlwrSerde(
         object_serde=Pickle(disabled=config.disable_pickle),
-        default_arrays_target=algorithm.synthesizer_spec.arrays_target,
+        default_arrays_target=synthesizer.arrays_target,
     )
     return ClientContext(
         config,
         dataset,
-        algorithm.synthesizer_spec.factory,
+        synthesizer,
         eval_suite,
         serde,
         framework_cache,

@@ -13,7 +13,7 @@ from fedbench.runtime.pipeline import write_artifacts
 
 def _make_config(tmp_path: Path) -> Config:
     return Config(
-        algorithm="fed_hello",
+        synthesizer="fed_hello",
         coordinator="MISSING",
         data=DataConfig(dataset="dummy.csv", partitioner="iid-partitioner"),
         outputdir=str(tmp_path),
@@ -48,7 +48,7 @@ def test_config_snapshot_written(tmp_path: Path) -> None:
     snapshot = json.loads((tmp_path / "test-run" / "config_snapshot.json").read_text())
     assert snapshot["seed"] == 42
     assert snapshot["num_rounds"] == 3
-    assert snapshot["algorithm"] == "fed_hello"
+    assert snapshot["synthesizer"] == "fed_hello"
     assert snapshot["data"]["dataset"] == "dummy.csv"
 
 
