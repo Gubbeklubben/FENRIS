@@ -6,6 +6,6 @@ class Component(ABC):
 
     @property
     @abstractmethod
-    def id(self) -> str:
+    def name(self) -> str:
         """String identifying this component."""
         pass

@@ -29,7 +29,7 @@ from fedbench.core.eval.evaluator import (
 
 class TSTREvaluator(Evaluator):
     @property
-    def id(self) -> str:
+    def name(self) -> str:
         return "tstr"
 
     @property

@@ -44,7 +44,7 @@ class ScalabilityEvaluator(Evaluator):
     """
 
     @property
-    def id(self) -> str:
+    def name(self) -> str:
         return "scalability"
 
     @property

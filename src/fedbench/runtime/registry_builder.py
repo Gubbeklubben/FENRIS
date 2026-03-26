@@ -36,22 +36,22 @@ def build_evaluator_registry() -> FactoryRegistry[Evaluator]:
     existing_keys: dict[str, str] = {}
     for entry in registry.metadata():
         evaluator = registry.call(entry.name)
-        if evaluator.id != entry.name:
+        if evaluator.name != entry.name:
             raise ValueError(
                 f"Evaluator's name in registry ({entry.name}) "
-                f"does not match its declared name ({evaluator.id})."
+                f"does not match its declared name ({evaluator.name})."
             )
         keys = list(evaluator.get_metric_keys())
         if not keys:
             raise ValueError(
-                f"Evaluator {evaluator.id} does not declare any emitted metric keys."
+                f"Evaluator {evaluator.name} does not declare any emitted metric keys."
             )
         for key in keys:
             if key in existing_keys:
                 raise ValueError(
                     f"Metric key {key} is emitted multiple times, "
-                    f"by both {evaluator.id} and {existing_keys[key]}."
+                    f"by both {evaluator.name} and {existing_keys[key]}."
                 )
-            existing_keys[key] = evaluator.id
+            existing_keys[key] = evaluator.name
 
     return registry

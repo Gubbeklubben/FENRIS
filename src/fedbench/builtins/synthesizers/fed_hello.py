@@ -26,7 +26,7 @@ class FedHello(Synthesizer):
         self._name = name
 
     @property
-    def id(self) -> str:
+    def name(self) -> str:
         return "fed_hello"
 
     @property

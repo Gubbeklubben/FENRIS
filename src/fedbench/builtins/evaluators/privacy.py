@@ -102,7 +102,7 @@ class DirectOverlapDiagnosticEvaluator(Evaluator):
     """
 
     @property
-    def id(self) -> str:
+    def name(self) -> str:
         return "direct_overlap_diagnostic"
 
     @property
@@ -262,7 +262,7 @@ class MIANearestNeighborAttackEvaluator(Evaluator):
     """
 
     @property
-    def id(self) -> str:
+    def name(self) -> str:
         return "mia_nearest_neighbor_attack"
 
     @property
@@ -434,7 +434,7 @@ class AIASupervisedAttackEvaluator(Evaluator):
     """
 
     @property
-    def id(self) -> str:
+    def name(self) -> str:
         return "aia_supervised_attack"
 
     @property

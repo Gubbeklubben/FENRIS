@@ -80,7 +80,7 @@ class EvaluationSuite:
         actual_keys = set(raw_metrics.keys())
         if actual_keys != declared_keys:
             raise ValueError(
-                f"Incorrect output shape for evaluator {evaluator.id}."
+                f"Incorrect output shape for evaluator {evaluator.name}."
                 f"\nDeclared: {declared_keys}\nActual: {actual_keys}"
             )
         return {
@@ -118,7 +118,7 @@ class EvaluationSuite:
     def local_evaluate(self, ctx: LocalEvalContext) -> dict[str, Any]:
         metrics: dict[str, Any] = {}
         for ev in self._evaluators:
-            metrics[ev.id] = ev.local_evaluate(ctx)
+            metrics[ev.name] = ev.local_evaluate(ctx)
         return metrics
 
     def aggregate(
@@ -129,7 +129,7 @@ class EvaluationSuite:
     ) -> dict[str, float]:
         aggregated_metrics: dict[str, float] = {}
         for ev in self._evaluators:
-            stats = [client_metrics[ev.id] for client_metrics in per_client_metrics]
+            stats = [client_metrics[ev.name] for client_metrics in per_client_metrics]
             aggregated_metrics.update(
                 self._prefix_and_verify_key_names(
                     ev, ev.aggregate(stats), target_column, sensitive_columns

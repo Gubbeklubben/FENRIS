@@ -46,7 +46,7 @@ class FedAvg(SingleStepCoordinator):
         self._state: dict[str, torch.Tensor] | None = None
 
     @property
-    def id(self) -> str:
+    def name(self) -> str:
         return "fedavg"
 
     @property

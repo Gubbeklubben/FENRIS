@@ -122,7 +122,7 @@ class FlwrDelegatePartitioner(Partitioner):
         self._flwr_partitioner = flwr_partitioner
 
     @property
-    def id(self) -> str:
+    def name(self) -> str:
         out = ["flwr_"]
         for i, ch in enumerate(type(self._flwr_partitioner).__name__):
             if i > 0 and ch.isupper():

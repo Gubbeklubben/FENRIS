@@ -144,7 +144,7 @@ class FedTabDiff(Synthesizer):
         self._device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
     @property
-    def id(self) -> str:
+    def name(self) -> str:
         return "fedtabdiff"
 
     @property
