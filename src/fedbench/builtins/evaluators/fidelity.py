@@ -98,9 +98,12 @@ class MomentReductionMetricsEvaluator(Evaluator):
     """
 
     @property
+    def id(self) -> str:
+        return "moment_reduction_metrics"
+
+    @property
     def metadata(self) -> EvaluatorDescriptor:
         return EvaluatorDescriptor(
-            name="moment_reduction_metrics",
             category=Category.FIDELITY,
             eval_mode=EvaluationMode.BOTH,
             metrics=[
@@ -235,9 +238,12 @@ class DistributionSimilarityMetricsEvaluator(Evaluator):
     """
 
     @property
+    def id(self) -> str:
+        return "distribution_similarity_metrics"
+
+    @property
     def metadata(self) -> EvaluatorDescriptor:
         return EvaluatorDescriptor(
-            name="distribution_similarity_metrics",
             category=Category.FIDELITY,
             eval_mode=EvaluationMode.BOTH,
             metrics=[
@@ -329,9 +335,12 @@ class CategoricalTvMeanEvaluator(Evaluator):
     """
 
     @property
+    def id(self) -> str:
+        return "categorical_tv_mean"
+
+    @property
     def metadata(self) -> EvaluatorDescriptor:
         return EvaluatorDescriptor(
-            name="categorical_tv_mean",
             category=Category.FIDELITY,
             eval_mode=EvaluationMode.BOTH,
             metrics=[
@@ -420,9 +429,12 @@ class CorrFroDiffEvaluator(Evaluator):
     """
 
     @property
+    def id(self) -> str:
+        return "corr_fro_diff"
+
+    @property
     def metadata(self) -> EvaluatorDescriptor:
         return EvaluatorDescriptor(
-            name="corr_fro_diff",
             category=Category.FIDELITY,
             eval_mode=EvaluationMode.CENTRALIZED,
             metrics=[

@@ -122,6 +122,15 @@ class FlwrDelegatePartitioner(Partitioner):
         self._flwr_partitioner = flwr_partitioner
 
     @property
+    def id(self) -> str:
+        out = ["flwr_"]
+        for i, ch in enumerate(type(self._flwr_partitioner).__name__):
+            if i > 0 and ch.isupper():
+                out.append("_")
+            out.append(ch.lower())
+        return "".join(out)
+
+    @property
     def num_partitions(self) -> int:
         # noinspection PyUnnecessaryCast
         return cast(int, self._flwr_partitioner.num_partitions)

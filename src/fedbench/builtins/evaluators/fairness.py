@@ -67,9 +67,12 @@ class FairnessEvaluator(Evaluator):
     """
 
     @property
+    def id(self) -> str:
+        return "fairness"
+
+    @property
     def metadata(self) -> EvaluatorDescriptor:
         return EvaluatorDescriptor(
-            name="fairness",
             category=Category.FAIRNESS,
             eval_mode=EvaluationMode.BOTH,
             metrics=[
