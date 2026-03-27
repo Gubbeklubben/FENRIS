@@ -5,6 +5,7 @@ from typing import Self, cast
 import numpy as np
 import pandas as pd
 import torch
+import torch.nn.functional as F
 from pandas import DataFrame
 from sklearn.preprocessing import LabelEncoder
 
@@ -34,6 +35,41 @@ def split_cat_num(schema: TableSchema) -> tuple[list[str], list[str]]:
     return cat_attrs, num_attrs
 
 
+def apply_activate(data: torch.Tensor, output_info: list[tuple[int, str]]) -> torch.Tensor:
+    """Apply column-specific activations.
+
+    For continuous columns: Apply tanh (maps to [-1, 1])
+    For categorical columns: Apply Gumbel-Softmax (differentiable sampling)
+
+    Parameters
+    ----------
+    data : torch.Tensor
+        Raw generator output
+    output_info : list[tuple[int, str]]
+        List of (dimension, activation_type) per column from BGMTransformer
+
+    Returns
+    -------
+    torch.Tensor
+        Activated data
+    """
+    data_t = []
+    st = 0
+    for dim, activation in output_info:
+        if activation == "tanh":
+            ed = st + dim
+            data_t.append(torch.tanh(data[:, st:ed]))
+            st = ed
+        elif activation == "softmax":
+            ed = st + dim
+            data_t.append(F.gumbel_softmax(data[:, st:ed], tau=0.2, hard=False))
+            st = ed
+        else:
+            raise ValueError(f"Unknown activation: {activation}")
+
+    return torch.cat(data_t, dim=1)
+
+
 @dataclass(frozen=True)
 class _FedTGANArtifacts:
     cat_attrs: list[str]
@@ -41,6 +77,7 @@ class _FedTGANArtifacts:
     input_dim: int
     output_dim: int
     transformer: BGMTransformer
+    output_info: list[tuple[int, str]]
 
     # noinspection PyUnnecessaryCast
     @classmethod
@@ -53,6 +90,7 @@ class _FedTGANArtifacts:
             input_dim=cast(int, extras["input-dim"]),
             output_dim=cast(int, extras["output-dim"]),
             transformer=cast(BGMTransformer, objects["transformer"]),
+            output_info=cast(list[tuple[int, str]], objects["output-info"]),
         )
 
     def encode(self) -> Payload:
@@ -60,6 +98,7 @@ class _FedTGANArtifacts:
             objects={
                 "objects": {
                     "transformer": self.transformer,
+                    "output-info": self.output_info,
                 }
             },
             extras={
@@ -129,8 +168,9 @@ class FedTGAN(Synthesizer):
         transformer = BGMTransformer(n_clusters=10, eps=0.005)
         transformer.fit(dataset, cat_attrs, num_attrs)
 
-        # Get output dimension from transformer
+        # Get output dimension and info from transformer
         output_dim = transformer.get_output_dim()
+        output_info = transformer.get_output_info()
         input_dim = output_dim
 
         # Initialize models with correct dimensions
@@ -150,6 +190,7 @@ class FedTGAN(Synthesizer):
             input_dim=input_dim,
             output_dim=output_dim,
             transformer=transformer,
+            output_info=output_info,
         )
         return GlobalInitArtifacts(
             coordinator=GlobalState(packed_state).encode(),
@@ -170,6 +211,7 @@ class FedTGAN(Synthesizer):
         input_dim = artifacts.input_dim
         output_dim = artifacts.output_dim
         transformer = artifacts.transformer
+        output_info = artifacts.output_info
 
         # Unpack generator and discriminator state_dicts from received state
         generator_state = {
@@ -225,7 +267,8 @@ class FedTGAN(Synthesizer):
                 noise = torch.randn(
                     real_data.size(0), self._latent_dim, device=self._device
                 )
-                fake_data = generator(noise)
+                fake_data_raw = generator(noise)
+                fake_data = apply_activate(fake_data_raw, output_info)
 
                 # Train discriminator on combined data
                 train_loss_discriminator += discriminator_step(
@@ -281,6 +324,7 @@ class FedTGAN(Synthesizer):
 
         output_dim = artifacts.output_dim
         transformer = artifacts.transformer
+        output_info = artifacts.output_info
 
         # Unpack generator state (only need generator for sampling)
         generator_state = {
@@ -298,7 +342,9 @@ class FedTGAN(Synthesizer):
         # Generate synthetic data
         with torch.no_grad():
             noise = torch.randn(context.num_rows, self._latent_dim, device=self._device)
-            synthetic_data = generator(noise).cpu().numpy()
+            synthetic_data_raw = generator(noise)
+            synthetic_data = apply_activate(synthetic_data_raw, output_info)
+            synthetic_data_np = synthetic_data.cpu().numpy()
 
         # Inverse transform with BGMTransformer
-        return transformer.inverse_transform(synthetic_data, sigmas=None)
+        return transformer.inverse_transform(synthetic_data_np, sigmas=None)
