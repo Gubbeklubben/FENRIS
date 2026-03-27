@@ -6,9 +6,10 @@ import numpy as np
 import pandas as pd
 import torch
 from pandas import DataFrame
-from sklearn.preprocessing import LabelEncoder, MinMaxScaler
+from sklearn.preprocessing import LabelEncoder
 
 from fedbench.builtins.coordinators.fedavg import ClientUpdate, GlobalState
+from fedbench.builtins.synthesizers.fed_tgan.bgm_transformer import BGMTransformer
 from fedbench.builtins.synthesizers.fed_tgan.discriminator import Discriminator
 from fedbench.builtins.synthesizers.fed_tgan.generator import Generator
 from fedbench.builtins.synthesizers.fed_tgan.training import (
@@ -39,9 +40,7 @@ class _FedTGANArtifacts:
     num_attrs: list[str]
     input_dim: int
     output_dim: int
-    cat_max_values: Mapping[str, int]
-    label_encoders: Mapping[str, LabelEncoder]
-    num_scaler: MinMaxScaler
+    transformer: BGMTransformer
 
     # noinspection PyUnnecessaryCast
     @classmethod
@@ -53,18 +52,14 @@ class _FedTGANArtifacts:
             num_attrs=cast(list[str], extras["num-attrs"]),
             input_dim=cast(int, extras["input-dim"]),
             output_dim=cast(int, extras["output-dim"]),
-            cat_max_values=cast(Mapping[str, int], objects["cat-max-values"]),
-            label_encoders=cast(Mapping[str, LabelEncoder], objects["label-encoders"]),
-            num_scaler=cast(MinMaxScaler, objects["num-scaler"]),
+            transformer=cast(BGMTransformer, objects["transformer"]),
         )
 
     def encode(self) -> Payload:
         return Payload(
             objects={
                 "objects": {
-                    "cat-max-values": self.cat_max_values,
-                    "label-encoders": self.label_encoders,
-                    "num-scaler": self.num_scaler,
+                    "transformer": self.transformer,
                 }
             },
             extras={
@@ -130,22 +125,13 @@ class FedTGAN(Synthesizer):
         # Split schema into categorical and numerical columns
         cat_attrs, num_attrs = split_cat_num(context.schema)
 
-        # Create separate label encoder for each categorical column
-        # and track max encoded value for normalization
-        label_encoders = {}
-        cat_max_values = {}
-        for col in cat_attrs:
-            unique_vals = sorted(dataset[col].astype(str).unique())
-            le = LabelEncoder()
-            le.fit(unique_vals)
-            label_encoders[col] = le
-            # Max encoded value = number of classes - 1
-            cat_max_values[col] = len(unique_vals) - 1
+        # Fit BGMTransformer
+        transformer = BGMTransformer(n_clusters=10, eps=0.005)
+        transformer.fit(dataset, cat_attrs, num_attrs)
 
-        # Calculate dimensions
-        n_cat_features = len(cat_attrs)
-        n_num_features = len(num_attrs)
-        input_dim = output_dim = n_cat_features + n_num_features
+        # Get output dimension from transformer
+        output_dim = transformer.get_output_dim()
+        input_dim = output_dim
 
         # Initialize models with correct dimensions
         generator = Generator(latent_dim=self._latent_dim, output_dim=output_dim)
@@ -158,20 +144,12 @@ class FedTGAN(Synthesizer):
         for k, v in discriminator.state_dict().items():
             packed_state[f"discriminator.{k}"] = v
 
-        # Fit scaler on numerical features
-        num_scaler = None
-        if num_attrs:
-            num_scaler = MinMaxScaler()
-            num_scaler.fit(dataset[num_attrs].values)
-
         artifacts = _FedTGANArtifacts(
             cat_attrs=cat_attrs,
             num_attrs=num_attrs,
             input_dim=input_dim,
             output_dim=output_dim,
-            cat_max_values=cat_max_values,
-            label_encoders=label_encoders,
-            num_scaler=num_scaler,
+            transformer=transformer,
         )
         return GlobalInitArtifacts(
             coordinator=GlobalState(packed_state).encode(),
@@ -189,13 +167,9 @@ class FedTGAN(Synthesizer):
 
         artifacts = _FedTGANArtifacts.decode(context.global_init_artifacts)
 
-        cat_attrs = artifacts.cat_attrs
-        num_attrs = artifacts.num_attrs
         input_dim = artifacts.input_dim
         output_dim = artifacts.output_dim
-        cat_max_values = artifacts.cat_max_values
-        label_encoders = artifacts.label_encoders
-        num_scaler = artifacts.num_scaler
+        transformer = artifacts.transformer
 
         # Unpack generator and discriminator state_dicts from received state
         generator_state = {
@@ -209,36 +183,8 @@ class FedTGAN(Synthesizer):
             if k.startswith("discriminator.")
         }
 
-        # Preprocess data: label-encode categoricals, concatenate with numericals
-        processed_data = []
-
-        # Encode and normalize categorical columns
-        for col in cat_attrs:
-            if col in label_encoders:
-                encoded = label_encoders[col].transform(data[col].astype(str))
-                # Normalize to [0, 1] by dividing by max value
-                max_val = cat_max_values[col]
-                if max_val > 0:
-                    normalized = encoded / max_val
-                else:
-                    normalized = encoded  # Single-class column, stays 0
-                processed_data.append(normalized.reshape(-1, 1))
-
-        # Add numerical columns (scaled)
-        if num_attrs and num_scaler is not None:
-            num_data = data[num_attrs].values
-            num_scaled = num_scaler.transform(num_data)
-            processed_data.append(num_scaled)
-        elif num_attrs:
-            # Fallback if no scaler (shouldn't happen)
-            num_data = data[num_attrs].values
-            processed_data.append(num_data)
-
-        # Concatenate all features
-        if processed_data:
-            x = np.hstack(processed_data).astype(np.float32)
-        else:
-            raise ValueError("No data to train on")
+        # Transform data with BGMTransformer
+        x = transformer.transform(data).astype(np.float32)
 
         # Convert to torch tensor and create DataLoader
         dataset = torch.utils.data.TensorDataset(torch.from_numpy(x))
@@ -333,12 +279,8 @@ class FedTGAN(Synthesizer):
 
         artifacts = _FedTGANArtifacts.decode(context.global_init_artifacts)
 
-        cat_attrs = artifacts.cat_attrs
-        num_attrs = artifacts.num_attrs
         output_dim = artifacts.output_dim
-        cat_max_values = artifacts.cat_max_values
-        label_encoders = artifacts.label_encoders
-        num_scaler = artifacts.num_scaler
+        transformer = artifacts.transformer
 
         # Unpack generator state (only need generator for sampling)
         generator_state = {
@@ -358,38 +300,5 @@ class FedTGAN(Synthesizer):
             noise = torch.randn(context.num_rows, self._latent_dim, device=self._device)
             synthetic_data = generator(noise).cpu().numpy()
 
-        # Reverse preproc: decode categorical features and extract numerical features
-        decoded_data = {}
-        n_cat_features = len(cat_attrs)
-
-        # Decode categorical columns
-        for i, col in enumerate(cat_attrs):
-            if col in label_encoders:
-                # Denormalize from [0, 1] back to integer range
-                max_val = cat_max_values[col]
-                denormalized = synthetic_data[:, i] * max_val
-                # Round to nearest integer for categorical encoding
-                encoded_values = np.round(denormalized).astype(int)
-                # Clip to valid range
-                encoded_values = np.clip(encoded_values, 0, max_val)
-                # Inverse transform to get original categorical values
-                decoded_data[col] = label_encoders[col].inverse_transform(
-                    encoded_values
-                )
-
-        if num_attrs and num_scaler is not None:
-            # Extract numerical columns
-            num_synthetic = synthetic_data[
-                :, n_cat_features : n_cat_features + len(num_attrs)
-            ]
-            # Inverse transform to get back original scale
-            num_original = num_scaler.inverse_transform(num_synthetic)
-            # Add to decoded data
-            for i, col in enumerate(num_attrs):
-                decoded_data[col] = num_original[:, i]
-        elif num_attrs:
-            # Fallback if no scaler (shouldn't happen)
-            for i, col in enumerate(num_attrs):
-                decoded_data[col] = synthetic_data[:, n_cat_features + i]
-
-        return pd.DataFrame(decoded_data)
+        # Inverse transform with BGMTransformer
+        return transformer.inverse_transform(synthetic_data, sigmas=None)
