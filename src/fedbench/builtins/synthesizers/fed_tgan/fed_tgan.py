@@ -11,12 +11,9 @@ from sklearn.preprocessing import LabelEncoder
 
 from fedbench.builtins.coordinators.fedavg import ClientUpdate, GlobalState
 from fedbench.builtins.synthesizers.fed_tgan.bgm_transformer import BGMTransformer
+from fedbench.builtins.synthesizers.fed_tgan.conditional import Cond, cond_loss
 from fedbench.builtins.synthesizers.fed_tgan.discriminator import Discriminator
 from fedbench.builtins.synthesizers.fed_tgan.generator import Generator
-from fedbench.builtins.synthesizers.fed_tgan.training import (
-    discriminator_step,
-    generator_step,
-)
 from fedbench.core.algorithm import (
     GlobalInitArtifacts,
     GlobalInitContext,
@@ -37,6 +34,9 @@ def split_cat_num(schema: TableSchema) -> tuple[list[str], list[str]]:
 
 def apply_activate(data: torch.Tensor, output_info: list[tuple[int, str]]) -> torch.Tensor:
     """Apply column-specific activations.
+
+    Ported from the original Fed-TGAN implementation:
+    https://github.com/zhao-zilong/Fed-TGAN/blob/main/Server/dtds/synthesizers/ctgan.py
 
     For continuous columns: Apply tanh (maps to [-1, 1])
     For categorical columns: Apply Gumbel-Softmax (differentiable sampling)
@@ -173,8 +173,12 @@ class FedTGAN(Synthesizer):
         output_info = transformer.get_output_info()
         input_dim = output_dim
 
+        # Calculate conditional dimension (sum of all categorical/softmax dimensions)
+        cond_dim = sum(dim for dim, act in output_info if act == "softmax")
+
         # Initialize models with correct dimensions
-        generator = Generator(latent_dim=self._latent_dim, output_dim=output_dim)
+        # Generator input = latent + conditional
+        generator = Generator(latent_dim=self._latent_dim + cond_dim, output_dim=output_dim)
         discriminator = Discriminator(input_dim=input_dim)
 
         # Pack both models into a single state_dict with prefixed keys
@@ -228,14 +232,20 @@ class FedTGAN(Synthesizer):
         # Transform data with BGMTransformer
         x = transformer.transform(data).astype(np.float32)
 
+        # Initialize conditional vector generator
+        cond_generator = Cond(x, output_info)
+
+        # Calculate conditional dimension
+        cond_dim = cond_generator.n_opt if cond_generator.n_col > 0 else 0
+
         # Convert to torch tensor and create DataLoader
         dataset = torch.utils.data.TensorDataset(torch.from_numpy(x))
         dataloader = torch.utils.data.DataLoader(
             dataset, batch_size=self._batch_size, shuffle=True
         )
 
-        # Initialize models
-        generator = Generator(latent_dim=self._latent_dim, output_dim=output_dim)
+        # Initialize models (generator input includes conditional dimension)
+        generator = Generator(latent_dim=self._latent_dim + cond_dim, output_dim=output_dim)
         discriminator = Discriminator(input_dim=input_dim)
 
         # Load weights from request
@@ -260,32 +270,78 @@ class FedTGAN(Synthesizer):
 
         # Training loop
         for _ in range(self._local_epochs):
+
+            """
+            Inline training loop adapted to resemble the original Fed-TGAN implementation:
+            https://github.com/zhao-zilong/Fed-TGAN/blob/main/Server/dtds/synthesizers/ctgan.py
+            """
+
             for (real_data_batch,) in dataloader:
                 real_data = real_data_batch.to(self._device)
+                batch_size = real_data.size(0)
 
-                # Generate synthetic data
-                noise = torch.randn(
-                    real_data.size(0), self._latent_dim, device=self._device
-                )
-                fake_data_raw = generator(noise)
+                # Sample conditional vectors
+                condvec = cond_generator.sample(batch_size)
+                if condvec is not None:
+                    c, m, col, opt = condvec
+                    c = torch.from_numpy(c).to(self._device)
+                    m = torch.from_numpy(m).to(self._device)
+                else:
+                    c = torch.zeros(batch_size, 0, device=self._device)
+                    m = torch.zeros(batch_size, 0, device=self._device)
+
+                # ===== Train Discriminator =====
+                discriminator.train()
+
+                # Generate fake data with conditional
+                noise = torch.randn(batch_size, self._latent_dim, device=self._device)
+                noise_c = torch.cat([noise, c], dim=1) if c.size(1) > 0 else noise
+
+                fake_data_raw = generator(noise_c)
                 fake_data = apply_activate(fake_data_raw, output_info)
 
-                # Train discriminator on combined data
-                train_loss_discriminator += discriminator_step(
-                    discriminator,
-                    real_data,
-                    fake_data.detach(),
-                    optimizer_discriminator,
-                    self._device,
+                # Discriminator outputs
+                d_real = discriminator(real_data).view(-1)
+                d_fake = discriminator(fake_data.detach()).view(-1)
+
+                # Discriminator loss
+                loss_d = -(torch.log(d_real + 1e-4).mean()) - (
+                    torch.log(1.0 - d_fake + 1e-4).mean()
                 )
 
-                # Train the generator
-                noise_g = torch.randn(
-                    real_data.size(0), self._latent_dim, device=self._device
-                )
-                train_loss_generator += generator_step(
-                    generator, discriminator, noise_g, optimizer_generator, self._device
-                )
+                optimizer_discriminator.zero_grad()
+                loss_d.backward()
+                optimizer_discriminator.step()
+
+                train_loss_discriminator += loss_d.item()
+
+                # ===== Train Generator =====
+                generator.train()
+                discriminator.eval()
+
+                # Generate fake data with conditional
+                noise = torch.randn(batch_size, self._latent_dim, device=self._device)
+                noise_c = torch.cat([noise, c], dim=1) if c.size(1) > 0 else noise
+
+                fake_data_raw = generator(noise_c)
+                fake_data = apply_activate(fake_data_raw, output_info)
+
+                d_fake_g = discriminator(fake_data).view(-1)
+
+                # Generator loss: adversarial + conditional
+                loss_g_adv = -(torch.log(d_fake_g + 1e-4).mean())
+
+                if condvec is not None and c.size(1) > 0:
+                    loss_g_cond = cond_loss(fake_data_raw, output_info, c, m)
+                    loss_g = loss_g_adv + loss_g_cond
+                else:
+                    loss_g = loss_g_adv
+
+                optimizer_generator.zero_grad()
+                loss_g.backward()
+                optimizer_generator.step()
+
+                train_loss_generator += loss_g.item()
 
                 num_batches += 1
 
@@ -333,8 +389,11 @@ class FedTGAN(Synthesizer):
             if k.startswith("generator.")
         }
 
-        # Initialize and load generator
-        generator = Generator(latent_dim=self._latent_dim, output_dim=output_dim)
+        # Calculate conditional dimension
+        cond_dim = sum(dim for dim, act in output_info if act == "softmax")
+
+        # Initialize and load generator (with conditional dimension)
+        generator = Generator(latent_dim=self._latent_dim + cond_dim, output_dim=output_dim)
         generator.load_state_dict(generator_state)
         generator.to(self._device)
         generator.eval()
@@ -342,7 +401,14 @@ class FedTGAN(Synthesizer):
         # Generate synthetic data
         with torch.no_grad():
             noise = torch.randn(context.num_rows, self._latent_dim, device=self._device)
-            synthetic_data_raw = generator(noise)
+
+            # Sample conditional vectors (zeros for now, could use Cond.sample_original_training_data_prob)
+            c = torch.zeros(context.num_rows, cond_dim, device=self._device)
+
+            # Concatenate noise and conditional
+            noise_c = torch.cat([noise, c], dim=1) if cond_dim > 0 else noise
+
+            synthetic_data_raw = generator(noise_c)
             synthetic_data = apply_activate(synthetic_data_raw, output_info)
             synthetic_data_np = synthetic_data.cpu().numpy()
 
