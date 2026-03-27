@@ -1,8 +1,12 @@
+from __future__ import annotations
+
 import importlib
-import inspect
 from dataclasses import dataclass
+from enum import StrEnum
 from importlib.metadata import entry_points
-from typing import Any, Iterator
+from typing import Any, Iterator, Self
+
+_ROOT_PKG = __package__.split(".")[0]
 
 
 @dataclass(frozen=True)
@@ -11,75 +15,61 @@ class Metadata:
     locator: str
 
 
-class FactoryRegistry[T]:
-    def __init__(self, group: str, product_cls: type[T]) -> None:
+class Group(StrEnum):
+    SYNTHESIZERS = "synthesizers"
+    COORDINATORS = "coordinators"
+    PARTITIONERS = "partitioners"
+    EVALUATORS = "evaluators"
+
+    def get_registry(self) -> Registry:
+        return Registry.get(f"{_ROOT_PKG}.{self.value}")
+
+
+class Registry:
+    _instances: dict[str, Self] = {}
+
+    @classmethod
+    def get(cls, group: str) -> Self:
+        try:
+            return cls._instances[group]
+        except KeyError:
+            registry = cls(group)
+            cls._instances[group] = registry
+            return registry
+
+    def __init__(self, group: str) -> None:
         self._group = group
-
-        if not isinstance(product_cls, type):
-            raise TypeError("product_cls must be a type.")
-        self._product_cls = product_cls
-
-        self._plugins: dict[str, importlib.metadata.EntryPoint] = {}
+        self._entry_points: dict[str, importlib.metadata.EntryPoint] = {}
 
         for ep in entry_points(group=group):
-            if ep.name in self._plugins:
+            if ep.name in self._entry_points:
                 raise ValueError(
                     f"Duplicate component {ep.name} from {ep.value}. "
                     f"{self} already contains {ep.name} from "
-                    f"{self._plugins[ep.name].value}"
+                    f"{self._entry_points[ep.name].value}"
                 )
             else:
-                self._plugins[ep.name] = ep
+                self._entry_points[ep.name] = ep
 
     def __repr__(self) -> str:
-        return (
-            f"{self.__class__.__name__}(group={self.group}, "
-            f"product_cls={self._product_cls})"
-        )
+        return f"{self.__class__.__name__}(group={self._group})"
 
     def __iter__(self) -> Iterator[str]:
-        yield from self._plugins.keys()
+        yield from self._entry_points.keys()
 
     def __contains__(self, name: str) -> bool:
-        return name in self._plugins
-
-    @property
-    def group(self) -> str:
-        return self._group
-
-    def call(self, name: str, factory_kwargs: dict[str, Any] | None = None) -> T:
-        factory_kwargs = factory_kwargs or {}
-        factory = self.load(name)
-
-        if inspect.isclass(factory) and inspect.isabstract(factory):
-            raise TypeError(f"{factory} is an abstract class.")
-
-        if not callable(factory):
-            raise TypeError(f"{factory} is not callable.")
-
-        instance = factory(**factory_kwargs)
-        if not isinstance(instance, self._product_cls):
-            raise TypeError(
-                f"Unexpected type {type(instance)} produced by factory {name}"
-            )
-        return instance
+        return name in self._entry_points
 
     def metadata(self) -> Iterator[Metadata]:
-        for ep in self._plugins.values():
+        for ep in self._entry_points.values():
             yield Metadata(name=ep.name, locator=ep.value)
 
     def load(self, name: str) -> Any:
-        factory = self._load_plugin(name)
-
-        if factory is None:
-            raise ValueError(f"No such factory: '{name}'.")
-
-        return factory
-
-    def _load_plugin(self, name: str) -> Any | None:
         try:
-            entry_point = self._plugins[name]
+            entry_point = self._entry_points[name]
         except KeyError:
-            return None
+            raise ValueError(
+                f"No registry entry for component named '{name}'"
+            ) from None
 
         return entry_point.load()

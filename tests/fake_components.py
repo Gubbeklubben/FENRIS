@@ -11,10 +11,14 @@ from fedbench.core.algorithm import (
 )
 from fedbench.core.data import Partitioner
 from fedbench.core.payload import ArraysTarget, Payload
-from fedbench.runtime.registry import FactoryRegistry
+from fedbench.runtime.registry import Registry
 
 
 class FakeSynthesizer(Synthesizer):
+    @property
+    def name(self) -> str:
+        return "fake_synthesizer"
+
     @property
     def arrays_target(self) -> ArraysTarget:
         return ArraysTarget.NUMPY
@@ -38,6 +42,10 @@ class FakeSynthesizer(Synthesizer):
 
 
 class FakePartitioner(Partitioner):
+    @property
+    def name(self) -> str:
+        return "fake_partitioner"
+
     # noinspection PyUnusedLocal
     def __init__(self, num_partitions: int):
         pass
@@ -70,25 +78,25 @@ class FakeEntryPoint:
         return self.product
 
 
-class FakeSynthRegistry(FactoryRegistry[Synthesizer]):
-    KEY = "test_synthesizer"
+class FakeSynthRegistry(Registry):
+    KEY = "fake_synthesizer"
 
     def __init__(self):
-        super().__init__(f"{__package__}.synthesizers", Synthesizer)
-        self._plugins = {
+        super().__init__(f"{__package__}.fake_synthesizers")
+        self._entry_points = {
             self.KEY: FakeEntryPoint(
-                self.KEY, "", f"{__package__}.synthesizers", FakeSynthesizer
+                self.KEY, "", f"{__package__}.fake_synthesizers", FakeSynthesizer
             )
         }
 
 
-class FakePartitionerRegistry(FactoryRegistry[Partitioner]):
-    KEY = "test_partitioner"
+class FakePartitionerRegistry(Registry):
+    KEY = "fake_partitioner"
 
     def __init__(self):
-        super().__init__(f"{__package__}.partitioners", Partitioner)
-        self._plugins = {
+        super().__init__(f"{__package__}.fake_partitioners")
+        self._entry_points = {
             self.KEY: FakeEntryPoint(
-                self.KEY, "", f"{__package__}.partitioners", FakePartitioner
+                self.KEY, "", f"{__package__}.fake_partitioners", FakePartitioner
             )
         }

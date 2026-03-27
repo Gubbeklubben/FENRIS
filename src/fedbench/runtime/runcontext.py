@@ -63,14 +63,14 @@ class _RunCtxField[T]:
 
 class RunContext:
     # fmt: off
+    df_loader             = _RunCtxField[Callable[[], DataFrame]]()
     synthesizer           = _RunCtxField[Synthesizer]()
     coordinator           = _RunCtxField[Coordinator]()
-    df_loader             = _RunCtxField[Callable[[], DataFrame]]()
     partitioner           = _RunCtxField[Partitioner]()
     eval_suite            = _RunCtxField[EvaluationSuite]()
     dataset               = _RunCtxField[PartitionedDataset]()
     global_init_artifacts = _RunCtxField[GlobalInitArtifacts]()
-    train_artifacts      = _RunCtxField[Payload]()
+    train_artifacts       = _RunCtxField[Payload]()
     per_client_metrics    = _RunCtxField[Mapping[int, Mapping[str, Any]]]()
     aggregated_metrics    = _RunCtxField[Mapping[str, float]]()
     centralized_metrics   = _RunCtxField[Mapping[str, float]]()

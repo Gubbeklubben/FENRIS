@@ -1,55 +1,16 @@
-from collections.abc import Iterable, Mapping
-from typing import Any, Self
+from collections.abc import Iterable, Iterator, Mapping
+from typing import Any
 
 from fedbench.core.eval.evalcontext import GlobalEvalContext, LocalEvalContext
-from fedbench.core.eval.evaluator import Category, Evaluator, MetricDescriptor
-from fedbench.runtime.registry import FactoryRegistry
+from fedbench.core.eval.evaluator import Evaluator, MetricDescriptor
 
 
 class EvaluationSuite:
     def __init__(self, evaluators: Iterable[Evaluator]):
         self._evaluators = tuple(evaluators)
 
-    @classmethod
-    def default(
-        cls,
-        registry: FactoryRegistry[Evaluator],
-    ) -> Self:
-        return cls(cls._get_evaluators(registry))
-
-    @classmethod
-    def with_evaluator_categories(
-        cls,
-        registry: FactoryRegistry[Evaluator],
-        categories: Iterable[Category],
-    ) -> Self:
-        return cls(cls._get_evaluators(registry, categories=categories))
-
-    @classmethod
-    def with_evaluator_names(
-        cls,
-        registry: FactoryRegistry[Evaluator],
-        names: Iterable[str],
-    ) -> Self:
-        return cls(cls._get_evaluators(registry, names=names))
-
-    @staticmethod
-    def _get_evaluators(
-        registry: FactoryRegistry[Evaluator],
-        categories: Iterable[Category] = tuple(Category),
-        names: Iterable[str] = (),
-    ) -> Iterable[Evaluator]:
-        categories = set(categories)
-        names = set(names)
-        for name in registry:
-            evaluator = registry.call(name)
-            is_scalability = evaluator.metadata.category == Category.SCALABILITY
-            if not is_scalability:
-                if evaluator.metadata.category not in categories:
-                    continue
-                if names and name not in names:
-                    continue
-            yield evaluator
+    def __iter__(self) -> Iterator[Evaluator]:
+        yield from self._evaluators
 
     def get_evaluator_for_metric_key(
         self,
@@ -57,6 +18,7 @@ class EvaluationSuite:
         target_column: str | None,
         sensitive_columns: tuple[str, ...] | None,
     ) -> tuple[Evaluator, MetricDescriptor]:
+
         for ev in self._evaluators:
             for key, metric in ev.get_metric_descriptor_dict(
                 target_column, sensitive_columns

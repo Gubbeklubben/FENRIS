@@ -1,4 +1,3 @@
-from enum import StrEnum
 from typing import Annotated, Literal
 
 import typer
@@ -7,18 +6,7 @@ import fedbench.runtime.runner as runner
 from fedbench.config.builder import build_config
 from fedbench.config.parsing import split_outside_brackets
 from fedbench.runtime.pipeline import pipeline
-from fedbench.runtime.registry import FactoryRegistry
-from fedbench.runtime.registry_builder import (
-    build_coordinator_registry,
-    build_evaluator_registry,
-    build_partitioner_registry,
-    build_synthesizer_registry,
-)
-
-synthesizers = build_synthesizer_registry()
-coordinators = build_coordinator_registry()
-partitioners = build_partitioner_registry()
-evaluators = build_evaluator_registry()
+from fedbench.runtime.registry import Group
 
 app = typer.Typer()
 
@@ -46,19 +34,12 @@ def new(name: str) -> None:
     pass
 
 
-class Component(StrEnum):
-    SYNTHESIZERS = "synthesizers"
-    COORDINATORS = "coordinators"
-    PARTITIONERS = "partitioners"
-    EVALUATORS = "evaluators"
-
-
 @app.command()
 def show(
-    components: Annotated[
-        list[Component] | None,
+    groups: Annotated[
+        list[Group] | None,
         typer.Argument(
-            help="Components to show. If omitted, all are shown.",
+            help="Groups of components to show. If omitted, all are shown.",
         ),
     ] = None,
     include_locators: Annotated[
@@ -78,23 +59,25 @@ def show(
       fedbench show synthesizers partitioners --include-locators
     """
 
-    selected = components if components else list(Component)
+    selected = groups if groups else list(Group)
 
-    def maybe_show[T](component: Component, registry: FactoryRegistry[T]) -> None:
-        if component not in selected:
+    def maybe_show(group: Group) -> None:
+        if group not in selected:
             return
 
+        registry = group.get_registry()
         entries = list(registry.metadata())
         width = max(len(e.name) for e in entries)
-        print(f"\n --- {component.value.upper()} ---")
+
+        print(f"\n --- {group.value.upper()} ---")
         for metadata in entries:
             print(f"  {metadata.name:<{width}}", end="")
             print(f"  {metadata.locator}" if include_locators else "")
 
-    maybe_show(Component.SYNTHESIZERS, synthesizers)
-    maybe_show(Component.COORDINATORS, coordinators)
-    maybe_show(Component.PARTITIONERS, partitioners)
-    maybe_show(Component.EVALUATORS, evaluators)
+    maybe_show(Group.SYNTHESIZERS)
+    maybe_show(Group.COORDINATORS)
+    maybe_show(Group.PARTITIONERS)
+    maybe_show(Group.EVALUATORS)
 
     print()
 
@@ -191,7 +174,7 @@ def run(
         for key, value in locals().items()
         if value is not None
     }
-    config = build_config(cli_input, synthesizers, partitioners)
+    config = build_config(cli_input)
     runner.run(config, pipeline())
 
 

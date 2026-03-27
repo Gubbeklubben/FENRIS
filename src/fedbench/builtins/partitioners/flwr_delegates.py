@@ -123,7 +123,7 @@ class FlwrDelegatePartitioner(Partitioner):
 
     @property
     def name(self) -> str:
-        out = ["flwr_"]
+        out = []
         for i, ch in enumerate(type(self._flwr_partitioner).__name__):
             if i > 0 and ch.isupper():
                 out.append("_")
