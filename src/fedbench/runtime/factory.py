@@ -87,7 +87,7 @@ def _create_component[T: Component](
 
     if instance.name != name:
         raise ValueError(
-            f"Component name does match registry key, "
+            f"Component name does not match registry key, "
             f"type: {product_cls}, name: {instance.name}, key: {name}."
         )
     return instance
