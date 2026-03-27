@@ -121,7 +121,7 @@ def validate_stop_metrics(
 ) -> None:
     if not metrics_cfg.get("early_stop"):
         return
-    if "stop_metric" not in metrics_cfg:
+    if not metrics_cfg.get("stop_metric"):
         raise ValueError("stop_metric must be specified when early_stop is enabled")
 
     eval_suite = create_evaluation_suite(metrics_cfg["run_categories"])
@@ -142,7 +142,7 @@ def validate_stop_metrics(
             f"Metric `{metrics_cfg['stop_metric']}` does not support "
             f"centralized evaluation and cannot be used as a stop metric"
         )
-    if "stop_mode" not in metrics_cfg:
+    if not metrics_cfg.get("stop_mode"):
         metrics_cfg["stop_mode"] = metric.default_stop_mode
 
 

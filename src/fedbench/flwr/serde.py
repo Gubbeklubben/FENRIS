@@ -4,13 +4,7 @@ from collections.abc import Generator
 from contextlib import contextmanager
 from typing import Any, overload
 
-from flwr.app import (
-    Array,
-    ArrayRecord,
-    ConfigRecord,
-    MetricRecord,
-    RecordDict,
-)
+from flwr.app import Array, ArrayRecord, ConfigRecord, MetricRecord, RecordDict
 
 from fedbench.core.payload import ArraysTarget, Objects, Payload
 from fedbench.flwr.rdict import RDictNamespaceView

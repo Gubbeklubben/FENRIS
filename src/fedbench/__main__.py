@@ -157,7 +157,7 @@ def run(
     synthesizer_kwargs: Annotated[
         str | None,
         typer.Option(
-            callback=parse_kwargs, help="Kwargs for the algorithm (key=value)."
+            callback=parse_kwargs, help="Kwargs for the synthesizer (key=value)."
         ),
     ] = None,
     coordinator_kwargs: Annotated[
@@ -179,7 +179,7 @@ def run(
         str | None,
         typer.Option(
             callback=parse_args,
-            help="Comma-separated sensitive columns for fairness/AIA.",
+            help="Comma-separated list of sensitive columns for fairness/AIA metrics.",
         ),
     ] = None,
     run_categories: Annotated[
@@ -193,10 +193,14 @@ def run(
     ] = None,
     stop_metric: Annotated[
         str | None,
-        typer.Option(help="Metric key to monitor (e.g., fidelity.corr_fro_diff)."),
+        typer.Option(help="Metric key to monitor (e.g., `fidelity.corr_fro_diff`)."),
     ] = None,
     stop_mode: Annotated[
-        Literal["min", "max"] | None, typer.Option(help="min or max.")
+        Literal["min", "max"] | None,
+        typer.Option(
+            help="Whether stop metric is expected to converge "
+            "towards a minimum or a maximum."
+        ),
     ] = None,
     stop_epsilon: Annotated[
         float | None, typer.Option(help="Minimum improvement required.")
@@ -221,7 +225,11 @@ def run(
         int | None, typer.Option(help="Maximum number of federated rounds.")
     ] = None,
     test_size: Annotated[
-        float | None, typer.Option(help="Fraction of data to hold out for testing.")
+        float | None,
+        typer.Option(
+            help="Fraction of data to hold out for testing. "
+            "This is used for both local and global holdout fractions."
+        ),
     ] = None,
     seed: Annotated[int | None, typer.Option(help="Master random seed.")] = None,
     outputdir: Annotated[
@@ -231,7 +239,7 @@ def run(
         int | None, typer.Option(help="Number of synthetic rows to generate.")
     ] = None,
     disable_pickle: Annotated[
-        bool | None, typer.Option(help="Disable pickle for dataset loading.")
+        bool | None, typer.Option(help="Whether to disable pickle for dataset loading.")
     ] = None,
 ) -> None:
 

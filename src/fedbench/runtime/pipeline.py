@@ -61,11 +61,7 @@ def load_dataset(ctx: RunContext) -> None:
     df = ctx.df_loader()
     schema = _infer_schema(df)
     ctx.dataset = PartitionedDataset(
-        df,
-        schema,
-        ctx.partitioner,
-        ctx.config.test_size,
-        ctx.config.seed.partitioning,
+        df, schema, ctx.partitioner, ctx.config.test_size, ctx.config.seed.partitioning
     )
 
 
@@ -110,8 +106,7 @@ def global_sample(ctx: RunContext) -> None:
         global_init_artifacts=ctx.global_init_artifacts.synthesizer,
         client_cache=None,
         seed=ctx.config.seed.sampling,
-        num_rows=ctx.config.num_synthetic_rows
-        or len(ctx.dataset.load_global_holdout()),
+        num_rows=ctx.config.num_synthetic_rows or ctx.dataset.global_holdout_size,
     )
     ctx.synthetic_df = ctx.synthesizer.sample(ctx.train_artifacts, sample_ctx)
 
