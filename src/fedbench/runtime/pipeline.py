@@ -5,6 +5,7 @@ import math
 from collections.abc import Iterable
 from pathlib import Path
 
+import fedbench.runtime.factory as factory
 from fedbench.core.algorithm import (
     GlobalInitArtifacts,
     GlobalInitContext,
@@ -12,45 +13,48 @@ from fedbench.core.algorithm import (
 )
 from fedbench.core.data import PartitionedDataset
 from fedbench.core.data.schemas import infer_schema as _infer_schema
+from fedbench.core.eval import CentralizedEvalContext, Evaluator
 from fedbench.core.logger import log_info
 from fedbench.runtime.command import Command
-from fedbench.runtime.component_factory import (
-    create_centralized_eval_ctx,
-    create_coordinator,
-    create_df_loader,
-    create_evaluation_suite,
-    create_partitioner,
-    create_synthesizer,
-)
 from fedbench.runtime.platform_info import collect_platform_info
-from fedbench.runtime.registry_builder import (
-    build_coordinator_registry,
-    build_evaluator_registry,
-    build_partitioner_registry,
-    build_synthesizer_registry,
-)
 from fedbench.runtime.runcontext import RunContext
 
 
 def create_components(ctx: RunContext) -> None:
-    ctx.df_loader = create_df_loader(ctx.config)
+    ctx.df_loader = factory.create_df_loader(ctx.config.data.dataset)
 
-    ctx.synthesizer = create_synthesizer(
-        ctx.config,
-        build_synthesizer_registry(),
+    ctx.partitioner = factory.create_partitioner(
+        ctx.config.data.partitioner,
+        ctx.config.data.partitioner_kwargs,
     )
-    ctx.coordinator = create_coordinator(
-        ctx.config,
-        build_coordinator_registry(),
+    ctx.synthesizer = factory.create_synthesizer(
+        ctx.config.synthesizer,
+        ctx.config.synthesizer_kwargs,
     )
-    ctx.partitioner = create_partitioner(
-        ctx.config,
-        build_partitioner_registry(),
+    ctx.coordinator = factory.create_coordinator(
+        ctx.config.coordinator,
+        ctx.config.coordinator_kwargs,
     )
-    ctx.eval_suite = create_evaluation_suite(
-        ctx.config,
-        build_evaluator_registry(),
-    )
+    ctx.eval_suite = factory.create_evaluation_suite(ctx.config.metrics.run_categories)
+    _validate_evaluators(ctx.eval_suite)
+
+
+def _validate_evaluators(evaluators: Iterable[Evaluator]) -> None:
+    existing_keys: dict[str, str] = {}
+
+    for evaluator in evaluators:
+        keys = list(evaluator.get_metric_keys())
+        if not keys:
+            raise ValueError(
+                f"Evaluator {evaluator.name} does not declare any emitted metric keys."
+            )
+        for key in keys:
+            if key in existing_keys:
+                raise ValueError(
+                    f"Metric key {key} is emitted multiple times, "
+                    f"by both {evaluator.name} and {existing_keys[key]}."
+                )
+            existing_keys[key] = evaluator.name
 
 
 def load_dataset(ctx: RunContext) -> None:
@@ -113,7 +117,15 @@ def global_sample(ctx: RunContext) -> None:
 
 
 def global_evaluate(ctx: RunContext) -> None:
-    eval_ctx = create_centralized_eval_ctx(ctx.config, ctx.dataset, ctx.synthetic_df)
+    eval_ctx = CentralizedEvalContext(
+        synthetic_df=ctx.synthetic_df,
+        holdout_df=ctx.dataset.load_global_holdout(),
+        client_train_df=ctx.dataset.load_all_train_data(),
+        target_column=ctx.config.data.target_col,
+        sensitive_columns=ctx.config.data.sensitive_cols,
+        schema=ctx.dataset.schema,
+        seed=ctx.config.seed.evaluation,
+    )
     ctx.centralized_metrics = ctx.eval_suite.global_evaluate(eval_ctx)
 
 

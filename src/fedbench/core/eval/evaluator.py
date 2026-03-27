@@ -1,10 +1,11 @@
 import math
 import re
-from abc import ABC, abstractmethod
+from abc import abstractmethod
 from dataclasses import dataclass
 from enum import Flag, StrEnum, auto
 from typing import Any, Iterable, Literal
 
+from fedbench.core.component import Component
 from fedbench.core.eval.evalcontext import GlobalEvalContext, LocalEvalContext
 
 
@@ -36,13 +37,12 @@ class MetricDescriptor:
 
 @dataclass(frozen=True)
 class EvaluatorDescriptor:
-    name: str
     category: Category
     eval_mode: EvaluationMode
     metrics: list[MetricDescriptor]
 
 
-class Evaluator(ABC):
+class Evaluator(Component):
     @property
     @abstractmethod
     def metadata(self) -> EvaluatorDescriptor: ...

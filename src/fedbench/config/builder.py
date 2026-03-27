@@ -13,19 +13,18 @@ from fedbench.config.config import (
     SeedConfig,
 )
 from fedbench.config.parsing import parse_for_function
-from fedbench.core.algorithm import Synthesizer
-from fedbench.core.data import Partitioner
-from fedbench.core.eval import Category, EvaluationSuite
+from fedbench.core.eval import Category
 from fedbench.core.eval.evaluator import EvaluationMode
-from fedbench.runtime.registry import FactoryRegistry
-from fedbench.runtime.registry_builder import build_evaluator_registry
+from fedbench.runtime.factory import create_evaluation_suite
+from fedbench.runtime.registry import Group, Registry
 
 
 def build_config(
     cli_input: dict[str, Any],
-    synthesizer_registry: FactoryRegistry[Synthesizer],
-    partitioner_registry: FactoryRegistry[Partitioner],
+    synthesizer_registry: Registry | None = None,
+    partitioner_registry: Registry | None = None,
 ) -> Config:
+
     # Remove seed from cli_input so it doesn't become part of the cfg dict.
     # We use cli_input["seed"] to construct Config.seed of type SeedConfig.
     default_seed = inspect.signature(SeedConfig.from_master).parameters["seed"].default
@@ -43,6 +42,8 @@ def build_config(
     resolve_run_categories(metrics_cfg)
     validate_stop_metrics(metrics_cfg, data_cfg)
 
+    synthesizer_registry = synthesizer_registry or Group.SYNTHESIZERS.get_registry()
+    partitioner_registry = partitioner_registry or Group.PARTITIONERS.get_registry()
     parse_synthesizer_kwargs(cfg, synthesizer_registry)
     parse_partitioner_kwargs(cfg, data_cfg, seed_cfg, partitioner_registry)
 
@@ -108,7 +109,10 @@ def resolve_run_categories(metrics_cfg: dict[str, Any]) -> None:
         metrics_cfg["run_categories"] = tuple(Category)
     else:
         metrics_cfg["run_categories"] = tuple(
-            Category(v) for v in metrics_cfg["run_categories"]
+            (
+                Category.SCALABILITY,
+                *(Category(v) for v in metrics_cfg["run_categories"]),
+            )
         )
 
 
@@ -120,11 +124,7 @@ def validate_stop_metrics(
     if "stop_metric" not in metrics_cfg:
         raise ValueError("stop_metric must be specified when early_stop is enabled")
 
-    eval_suite = EvaluationSuite.with_evaluator_categories(
-        build_evaluator_registry(),
-        metrics_cfg["run_categories"],
-    )
-
+    eval_suite = create_evaluation_suite(metrics_cfg["run_categories"])
     try:
         evaluator, metric = eval_suite.get_evaluator_for_metric_key(
             metrics_cfg["stop_metric"],
@@ -147,7 +147,7 @@ def validate_stop_metrics(
 
 
 def parse_synthesizer_kwargs(
-    cfg: dict[str, Any], synthesizer_registry: FactoryRegistry[Synthesizer]
+    cfg: dict[str, Any], synthesizer_registry: Registry
 ) -> None:
 
     name = cfg["synthesizer"]
@@ -200,7 +200,7 @@ def parse_partitioner_kwargs(
     cfg: dict[str, Any],
     data_cfg: dict[str, Any],
     seed: SeedConfig,
-    partitioner_registry: FactoryRegistry[Partitioner],
+    partitioner_registry: Registry,
 ) -> None:
     # Check that specified partitioner is registered
     if data_cfg["partitioner"] not in partitioner_registry:

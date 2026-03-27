@@ -1,4 +1,4 @@
-from abc import ABC, abstractmethod
+from abc import abstractmethod
 from dataclasses import dataclass
 
 from pandas import DataFrame
@@ -8,6 +8,7 @@ from fedbench.core.algorithm.context import (
     SampleContext,
     TrainContext,
 )
+from fedbench.core.component import Component
 from fedbench.core.payload import ArraysTarget, Payload
 
 
@@ -17,7 +18,7 @@ class GlobalInitArtifacts:
     synthesizer: Payload | None = None
 
 
-class Synthesizer(ABC):
+class Synthesizer(Component):
     """The framework view of the model to train and sample from."""
 
     def __repr__(self) -> str:

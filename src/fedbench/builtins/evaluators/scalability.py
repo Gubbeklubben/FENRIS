@@ -44,9 +44,12 @@ class ScalabilityEvaluator(Evaluator):
     """
 
     @property
+    def name(self) -> str:
+        return "scalability"
+
+    @property
     def metadata(self) -> EvaluatorDescriptor:
         return EvaluatorDescriptor(
-            name="scalability",
             category=Category.SCALABILITY,
             eval_mode=EvaluationMode.FEDERATED,
             metrics=[
