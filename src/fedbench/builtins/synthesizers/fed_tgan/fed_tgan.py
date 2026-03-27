@@ -1,13 +1,10 @@
-from collections.abc import Mapping
 from dataclasses import dataclass
 from typing import Self, cast
 
 import numpy as np
-import pandas as pd
 import torch
 import torch.nn.functional as F
 from pandas import DataFrame
-from sklearn.preprocessing import LabelEncoder
 
 from fedbench.builtins.coordinators.fedavg import ClientUpdate, GlobalState
 from fedbench.builtins.synthesizers.fed_tgan.bgm_transformer import BGMTransformer
