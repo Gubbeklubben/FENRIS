@@ -1,4 +1,5 @@
 from dataclasses import dataclass
+from pathlib import Path
 from typing import cast
 
 from flwr.app import RecordDict
@@ -7,7 +8,7 @@ import fedbench.runtime.factory as factory
 from fedbench.config import Config
 from fedbench.core.algorithm import Synthesizer
 from fedbench.core.data import PartitionedDataset
-from fedbench.core.data.schemas import infer_schema
+from fedbench.core.data.schemas import load_or_infer_schema
 from fedbench.core.eval import EvaluationSuite
 from fedbench.flwr.namespace import Namespace
 from fedbench.flwr.rdict import RDictNamespaceView
@@ -75,7 +76,7 @@ def _get_dataset(config: Config) -> PartitionedDataset:
 
     df_loader = factory.create_df_loader(config.data.dataset)
     df = df_loader()
-    schema = infer_schema(df)
+    schema = load_or_infer_schema(Path(config.data.schema), df)
 
     partitioner = factory.create_partitioner(
         config.data.partitioner,

@@ -223,6 +223,22 @@ def run(
     disable_pickle: Annotated[
         bool | None, typer.Option(help="Whether to disable pickle for dataset loading.")
     ] = None,
+    schema: Annotated[
+        str | None,
+        typer.Option(
+            help="Path to the fixed schema to use for evaluation (in FedbenchSchema "
+            "format). If not specified, will look for a .schema.json file with the "
+            "same base name as the dataset file. If this does not exist, a schema "
+            "will be inferred."
+        ),
+    ] = None,
+    generate_input_schema: Annotated[
+        bool | None,
+        typer.Option(
+            help="Whether to write back the inferred schema as a .schema.json file "
+            "next to the input dataset. File must not already exist."
+        ),
+    ] = None,
 ) -> None:
 
     cli_input = {

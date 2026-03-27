@@ -2,7 +2,9 @@ from __future__ import annotations
 
 import json
 import math
+import shutil
 from collections.abc import Iterable
+from dataclasses import asdict
 from pathlib import Path
 
 import fedbench.runtime.factory as factory
@@ -12,9 +14,9 @@ from fedbench.core.algorithm import (
     SampleContext,
 )
 from fedbench.core.data import PartitionedDataset
-from fedbench.core.data.schemas import infer_schema as _infer_schema
+from fedbench.core.data.schemas import load_or_infer_schema
 from fedbench.core.eval import CentralizedEvalContext, Evaluator
-from fedbench.core.logger import log_info
+from fedbench.core.logger import log_info, log_warning
 from fedbench.runtime.command import Command
 from fedbench.runtime.platform_info import collect_platform_info
 from fedbench.runtime.runcontext import RunContext
@@ -59,7 +61,7 @@ def _validate_evaluators(evaluators: Iterable[Evaluator]) -> None:
 
 def load_dataset(ctx: RunContext) -> None:
     df = ctx.df_loader()
-    schema = _infer_schema(df)
+    schema = load_or_infer_schema(Path(ctx.config.data.schema), df)
     ctx.dataset = PartitionedDataset(
         df, schema, ctx.partitioner, ctx.config.test_size, ctx.config.seed.partitioning
     )
@@ -144,6 +146,30 @@ def write_artifacts(ctx: RunContext) -> None:
     with outputdir.joinpath("metadata.json").open("w") as f:
         json.dump(collect_platform_info(), f, indent=4, allow_nan=False)
 
+    # Document which schema was used
+    with outputdir.joinpath("schema.json").open("w") as f:
+        json.dump(asdict(ctx.dataset.schema), f, indent=4, allow_nan=False)
+
+    # Generate input schema file if requested by user
+    if ctx.config.data.generate_input_schema:
+        input_schema_path = Path(ctx.config.data.dataset).with_suffix(".schema.json")
+        if input_schema_path.exists():
+            # Config builder already checks this, but it doesn't hurt to double-check,
+            # since some time could pass between the start and end of a run
+            log_warning(
+                __name__,
+                f"Input schema file already exists "
+                f"and will not be overwritten: {input_schema_path}",
+            )
+        shutil.copy(
+            outputdir.joinpath("schema.json"),
+            input_schema_path,
+        )
+
+    # Synthetic data
+    ctx.synthetic_df.to_csv(outputdir.joinpath("synthetic.csv"), index=False)
+
+    # Metrics
     for name, metrics in [
         ("federated", ctx.aggregated_metrics),
         ("centralized", ctx.centralized_metrics),
@@ -154,9 +180,6 @@ def write_artifacts(ctx: RunContext) -> None:
         }
         with outputdir.joinpath(f"metrics.{name}.json").open("w") as f:
             json.dump(clean, f, indent=4, allow_nan=False)
-
-    # Synthetic data
-    ctx.synthetic_df.to_csv(outputdir.joinpath("synthetic.csv"), index=False)
 
     log_info(__name__, f"Benchmark artifacts written to {outputdir}.")
 
