@@ -1,5 +1,7 @@
 import uuid
 from collections.abc import Iterable
+from datetime import datetime
+from pathlib import Path
 
 from fedbench.config import Config
 from fedbench.core.events import (
@@ -36,7 +38,9 @@ def run(config: Config, commands: Iterable[Command]) -> None:
             ClientReply,
         ),
     )
-    run_id = str(uuid.uuid4())
+    timestamp = datetime.now().strftime("%Y-%m-%d-%H-%M-%S")
+    dataset = Path(config.data.dataset).stem
+    run_id = f"{timestamp}-{config.synthesizer}-{dataset}-{uuid.uuid4()}"
     ctx = RunContext(run_id, config, eventbus, collector)
 
     with eventbus:
