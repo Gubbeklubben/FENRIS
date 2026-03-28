@@ -3,6 +3,24 @@ from types import UnionType
 from typing import Any, Callable, Literal, Union, get_args, get_origin
 
 
+def parse_kwargs(value: str) -> dict[str, str]:
+    if value is None:
+        return {}
+
+    result = {}
+
+    for item in split_outside_brackets(value):
+        key, val = item.split("=")
+        result[key] = val
+    return result
+
+
+def parse_args(value: str) -> list[str]:
+    if value is None:
+        return []
+    return value.split(",")
+
+
 def split_outside_brackets(s: str) -> list[str]:
     if not s:
         return []

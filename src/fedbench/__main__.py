@@ -5,31 +5,13 @@ import typer
 
 import fedbench.runtime.runner as runner
 from fedbench.config.builder import build_config
-from fedbench.config.parsing import split_outside_brackets
+from fedbench.config.parsing import parse_args, parse_kwargs
 from fedbench.core.eval import Category
 from fedbench.core.eval.evaluator import EvaluatorDescriptor
 from fedbench.runtime.pipeline import pipeline
 from fedbench.runtime.registry import Group, Metadata
 
 app = typer.Typer()
-
-
-def parse_kwargs(value: str) -> dict[str, str]:
-    if value is None:
-        return {}
-
-    result = {}
-
-    for item in split_outside_brackets(value):
-        key, val = item.split("=")
-        result[key] = val
-    return result
-
-
-def parse_args(value: str) -> list[str]:
-    if value is None:
-        return []
-    return value.split(",")
 
 
 @app.command()
