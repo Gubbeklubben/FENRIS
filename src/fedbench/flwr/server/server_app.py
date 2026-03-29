@@ -67,8 +67,8 @@ def make_server_app(ctx: RunContext) -> ServerApp:
             coordinator=ctx.coordinator,
             monitor=EarlyStoppingMonitor(ctx.config.metrics, _evaluate_fn),
         )
-        state, metrics = strategy.run(grid, ctx.config.num_rounds)
-        ctx.train_artifacts = state
+        train_artifacts, metrics = strategy.run(grid, ctx.config.num_rounds)
+        ctx.train_artifacts = train_artifacts
         ctx.per_client_metrics = metrics
 
     return app
