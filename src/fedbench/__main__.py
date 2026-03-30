@@ -1,3 +1,4 @@
+import inspect
 from typing import Annotated, Literal
 
 import typer
@@ -5,8 +6,10 @@ import typer
 import fedbench.runtime.runner as runner
 from fedbench.config.builder import build_config
 from fedbench.config.parsing import split_outside_brackets
+from fedbench.core.eval import Category
+from fedbench.core.eval.evaluator import EvaluatorDescriptor
 from fedbench.runtime.pipeline import pipeline
-from fedbench.runtime.registry import Group
+from fedbench.runtime.registry import Group, Metadata
 
 app = typer.Typer()
 
@@ -49,30 +52,93 @@ def show(
             help="Include factory locators (import paths) in the output.",
         ),
     ] = False,
+    include_details: Annotated[
+        bool,
+        typer.Option(
+            "--include-details",
+            help="Include keyword arguments or other detailed component information "
+            "in the output.",
+        ),
+    ] = False,
 ) -> None:
     """
     Show available components.
 
-    Examples:\n
-      fedbench show\n
-      fedbench show synthesizers\n
-      fedbench show synthesizers partitioners --include-locators
+    Examples:
+      fedbench show
+      fedbench show synthesizers
+      fedbench show synthesizers coordinators --include-locators
+      fedbench show partitioners evaluators --include-details
     """
 
     selected = groups if groups else list(Group)
+
+    def show_evaluators() -> None:
+        # Sort evaluator metadata by category
+        evaluators_by_category: dict[
+            Category, list[tuple[Metadata, EvaluatorDescriptor]]
+        ] = {category: [] for category in Category}
+        for evaluator in Group.EVALUATORS.get_registry().metadata():
+            evaluator_factory = Group.EVALUATORS.get_registry().load(evaluator.name)
+            metadata = evaluator_factory().metadata
+            evaluators_by_category[metadata.category].append((evaluator, metadata))
+
+        for category, entries in evaluators_by_category.items():
+            # Category title
+            title = f"{category[0].upper() + category[1:]} evaluators"
+            print()
+            print(f"{'':<2}{title}")
+            print(f"{'':<2}{'\u2500' * len(title)}")
+
+            for metadata, evaluator_metadata in entries:
+                # Evaluator title
+                print(f"{'':<4}{metadata.name}")
+
+                if include_locators:
+                    print(f"{'':<6}Locator: {metadata.locator}")
+
+                if include_details:
+                    eval_mode = evaluator_metadata.eval_mode.name or ""
+                    print(f"{'':<6}Evaluation mode: {eval_mode.lower()}")
+
+                    print(f"{'':<6}Metrics:")
+                    for metric in evaluator_metadata.metrics:
+                        print(f"{'':<8}{metric.key}", end="")
+                        print(
+                            f".<{metric.suffix_type}_column>"
+                            if metric.suffix_type
+                            else ""
+                        )
+                    print()
 
     def maybe_show(group: Group) -> None:
         if group not in selected:
             return
 
-        registry = group.get_registry()
-        entries = list(registry.metadata())
-        width = max(len(e.name) for e in entries)
+        # Component type heading
+        print()
+        print(group.name)
+        print("\u2500" * len(group.name))
 
-        print(f"\n --- {group.value.upper()} ---")
-        for metadata in entries:
-            print(f"  {metadata.name:<{width}}", end="")
-            print(f"  {metadata.locator}" if include_locators else "")
+        if group == Group.EVALUATORS:
+            show_evaluators()
+            return
+
+        registry = group.get_registry()
+        for metadata in registry.metadata():
+            # Component name
+            print(f"{'':<2}{metadata.name}")
+
+            if include_locators:
+                print(f"{'':<4}Locator: {metadata.locator}")
+
+            if include_details:
+                component_factory = registry.load(metadata.name)
+                if params := inspect.signature(component_factory).parameters.values():
+                    print(f"{'':<4}Parameters:")
+                    for param in params:
+                        print(f"{'':<6}{param}")
+                    print()
 
     maybe_show(Group.SYNTHESIZERS)
     maybe_show(Group.COORDINATORS)
