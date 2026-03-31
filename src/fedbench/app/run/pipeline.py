@@ -157,6 +157,12 @@ def write_artifacts(ctx: RunContext) -> None:
     outputdir = Path(ctx.config.outputdir).joinpath(ctx.run_id)
     outputdir.mkdir(parents=True, exist_ok=False)
 
+    # Document how the data was partitioned
+    partitions_dir = outputdir.joinpath("partitions")
+    partitions_dir.mkdir(parents=True, exist_ok=False)
+    for i in range(ctx.dataset.num_partitions):
+        ctx.dataset.load_train_partition(i).to_csv(partitions_dir.joinpath(f"{i}.csv"))
+
     # Config snapshot
     with outputdir.joinpath("config_snapshot.json").open("w") as f:
         json.dump(ctx.config.jsondict(), f, indent=4)
