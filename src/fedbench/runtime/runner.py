@@ -75,4 +75,4 @@ def _infer_name(command: Command) -> str:
         name = type(command).__name__
 
     split = name.split("_")
-    return split[0].capitalize() + "".join(s.capitalize() for s in split[1:])
+    return "".join(s.capitalize() for s in split)

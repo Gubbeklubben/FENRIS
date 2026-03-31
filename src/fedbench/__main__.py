@@ -85,7 +85,7 @@ def show(
 
         for category, entries in evaluators_by_category.items():
             # Category title
-            title = f"{category[0].upper() + category[1:]} evaluators"
+            title = f"{category.capitalize()} evaluators"
             print()
             print(f"{'':<2}{title}")
             print(f"{'':<2}{'\u2500' * len(title)}")
