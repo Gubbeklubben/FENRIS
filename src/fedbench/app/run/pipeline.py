@@ -111,7 +111,7 @@ def federated_train_eval_loop(ctx: RunContext) -> None:
     run_simulation(
         client_app=client_app,
         server_app=make_server_app(ctx),
-        num_supernodes=ctx.config.num_clients,
+        num_supernodes=ctx.partitioner.num_partitions,
         backend_config={
             "client_resources": {"num_cpus": num_cpus, "num_gpus": num_gpus}
         },

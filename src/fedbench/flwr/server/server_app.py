@@ -53,6 +53,7 @@ def make_server_app(ctx: RunContext) -> ServerApp:
             default_arrays_target=ctx.coordinator.arrays_target,
         )
         configure_clients(
+            num_clients=ctx.partitioner.num_partitions,
             config=ctx.config,
             artifacts=ctx.global_init_artifacts.synthesizer,
             serde=serde,

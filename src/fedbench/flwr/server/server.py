@@ -198,6 +198,7 @@ class Strategy:
 
 
 def configure_clients(
+    num_clients: int,
     config: Config,
     artifacts: Payload | None,
     serde: FlwrSerde,
@@ -207,7 +208,7 @@ def configure_clients(
     # Wait for clients to connect.
     # ref. flwr.serverapp.strategy.strategy_utils:sample_nodes
     client_ids = list(grid.get_node_ids())
-    while len(client_ids) < config.num_clients:
+    while len(client_ids) < num_clients:
         time.sleep(1)
         client_ids = list(grid.get_node_ids())
 
