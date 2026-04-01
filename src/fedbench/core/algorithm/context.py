@@ -20,5 +20,6 @@ class TrainContext:
 class SampleContext:
     global_init_artifacts: Payload | None
     client_cache: Payload | None
+    schema: TableSchema
     seed: int
     num_rows: int

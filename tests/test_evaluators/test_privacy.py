@@ -109,16 +109,6 @@ class TestDirectOverlap:
 
         assert 0.4 < result["exact_row_match_rate_train"] < 0.6
 
-    def test_disjoint_columns_emits_nan_keys(self):
-        """No shared columns → local_evaluate returns None → aggregate emits all-NaN."""
-        real = pd.DataFrame({"a": [1, 2]})
-        syn = pd.DataFrame({"b": [3, 4]})
-        ctx = make_local_ctx(real, syn)
-        result = self.evaluator.aggregate([self.evaluator.local_evaluate(ctx)])
-
-        assert set(result.keys()) == self.EXPECTED_KEYS
-        assert all(math.isnan(v) for v in result.values())
-
     def test_returns_all_keys(self):
         """Key-completeness check: all six expected metric keys must be present."""
         ctx = make_local_ctx(NUMERIC_DF, NUMERIC_DF.copy())

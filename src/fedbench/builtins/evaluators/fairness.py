@@ -193,19 +193,18 @@ class FairnessEvaluator(Evaluator):
     ) -> dict[str, _PerGroupConfusion]:
         """Run TSTR prediction and return raw per-group confusion matrix counts."""
         for col in [sensitive_column, target_column]:
-            for df in [train_df, syn_df]:
-                if col not in df.columns:
-                    log_debug(
-                        "Fairness",
-                        f"Column '{col}' missing from DataFrame "
-                        f"with columns {df.columns.tolist()}",
-                    )
-                    return {}
+            if col not in train_df.columns:
+                log_debug(
+                    "Fairness",
+                    f"Column '{col}' missing from DataFrame "
+                    f"with columns {train_df.columns.tolist()}",
+                )
+                return {}
 
         feature_columns = [
             col
             for col in syn_df.columns
-            if col not in (sensitive_column, target_column) and col in train_df.columns
+            if col not in (sensitive_column, target_column)
         ]
         if not feature_columns:
             log_debug(

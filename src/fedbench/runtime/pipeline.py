@@ -105,6 +105,7 @@ def global_sample(ctx: RunContext) -> None:
     sample_ctx = SampleContext(
         global_init_artifacts=ctx.global_init_artifacts.synthesizer,
         client_cache=None,
+        schema=ctx.dataset.schema,
         seed=ctx.config.seed.sampling,
         num_rows=ctx.config.num_synthetic_rows or ctx.dataset.global_holdout_size,
     )
