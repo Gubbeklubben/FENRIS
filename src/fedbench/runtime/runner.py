@@ -61,7 +61,7 @@ def _run(ctx: RunContext, commands: Iterable[Command]) -> None:
                 f"Error executing command {name}",
                 exc_info=True,
             )
-            return
+            raise
         else:
             eventbus.emit(CommandCompleted(name))
 
