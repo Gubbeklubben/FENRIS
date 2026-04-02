@@ -45,6 +45,7 @@ _VALID_SCENARIOS = frozenset(
     {
         "crash",
         "corrupt",
+        "nan_columns",
         "wrong_type",
         "empty",
     }
@@ -55,6 +56,13 @@ _VALID_POINTS = frozenset(
         "global_init",
         "synth_train",
         "synth_sample",
+    }
+)
+
+_INVALID_COMBINATIONS = frozenset(
+    {
+        ("nan_columns", "global_init"),
+        ("nan_columns", "synth_train"),
     }
 )
 
@@ -77,6 +85,10 @@ class _NaughtyConfig:
         if self.scenario == "crash" and self.exception not in _EXCEPTION_MAP:
             raise ValueError(
                 f"Unknown exception '{self.exception}'. Valid: {sorted(_EXCEPTION_MAP)}"
+            )
+        if (self.scenario, self.point) in _INVALID_COMBINATIONS:
+            raise ValueError(
+                f"Scenario '{self.scenario}' is not applicable at point '{self.point}'."
             )
 
 
@@ -104,6 +116,9 @@ def _encode_artifacts(context: GlobalInitContext, config: _NaughtyConfig) -> Pay
                 "point": config.point,
                 "exception": config.exception,
             },
+            "schema": {
+                "column_names": [col.name for col in context.schema.columns],
+            },
         }
     )
 
@@ -119,6 +134,16 @@ def _decode_config(artifacts: Payload | None) -> _NaughtyConfig | None:
             point=cast(str, naughty["point"]),
             exception=cast(str, naughty["exception"]),
         )
+    except KeyError:
+        return None
+
+
+def _decode_schema_columns(artifacts: Payload | None) -> list[str] | None:
+    if artifacts is None:
+        return None
+    try:
+        # noinspection PyUnnecessaryCast
+        return cast(list[str], artifacts.extras["schema"]["column_names"])
     except KeyError:
         return None
 
@@ -210,6 +235,7 @@ class FedNaughty(Synthesizer):
         context: SampleContext,
     ) -> DataFrame:
         config = _decode_config(context.global_init_artifacts) or self._config
+        column_names = _decode_schema_columns(context.global_init_artifacts) or []
 
         if config.point == "synth_sample":
             scenario = config.scenario
@@ -224,10 +250,16 @@ class FedNaughty(Synthesizer):
                         "WRONG_COL_2": [math.inf] * context.num_rows,
                     }
                 )
+            elif scenario == "nan_columns":
+                return pd.DataFrame(
+                    {name: [math.nan] * context.num_rows for name in column_names}
+                )
             elif scenario == "wrong_type":
                 return {"THIS_IS": "NOT_A_DATAFRAME"}  # type: ignore[return-value]
             elif scenario == "empty":
                 return pd.DataFrame()
 
         rng = np.random.default_rng(context.seed)
-        return pd.DataFrame({"naughty_col": rng.random(context.num_rows)})
+        return pd.DataFrame(
+            {name: rng.random(context.num_rows) for name in column_names}
+        )
