@@ -126,59 +126,6 @@ def _decode_config(artifacts: Payload | None) -> _NaughtyConfig | None:
 class FedNaughty(Synthesizer):
     """CLI-configurable naughty synthesizer for framework testing."""
 
-    def sample(
-        self,
-        request: Payload,
-        context: SampleContext,
-    ) -> DataFrame:
-        config = _decode_config(context.global_init_artifacts) or self._config
-
-        if config.point == "synth_sample":
-            scenario = config.scenario
-            log_info(_LOG_SRC, f"NAUGHTY [{scenario}] triggered at synth_sample")
-
-            if scenario == "crash":
-                _do_crash(config, "synth_sample")
-            elif scenario == "corrupt":
-                return pd.DataFrame(
-                    {
-                        "WRONG_COL_1": [math.nan] * context.num_rows,
-                        "WRONG_COL_2": [math.inf] * context.num_rows,
-                    }
-                )
-            elif scenario == "wrong_type":
-                return {"THIS_IS": "NOT_A_DATAFRAME"}  # type: ignore[return-value]
-            elif scenario == "empty":
-                return pd.DataFrame()
-
-        rng = np.random.default_rng(context.seed)
-        return pd.DataFrame({"naughty_col": rng.random(context.num_rows)})
-
-    def train(
-        self,
-        request: Payload,
-        data: DataFrame,
-        context: TrainContext,
-    ) -> Payload:
-        config = _decode_config(context.global_init_artifacts) or self._config
-
-        if config.point == "synth_train":
-            scenario = config.scenario
-            log_info(_LOG_SRC, f"NAUGHTY [{scenario}] triggered at synth_train")
-
-            if scenario == "crash":
-                _do_crash(config, "synth_train")
-            elif scenario == "corrupt":
-                return _do_corrupt_payload("synth_train")
-            elif scenario == "wrong_type":
-                return "THIS_IS_NOT_A_PAYLOAD"  # type: ignore[return-value]
-            elif scenario == "empty":
-                return Payload()
-
-        return ClientUpdate(
-            state=GlobalState.decode(request).state, count=len(data)
-        ).encode()
-
     def __init__(
         self,
         scenario: str = "crash",
@@ -231,3 +178,56 @@ class FedNaughty(Synthesizer):
             coordinator=GlobalState(state={}).encode(),
             synthesizer=_encode_artifacts(context, self._config),
         )
+
+    def train(
+        self,
+        request: Payload,
+        data: DataFrame,
+        context: TrainContext,
+    ) -> Payload:
+        config = _decode_config(context.global_init_artifacts) or self._config
+
+        if config.point == "synth_train":
+            scenario = config.scenario
+            log_info(_LOG_SRC, f"NAUGHTY [{scenario}] triggered at synth_train")
+
+            if scenario == "crash":
+                _do_crash(config, "synth_train")
+            elif scenario == "corrupt":
+                return _do_corrupt_payload("synth_train")
+            elif scenario == "wrong_type":
+                return "THIS_IS_NOT_A_PAYLOAD"  # type: ignore[return-value]
+            elif scenario == "empty":
+                return Payload()
+
+        return ClientUpdate(
+            state=GlobalState.decode(request).state, count=len(data)
+        ).encode()
+
+    def sample(
+        self,
+        request: Payload,
+        context: SampleContext,
+    ) -> DataFrame:
+        config = _decode_config(context.global_init_artifacts) or self._config
+
+        if config.point == "synth_sample":
+            scenario = config.scenario
+            log_info(_LOG_SRC, f"NAUGHTY [{scenario}] triggered at synth_sample")
+
+            if scenario == "crash":
+                _do_crash(config, "synth_sample")
+            elif scenario == "corrupt":
+                return pd.DataFrame(
+                    {
+                        "WRONG_COL_1": [math.nan] * context.num_rows,
+                        "WRONG_COL_2": [math.inf] * context.num_rows,
+                    }
+                )
+            elif scenario == "wrong_type":
+                return {"THIS_IS": "NOT_A_DATAFRAME"}  # type: ignore[return-value]
+            elif scenario == "empty":
+                return pd.DataFrame()
+
+        rng = np.random.default_rng(context.seed)
+        return pd.DataFrame({"naughty_col": rng.random(context.num_rows)})
