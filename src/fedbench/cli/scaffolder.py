@@ -60,9 +60,9 @@ class Collector(cst.CSTVisitor):
 
     def build_tree(self, name: str) -> cst.Module:
         if not self._collected:
-            for src_file in (
+            for src_file in {
                 inspect.getsourcefile(c) for c in (self._cls, *self._parents)
-            ):
+            }:
                 with Path(src_file).resolve().open() as f:
                     code = f.read()
                     tree = cst.parse_module(code)
