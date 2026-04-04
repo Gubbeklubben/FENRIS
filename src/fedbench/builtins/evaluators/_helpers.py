@@ -23,32 +23,28 @@ def make_tabular_preprocessor(df: pd.DataFrame) -> ColumnTransformer:
     num_cols = df.select_dtypes(include="number").columns.tolist()
     cat_cols = [c for c in df.columns if c not in num_cols]
 
-    # fmt: off
     preprocessor = ColumnTransformer(
-        transformers=[
-            (
-                "num",
-                Pipeline([
-                    ("imputer", SimpleImputer(strategy="median")),
-                    ("scaler", StandardScaler()),
-                ]),
-                num_cols,
-            ),
-            (
-                "cat",
-                Pipeline([
-                    ("imputer", SimpleImputer(strategy="most_frequent")),
-                    ("onehot", OneHotEncoder(
-                        handle_unknown="ignore",
-                        sparse_output=False,
-                    )),
-                ]),
-                cat_cols,
-            ),
-        ],
+        transformers=[(
+            "num",
+            Pipeline([
+                ("imputer", SimpleImputer(strategy="median")),
+                ("scaler", StandardScaler()),
+            ]),
+            num_cols,
+        ),
+        (
+            "cat",
+            Pipeline([
+                ("imputer", SimpleImputer(strategy="most_frequent")),
+                ("onehot", OneHotEncoder(
+                    handle_unknown="ignore",
+                    sparse_output=False,
+                )),
+            ]),
+            cat_cols,
+        )],
         remainder="drop",
-    )
-    # fmt: on
+    )  # fmt: skip
 
     return preprocessor
 

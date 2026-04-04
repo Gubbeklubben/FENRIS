@@ -108,11 +108,9 @@ def resolve_run_categories(metrics_cfg: dict[str, Any]) -> None:
     if not metrics_cfg.get("run_categories"):
         metrics_cfg["run_categories"] = tuple(Category)
     else:
-        metrics_cfg["run_categories"] = tuple(
-            (
-                Category.SCALABILITY,
-                *(Category(v) for v in metrics_cfg["run_categories"]),
-            )
+        metrics_cfg["run_categories"] = (
+            Category.SCALABILITY,
+            *(Category(v) for v in metrics_cfg["run_categories"]),
         )
 
 
@@ -121,7 +119,7 @@ def validate_stop_metrics(
 ) -> None:
     if not metrics_cfg.get("early_stop"):
         return
-    if "stop_metric" not in metrics_cfg:
+    if not metrics_cfg.get("stop_metric"):
         raise ValueError("stop_metric must be specified when early_stop is enabled")
 
     eval_suite = create_evaluation_suite(metrics_cfg["run_categories"])
@@ -142,7 +140,7 @@ def validate_stop_metrics(
             f"Metric `{metrics_cfg['stop_metric']}` does not support "
             f"centralized evaluation and cannot be used as a stop metric"
         )
-    if "stop_mode" not in metrics_cfg:
+    if not metrics_cfg.get("stop_mode"):
         metrics_cfg["stop_mode"] = metric.default_stop_mode
 
 
