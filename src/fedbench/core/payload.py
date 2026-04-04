@@ -17,13 +17,11 @@ type Metrics = dict[
     str,
     int | float | list[int] | list[float],
 ]
-# fmt: off
 type Extras = dict[
     str,
     str | bool | int | float | bytes |
     list[str] | list[bool] | list[int] | list[float] | list[bytes]
-]
-# fmt: on
+]  # fmt: skip
 
 
 class ArraysTarget(StrEnum):

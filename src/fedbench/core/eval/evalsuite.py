@@ -46,7 +46,7 @@ class EvaluationSuite:
                 f"\nDeclared: {declared_keys}\nActual: {actual_keys}"
             )
         return {
-            f"{evaluator.metadata.category}.{key}": value  # nofmt
+            f"{evaluator.metadata.category}.{key}": value
             for key, value in raw_metrics.items()
         }
 

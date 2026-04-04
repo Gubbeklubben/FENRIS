@@ -108,11 +108,9 @@ def resolve_run_categories(metrics_cfg: dict[str, Any]) -> None:
     if not metrics_cfg.get("run_categories"):
         metrics_cfg["run_categories"] = tuple(Category)
     else:
-        metrics_cfg["run_categories"] = tuple(
-            (
-                Category.SCALABILITY,
-                *(Category(v) for v in metrics_cfg["run_categories"]),
-            )
+        metrics_cfg["run_categories"] = (
+            Category.SCALABILITY,
+            *(Category(v) for v in metrics_cfg["run_categories"]),
         )
 
 
