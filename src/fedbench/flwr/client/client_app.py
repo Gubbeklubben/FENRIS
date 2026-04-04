@@ -50,6 +50,13 @@ def train(message: Message, flwr_context: Context) -> Message:
         reply = ctx.synthesizer.train(request, train_df, train_ctx)
         train_seconds = (time.perf_counter_ns() - start_time) / 1e9
 
+        if not isinstance(reply, Payload):
+            raise TypeError(
+                f"Invalid value type returned from {ctx.synthesizer}.train(). "
+                f"Expected: {Payload}. "
+                f"Actual: {type(reply)}."
+            )
+
     with ctx.serde.use_deserialized(ctx.framework_cache) as cache:
         metrics = cast(
             dict[str, float],

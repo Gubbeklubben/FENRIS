@@ -74,6 +74,13 @@ def global_init(ctx: RunContext) -> None:
     artifacts: GlobalInitArtifacts = ctx.synthesizer.global_init(df, init_ctx)
     ctx.global_init_artifacts = artifacts
 
+    if not isinstance(artifacts, GlobalInitArtifacts):
+        raise TypeError(
+            f"Invalid value type returned from {ctx.synthesizer}.global_init(). "
+            f"Expected: {GlobalInitArtifacts}. "
+            f"Actual: {type(artifacts)}."
+        )
+
     if artifacts.coordinator is not None:
         ctx.coordinator.attach_global_init_artifacts(artifacts.coordinator)
 
