@@ -6,7 +6,7 @@ import torch
 import torch.nn.functional as F
 from pandas import DataFrame
 
-from fedbench.builtins.coordinators.fedavg import ClientUpdate, GlobalState
+from fedbench.builtins.coordinators.fed_tgan import ClientUpdate, GlobalState
 from fedbench.builtins.synthesizers.fed_tgan.bgm_transformer import BGMTransformer
 from fedbench.builtins.synthesizers.fed_tgan.conditional import Cond, cond_loss
 from fedbench.builtins.synthesizers.fed_tgan.discriminator import Discriminator
@@ -27,6 +27,46 @@ def split_cat_num(schema: TableSchema) -> tuple[list[str], list[str]]:
     cat_attrs = [c.name for c in schema.columns if c.kind in ("categorical", "binary")]
     num_attrs = [c.name for c in schema.columns if c.kind in ("continuous", "integer")]
     return cat_attrs, num_attrs
+
+
+def compute_column_distributions(
+    data: DataFrame, cat_attrs: list[str], num_attrs: list[str]
+) -> tuple[dict[str, dict[str, float]], dict[str, np.ndarray]]:
+    """Compute categorical and continuous column distributions for table similarity.
+
+    Ported from the original Fed-TGAN implementation:
+    https://github.com/zhao-zilong/Fed-TGAN/blob/main/Server/dtds/distributed.py
+
+    Parameters
+    ----------
+    data : DataFrame
+        Raw client data (not transformed)
+    cat_attrs : list[str]
+        Categorical column names
+    num_attrs : list[str]
+        Numerical column names
+
+    Returns
+    -------
+    tuple[dict[str, dict[str, float]], dict[str, np.ndarray]]
+        (categorical_distributions, numerical_distributions)
+        - categorical_distributions: {column_name: {category: probability}}
+        - numerical_distributions: {column_name: sample_values}
+    """
+    cat_distributions = {}
+    num_distributions = {}
+
+    # Compute categorical distributions (normalized value counts as dict)
+    for col in cat_attrs:
+        value_counts = data[col].value_counts(normalize=True)
+        # Store as dictionary: {category: probability}
+        cat_distributions[col] = {str(k): float(v) for k, v in value_counts.items()}
+
+    # Store continuous column samples
+    for col in num_attrs:
+        num_distributions[col] = data[col].values.astype(np.float32)
+
+    return cat_distributions, num_distributions
 
 
 def apply_activate(data: torch.Tensor, output_info: list[tuple[int, str]]) -> torch.Tensor:
@@ -149,7 +189,7 @@ class FedTGAN(Synthesizer):
 
     @property
     def supports_coordinators(self) -> set[str]:
-        return {"fedavg"}
+        return {"fed_tgan"}
 
     def global_init(
         self, dataset: DataFrame, context: GlobalInitContext
@@ -358,9 +398,16 @@ class FedTGAN(Synthesizer):
         for k, v in discriminator.state_dict().items():
             packed_state[f"discriminator.{k}"] = v
 
+        # Compute column distributions for table similarity
+        cat_distributions, num_distributions = compute_column_distributions(
+            data, artifacts.cat_attrs, artifacts.num_attrs
+        )
+
         reply = ClientUpdate(
             state=packed_state,
             count=len(dataset),
+            cat_distributions=cat_distributions,
+            num_distributions=num_distributions,
         )
         return reply.encode()
 

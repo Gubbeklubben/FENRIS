@@ -48,6 +48,7 @@ fed_simplegan   = "fedbench.builtins.synthesizers.fed_simplegan:FedSimpleGAN"
 
 [project.entry-points."fedbench.coordinators"]
 fedavg = "fedbench.builtins.coordinators.fedavg:FedAvg"
+fed_tgan = "fedbench.builtins.coordinators.fed_tgan:FedTGAN"
 
 [project.entry-points."fedbench.evaluators"]
 moment_reduction_metrics        = "fedbench.builtins.evaluators.fidelity:MomentReductionMetricsEvaluator"
