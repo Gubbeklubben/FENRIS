@@ -1,6 +1,10 @@
 """
-Generator model ported from the original Fed-TGAN implementation:
+Generator with Residual blocks for Fed-TGAN.
+
+Ported from the original Fed-TGAN implementation:
 https://github.com/zhao-zilong/Fed-TGAN/blob/main/Server/dtds/synthesizers/ctgan.py
+
+Residual blocks use skip connections to improve gradient flow and model capacity.
 """
 
 import torch

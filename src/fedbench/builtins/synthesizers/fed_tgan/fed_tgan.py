@@ -112,7 +112,7 @@ class _FedTGANArtifacts:
 class FedTGAN(Synthesizer):
     def __init__(
         self,
-        batch_size: int = 32,
+        batch_size: int = 500,
         max_batches: int = 100,
         local_epochs: int = 5,
         learning_rate: float = 1e-2,
@@ -121,6 +121,8 @@ class FedTGAN(Synthesizer):
 
         if batch_size < 1:
             raise ValueError("Expecting batch_size >= 1.")
+        if batch_size % 10 != 0:
+            raise ValueError("Expecting batch_size to be divisible by 10 (for PacGAN).")
         if max_batches < 1:
             raise ValueError("Expecting max_batches >= 1.")
         if local_epochs < 1:
@@ -238,7 +240,7 @@ class FedTGAN(Synthesizer):
         # Convert to torch tensor and create DataLoader
         dataset = torch.utils.data.TensorDataset(torch.from_numpy(x))
         dataloader = torch.utils.data.DataLoader(
-            dataset, batch_size=self._batch_size, shuffle=True
+            dataset, batch_size=self._batch_size, shuffle=True, drop_last=True
         )
 
         # Initialize models (generator input includes conditional dimension)
