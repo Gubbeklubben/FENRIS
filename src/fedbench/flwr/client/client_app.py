@@ -68,6 +68,12 @@ def train(message: Message, flwr_context: Context) -> Message:
         metrics["local_train_seconds"] += train_seconds
         metrics["local_train_rounds"] += 1
 
+    # Tag the reply with the partition_id so the server can ensure deterministic
+    # aggregation order between runs. This matters because floating point additions and
+    # multiplications are not guaranteed to be associative.
+    reply.metrics.setdefault("metrics", {})
+    reply.metrics["metrics"]["partition_id"] = partition_id
+
     rdict = ctx.serde.to_flwr(reply)
     return Message(content=rdict, reply_to=message)
 
