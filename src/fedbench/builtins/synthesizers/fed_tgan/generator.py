@@ -8,7 +8,6 @@ Residual blocks use skip connections to improve gradient flow and model capacity
 """
 
 import torch
-import torch.nn.functional as F
 from torch import Tensor, nn
 
 
@@ -34,7 +33,9 @@ class Residual(nn.Module):  # type: ignore[misc]
 
 
 class Generator(nn.Module):  # type: ignore[misc]
-    def __init__(self, latent_dim: int, output_dim: int, gen_dims: tuple[int, int] = (256, 256)):
+    def __init__(
+        self, latent_dim: int, output_dim: int, gen_dims: tuple[int, int] = (256, 256)
+    ):
         """Generator with Residual blocks.
 
         Parameters
@@ -61,5 +62,6 @@ class Generator(nn.Module):  # type: ignore[misc]
         self.seq = nn.Sequential(*layers)
 
     def forward(self, z: Tensor) -> Tensor:
-        # No activation at the end - apply_activate() handles column-specific activations
+        # No activation at the end
+        # apply_activate() handles column-specific activations
         return self.seq(z)

@@ -37,7 +37,9 @@ class ClientUpdate:
     state: Arrays
     count: int
     # Table similarity metrics (categorical and continuous column distributions)
-    cat_distributions: dict[str, dict[str, float]]  # column_name -> {category: probability}
+    cat_distributions: dict[
+        str, dict[str, float]
+    ]  # column_name -> {category: probability}
     num_distributions: dict[str, np.ndarray]  # column_name -> continuous values
 
     @classmethod
@@ -46,8 +48,14 @@ class ClientUpdate:
         return cls(
             state=payload.arrays["state"],
             count=cast(int, payload.metrics["metrics"]["count"]),
-            cat_distributions=cast(dict[str, dict[str, float]], payload.objects.get("objects", {}).get("cat_distributions", {})),
-            num_distributions=cast(dict[str, np.ndarray], payload.objects.get("objects", {}).get("num_distributions", {})),
+            cat_distributions=cast(
+                dict[str, dict[str, float]],
+                payload.objects.get("objects", {}).get("cat_distributions", {}),
+            ),
+            num_distributions=cast(
+                dict[str, np.ndarray],
+                payload.objects.get("objects", {}).get("num_distributions", {}),
+            ),
         )
 
     def encode(self) -> Payload:
@@ -184,10 +192,14 @@ class FedTGAN(SingleStepCoordinator):
             return [1.0]
 
         # Compute categorical similarity (Jensen-Shannon divergence)
-        cat_similarities = self._compute_categorical_similarity(cat_distributions, counts)
+        cat_similarities = self._compute_categorical_similarity(
+            cat_distributions, counts
+        )
 
         # Compute continuous similarity (Wasserstein distance)
-        num_similarities = self._compute_continuous_similarity(num_distributions, data_weights)
+        num_similarities = self._compute_continuous_similarity(
+            num_distributions, data_weights
+        )
 
         # Combine similarities
         combined_similarities = np.sum([cat_similarities, num_similarities], axis=0)
@@ -199,16 +211,16 @@ class FedTGAN(SingleStepCoordinator):
             # All clients identical, use data proportion
             return data_weights
 
-        similarity_weights = []
+        similarity_weights_list = []
         for i in range(n_clients):
             # Invert distance: (1 - normalized_distance)
             weight = (1 - combined_similarities[i] / total_similarity) * data_weights[i]
-            similarity_weights.append(weight)
+            similarity_weights_list.append(weight)
 
         # Apply softmax for final normalization
-        similarity_weights = self._softmax(np.array(similarity_weights))
+        similarity_weights = self._softmax(np.array(similarity_weights_list))
 
-        return similarity_weights.tolist()
+        return list(similarity_weights)
 
     def _compute_categorical_similarity(
         self,
@@ -234,26 +246,28 @@ class FedTGAN(SingleStepCoordinator):
 
         for col_idx, col_name in enumerate(cat_columns):
             # Get union of all categories across all clients
-            all_categories = set()
-            for client_dist in cat_distributions:
-                all_categories.update(client_dist[col_name].keys())
-            all_categories = sorted(all_categories)  # Sort for consistency
+            all_categories: set[str] = set()
+            for client_data in cat_distributions:
+                all_categories.update(client_data[col_name].keys())
+            all_categories_sorted = sorted(all_categories)  # Sort for consistency
 
             # Compute global distribution (weighted by counts)
             total_count = sum(counts)
-            global_dist = np.zeros(len(all_categories))
+            global_dist = np.zeros(len(all_categories_sorted))
 
             for client_idx in range(n_clients):
                 client_dict = cat_distributions[client_idx][col_name]
                 weight = counts[client_idx] / total_count
-                for cat_idx, category in enumerate(all_categories):
+                for cat_idx, category in enumerate(all_categories_sorted):
                     global_dist[cat_idx] += client_dict.get(category, 0.0) * weight
 
             # Compute JS divergence for each client
             for client_idx in range(n_clients):
                 client_dict = cat_distributions[client_idx][col_name]
                 # Convert client dict to aligned array
-                client_dist = np.array([client_dict.get(cat, 0.0) for cat in all_categories])
+                client_dist: np.ndarray = np.array(
+                    [client_dict.get(cat, 0.0) for cat in all_categories_sorted]
+                )
                 js_div = distance.jensenshannon(global_dist, client_dist)
                 similarity_matrix[client_idx, col_idx] = js_div
 
@@ -267,7 +281,8 @@ class FedTGAN(SingleStepCoordinator):
                 similarity_matrix[:, col_idx] = 1.0 / n_clients
 
         # Return sum across columns (total categorical similarity per client)
-        return np.sum(similarity_matrix, axis=1)
+        result: np.ndarray = np.sum(similarity_matrix, axis=1)
+        return result
 
     def _compute_continuous_similarity(
         self,
@@ -323,10 +338,12 @@ class FedTGAN(SingleStepCoordinator):
                 similarity_matrix[:, col_idx] = 1.0 / n_clients
 
         # Return sum across columns (total continuous similarity per client)
-        return np.sum(similarity_matrix, axis=1)
+        result: np.ndarray = np.sum(similarity_matrix, axis=1)
+        return result
 
     @staticmethod
     def _softmax(x: np.ndarray) -> np.ndarray:
         """Softmax normalization (line 135-137 in original)."""
         e = np.exp(x - np.max(x))  # Subtract max for numerical stability
-        return e / e.sum()
+        result: np.ndarray = e / e.sum()
+        return result

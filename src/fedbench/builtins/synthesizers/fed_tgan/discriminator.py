@@ -6,7 +6,6 @@ https://github.com/zhao-zilong/Fed-TGAN/blob/main/Server/dtds/synthesizers/ctgan
 PacGAN (Packing GAN) packs multiple samples together to help prevent mode collapse.
 """
 
-import torch
 from torch import Tensor, nn
 
 
@@ -62,6 +61,8 @@ class Discriminator(nn.Module):  # type: ignore[misc]
         Tensor
             Discriminator output (logits, not probabilities)
         """
-        assert x.size(0) % self.pack == 0, f"Batch size must be divisible by pack={self.pack}"
+        assert x.size(0) % self.pack == 0, (
+            f"Batch size must be divisible by pack={self.pack}"
+        )
         # Reshape to pack samples: (batch/pack, pack*input_dim)
         return self.seq(x.view(-1, self.packdim))

@@ -9,6 +9,7 @@ mode collapse.
 """
 
 import numpy as np
+import torch
 
 
 def maximum_interval(output_info: list[tuple[int, str]]) -> int:
@@ -48,7 +49,8 @@ def random_choice_prob_index(probs: np.ndarray, axis: int = 1) -> np.ndarray:
         Sampled indices for each row
     """
     r = np.expand_dims(np.random.rand(probs.shape[1 - axis]), axis=axis)
-    return (probs.cumsum(axis=axis) > r).argmax(axis=axis)
+    result: np.ndarray = (probs.cumsum(axis=axis) > r).argmax(axis=axis)
+    return result
 
 
 class Cond:
@@ -98,7 +100,7 @@ class Cond:
         assert st == data.shape[1], "Output info doesn't match data dimensions"
 
         # Build probability matrix for sampling
-        self.interval = []
+        interval_list: list[tuple[int, int]] = []
         self.n_col = 0
         self.n_opt = 0
         st = 0
@@ -120,14 +122,16 @@ class Cond:
                 tmp = tmp / np.sum(tmp)  # Normalize
 
                 self.p[self.n_col, :dim] = tmp
-                self.interval.append((self.n_opt, dim))
+                interval_list.append((self.n_opt, dim))
                 self.n_opt += dim
                 self.n_col += 1
                 st = ed
 
-        self.interval = np.asarray(self.interval)
+        self.interval = np.asarray(interval_list)
 
-    def sample(self, batch_size: int) -> tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray] | None:
+    def sample(
+        self, batch_size: int
+    ) -> tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray] | None:
         """Sample conditional vectors for a training batch.
 
         Randomly selects which column to condition on and which category

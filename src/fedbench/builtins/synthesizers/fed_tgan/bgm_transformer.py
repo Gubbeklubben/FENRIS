@@ -88,19 +88,23 @@ class BGMTransformer:
         for col in data.columns:
             if col in categorical_columns:
                 unique_vals = data[col].value_counts().index.tolist()
-                self.meta.append({
-                    "name": col,
-                    "type": "categorical",
-                    "size": len(unique_vals),
-                    "i2s": unique_vals,  # index to string mapping
-                })
+                self.meta.append(
+                    {
+                        "name": col,
+                        "type": "categorical",
+                        "size": len(unique_vals),
+                        "i2s": unique_vals,  # index to string mapping
+                    }
+                )
             elif col in continuous_columns:
-                self.meta.append({
-                    "name": col,
-                    "type": "continuous",
-                    "min": float(data[col].min()),
-                    "max": float(data[col].max()),
-                })
+                self.meta.append(
+                    {
+                        "name": col,
+                        "type": "continuous",
+                        "min": float(data[col].min()),
+                        "max": float(data[col].max()),
+                    }
+                )
             else:
                 raise ValueError(f"Column {col} not in categorical or continuous lists")
 
@@ -157,19 +161,25 @@ class BGMTransformer:
                 current = current.reshape(-1, 1)
 
                 # Get means and stds for all modes
-                means = self.model[id_].means_.reshape(1, self.n_clusters)
-                stds = np.sqrt(self.model[id_].covariances_).reshape(1, self.n_clusters)
+                model = self.model[id_]
+                assert model is not None  # Guaranteed by fit() for continuous columns
+                means = model.means_.reshape(1, self.n_clusters)
+                stds = np.sqrt(model.covariances_).reshape(1, self.n_clusters)
 
                 # Normalize per mode: (x - μ) / (4σ)
                 features = (current - means) / (4 * stds)
 
                 # Get mode probabilities
-                probs = self.model[id_].predict_proba(current)
-                n_opts = int(np.sum(self.components[id_]))
+                probs = model.predict_proba(current)
+                components = self.components[id_]
+                assert (
+                    components is not None
+                )  # Guaranteed by fit() for continuous columns
+                n_opts = int(np.sum(components))
 
                 # Keep only active modes
-                features = features[:, self.components[id_]]
-                probs = probs[:, self.components[id_]]
+                features = features[:, components]
+                probs = probs[:, components]
 
                 # Sample mode for each value
                 opt_sel = np.zeros(len(data), dtype=int)
@@ -193,7 +203,7 @@ class BGMTransformer:
             else:  # categorical
                 # One-hot encode
                 col_t = np.zeros([len(data), info["size"]])
-                idx = [info["i2s"].index(val) for val in current]
+                idx = np.array([info["i2s"].index(val) for val in current])
                 col_t[np.arange(len(data)), idx] = 1
                 values.append(col_t)
 
@@ -223,7 +233,11 @@ class BGMTransformer:
             if info["type"] == "continuous":
                 # Extract normalized value and mode one-hot
                 u = data[:, st]
-                n_modes = int(np.sum(self.components[id_]))
+                components = self.components[id_]
+                assert (
+                    components is not None
+                )  # Guaranteed by fit() for continuous columns
+                n_modes = int(np.sum(components))
                 v = data[:, st + 1 : st + 1 + n_modes]
 
                 # Optionally add noise for sampling diversity
@@ -235,14 +249,16 @@ class BGMTransformer:
 
                 # Expand mode selection to full n_clusters
                 v_t = np.ones((data.shape[0], self.n_clusters)) * -100
-                v_t[:, self.components[id_]] = v
+                v_t[:, components] = v
                 v = v_t
 
                 st += 1 + n_modes
 
                 # Get selected mode parameters
-                means = self.model[id_].means_.reshape(-1)
-                stds = np.sqrt(self.model[id_].covariances_).reshape(-1)
+                model = self.model[id_]
+                assert model is not None  # Guaranteed by fit() for continuous columns
+                means = model.means_.reshape(-1)
+                stds = np.sqrt(model.covariances_).reshape(-1)
                 p_argmax = np.argmax(v, axis=1)
                 std_t = stds[p_argmax]
                 mean_t = means[p_argmax]

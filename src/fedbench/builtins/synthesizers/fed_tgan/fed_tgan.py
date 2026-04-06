@@ -64,12 +64,14 @@ def compute_column_distributions(
 
     # Store continuous column samples
     for col in num_attrs:
-        num_distributions[col] = data[col].values.astype(np.float32)
+        num_distributions[col] = np.asarray(data[col].values, dtype=np.float32)
 
     return cat_distributions, num_distributions
 
 
-def apply_activate(data: torch.Tensor, output_info: list[tuple[int, str]]) -> torch.Tensor:
+def apply_activate(
+    data: torch.Tensor, output_info: list[tuple[int, str]]
+) -> torch.Tensor:
     """Apply column-specific activations.
 
     Ported from the original Fed-TGAN implementation:
@@ -217,7 +219,9 @@ class FedTGAN(Synthesizer):
 
         # Initialize models with correct dimensions
         # Generator input = latent + conditional
-        generator = Generator(latent_dim=self._latent_dim + cond_dim, output_dim=output_dim)
+        generator = Generator(
+            latent_dim=self._latent_dim + cond_dim, output_dim=output_dim
+        )
         discriminator = Discriminator(input_dim=input_dim)
 
         # Pack both models into a single state_dict with prefixed keys
@@ -284,7 +288,9 @@ class FedTGAN(Synthesizer):
         )
 
         # Initialize models (generator input includes conditional dimension)
-        generator = Generator(latent_dim=self._latent_dim + cond_dim, output_dim=output_dim)
+        generator = Generator(
+            latent_dim=self._latent_dim + cond_dim, output_dim=output_dim
+        )
         discriminator = Discriminator(input_dim=input_dim)
 
         # Load weights from request
@@ -309,9 +315,8 @@ class FedTGAN(Synthesizer):
 
         # Training loop
         for _ in range(self._local_epochs):
-
             """
-            Inline training loop adapted to resemble the original Fed-TGAN implementation:
+            Inline training loop adapted to resemble original Fed-TGAN implementation:
             https://github.com/zhao-zilong/Fed-TGAN/blob/main/Server/dtds/synthesizers/ctgan.py
             """
 
@@ -439,7 +444,9 @@ class FedTGAN(Synthesizer):
         cond_dim = sum(dim for dim, act in output_info if act == "softmax")
 
         # Initialize and load generator (with conditional dimension)
-        generator = Generator(latent_dim=self._latent_dim + cond_dim, output_dim=output_dim)
+        generator = Generator(
+            latent_dim=self._latent_dim + cond_dim, output_dim=output_dim
+        )
         generator.load_state_dict(generator_state)
         generator.to(self._device)
         generator.eval()
@@ -448,7 +455,8 @@ class FedTGAN(Synthesizer):
         with torch.no_grad():
             noise = torch.randn(context.num_rows, self._latent_dim, device=self._device)
 
-            # Sample conditional vectors (zeros for now, could use Cond.sample_original_training_data_prob)
+            # Sample conditional vectors
+            # (zeros for now, could use Cond.sample_original_training_data_prob)
             c = torch.zeros(context.num_rows, cond_dim, device=self._device)
 
             # Concatenate noise and conditional
