@@ -9,9 +9,9 @@ from pandas import DataFrame
 from sklearn.preprocessing import LabelEncoder, MinMaxScaler
 
 from fedbench.builtins.coordinators.fedavg import ClientUpdate, GlobalState
-from fedbench.builtins.synthesizers.fed_tgan.discriminator import Discriminator
-from fedbench.builtins.synthesizers.fed_tgan.generator import Generator
-from fedbench.builtins.synthesizers.fed_tgan.training import (
+from fedbench.builtins.synthesizers.fed_simplegan.discriminator import Discriminator
+from fedbench.builtins.synthesizers.fed_simplegan.generator import Generator
+from fedbench.builtins.synthesizers.fed_simplegan.training import (
     discriminator_step,
     generator_step,
 )
@@ -34,7 +34,7 @@ def split_cat_num(schema: TableSchema) -> tuple[list[str], list[str]]:
 
 
 @dataclass(frozen=True)
-class _FedTGANArtifacts:
+class _FedSimpleGANArtifacts:
     cat_attrs: list[str]
     num_attrs: list[str]
     input_dim: int
@@ -78,7 +78,7 @@ class _FedTGANArtifacts:
         )
 
 
-class FedTGAN(Synthesizer):
+class FedSimpleGAN(Synthesizer):
     def __init__(
         self,
         batch_size: int = 32,
@@ -108,7 +108,7 @@ class FedTGAN(Synthesizer):
 
     @property
     def name(self) -> str:
-        return "fed_tgan"
+        return "fed_simplegan"
 
     @property
     def arrays_target(self) -> ArraysTarget:
@@ -164,7 +164,7 @@ class FedTGAN(Synthesizer):
             num_scaler = MinMaxScaler()
             num_scaler.fit(dataset[num_attrs].values)
 
-        artifacts = _FedTGANArtifacts(
+        artifacts = _FedSimpleGANArtifacts(
             cat_attrs=cat_attrs,
             num_attrs=num_attrs,
             input_dim=input_dim,
@@ -187,7 +187,7 @@ class FedTGAN(Synthesizer):
         if context.global_init_artifacts is None:
             raise RuntimeError("Missing preprocessing artifacts.")
 
-        artifacts = _FedTGANArtifacts.decode(context.global_init_artifacts)
+        artifacts = _FedSimpleGANArtifacts.decode(context.global_init_artifacts)
 
         cat_attrs = artifacts.cat_attrs
         num_attrs = artifacts.num_attrs
@@ -331,7 +331,7 @@ class FedTGAN(Synthesizer):
         if context.global_init_artifacts is None:
             raise RuntimeError("Missing preprocessing artifacts.")
 
-        artifacts = _FedTGANArtifacts.decode(context.global_init_artifacts)
+        artifacts = _FedSimpleGANArtifacts.decode(context.global_init_artifacts)
 
         cat_attrs = artifacts.cat_attrs
         num_attrs = artifacts.num_attrs

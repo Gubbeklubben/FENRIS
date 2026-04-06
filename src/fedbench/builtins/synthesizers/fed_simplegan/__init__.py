@@ -1,3 +1,3 @@
-from .fed_tgan import FedTGAN
+from .fed_simplegan import FedSimpleGAN
 
-__all__ = ["FedTGAN"]
+__all__ = ["FedSimpleGAN"]
