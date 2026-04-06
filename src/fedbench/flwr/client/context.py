@@ -3,6 +3,7 @@ from typing import cast
 
 from flwr.app import RecordDict
 
+import fedbench.runtime.factory as factory
 from fedbench.config import Config
 from fedbench.core.algorithm import Synthesizer
 from fedbench.core.data import PartitionedDataset
@@ -11,17 +12,6 @@ from fedbench.core.eval import EvaluationSuite
 from fedbench.flwr.namespace import Namespace
 from fedbench.flwr.rdict import RDictNamespaceView
 from fedbench.flwr.serde import FlwrSerde, Pickle
-from fedbench.runtime.component_factory import (
-    create_df_loader,
-    create_evaluation_suite,
-    create_partitioner,
-    create_synthesizer,
-)
-from fedbench.runtime.registry_builder import (
-    build_evaluator_registry,
-    build_partitioner_registry,
-    build_synthesizer_registry,
-)
 
 _config: Config | None = None
 _dataset: PartitionedDataset | None = None
@@ -44,8 +34,10 @@ def build_client_context(flwr_cache: RecordDict) -> ClientContext:
     config = _get_config(framework_cache)
     dataset = _get_dataset(config)
 
-    synthesizer = create_synthesizer(config, build_synthesizer_registry())
-    eval_suite = create_evaluation_suite(config, build_evaluator_registry())
+    synthesizer = factory.create_synthesizer(
+        config.synthesizer, config.synthesizer_kwargs
+    )
+    eval_suite = factory.create_evaluation_suite(set(config.metrics.run_categories))
     serde = FlwrSerde(
         object_serde=Pickle(disabled=config.disable_pickle),
         default_arrays_target=synthesizer.arrays_target,
@@ -81,11 +73,14 @@ def _get_dataset(config: Config) -> PartitionedDataset:
     if _dataset is not None:
         return _dataset
 
-    df_loader = create_df_loader(config)
+    df_loader = factory.create_df_loader(config.data.dataset)
     df = df_loader()
     schema = infer_schema(df)
-    partitioner = create_partitioner(config, build_partitioner_registry())
 
+    partitioner = factory.create_partitioner(
+        config.data.partitioner,
+        config.data.partitioner_kwargs,
+    )
     _dataset = PartitionedDataset(
         df=df,
         schema=schema,

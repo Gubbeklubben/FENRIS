@@ -62,8 +62,5 @@ class PartitionedDataset:
         )
 
     def load_all_train_data(self) -> pd.DataFrame:
-        partitions = [
-            self.load_train_partition(i)  # nofmt
-            for i in range(self.num_partitions)
-        ]
+        partitions = [self.load_train_partition(i) for i in range(self.num_partitions)]
         return pd.concat(partitions, ignore_index=True)

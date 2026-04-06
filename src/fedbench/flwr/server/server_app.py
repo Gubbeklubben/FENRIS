@@ -4,13 +4,11 @@ from flwr.app import Context
 from flwr.serverapp import Grid, ServerApp
 
 from fedbench.core.algorithm import SampleContext
+from fedbench.core.eval import CentralizedEvalContext
 from fedbench.core.events import ClientsConfigured
 from fedbench.core.payload import Payload
 from fedbench.flwr.serde import FlwrSerde, Pickle
 from fedbench.flwr.server.server import Strategy, configure_clients
-from fedbench.runtime.component_factory import (
-    create_centralized_eval_ctx,
-)
 from fedbench.runtime.early_stopping_monitor import EarlyStoppingMonitor
 from fedbench.runtime.runcontext import RunContext
 
@@ -33,7 +31,15 @@ def make_server_app(ctx: RunContext) -> ServerApp:
         )
         synthetic_df = ctx.synthesizer.sample(train_artifacts, sample_ctx)
 
-        eval_ctx = create_centralized_eval_ctx(ctx.config, ctx.dataset, synthetic_df)
+        eval_ctx = CentralizedEvalContext(
+            synthetic_df=synthetic_df,
+            holdout_df=ctx.dataset.load_global_holdout(),
+            client_train_df=ctx.dataset.load_all_train_data(),
+            target_column=ctx.config.data.target_col,
+            sensitive_columns=ctx.config.data.sensitive_cols,
+            schema=ctx.dataset.schema,
+            seed=ctx.config.seed.evaluation,
+        )
         # noinspection PyUnnecessaryCast
         return ctx.eval_suite.global_evaluate_single(
             eval_ctx, cast(str, ctx.config.metrics.stop_metric)
@@ -61,8 +67,8 @@ def make_server_app(ctx: RunContext) -> ServerApp:
             coordinator=ctx.coordinator,
             monitor=EarlyStoppingMonitor(ctx.config.metrics, _evaluate_fn),
         )
-        state, metrics = strategy.run(grid, ctx.config.num_rounds)
-        ctx.train_artifacts = state
+        train_artifacts, metrics = strategy.run(grid, ctx.config.num_rounds)
+        ctx.train_artifacts = train_artifacts
         ctx.per_client_metrics = metrics
 
     return app

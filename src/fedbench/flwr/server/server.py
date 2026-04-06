@@ -64,7 +64,7 @@ class Strategy:
 
     def evaluate(self, grid: Grid) -> None:
         msg_type = "evaluate"
-        artifacts = self._get_and_check_training_artifacts()
+        artifacts = self._get_and_check_train_artifacts()
         requests = []
 
         for dst_id in grid.get_node_ids():
@@ -115,13 +115,13 @@ class Strategy:
 
             # Check early stopping
             if self._monitor.should_run(curr_round, num_rounds):
-                self._monitor.run(self._get_and_check_training_artifacts())
+                self._monitor.run(self._get_and_check_train_artifacts())
                 if self._monitor.early_stop_triggered:
                     break
 
         self._eventbus.emit(TrainEvalLoopCompleted(curr_round))
         self.evaluate(grid)
-        return self._get_and_check_training_artifacts(), self._per_client_metrics
+        return self._get_and_check_train_artifacts(), self._per_client_metrics
 
     def _send_and_receive(
         self,
@@ -173,7 +173,7 @@ class Strategy:
                     )
                 )
 
-    def _get_and_check_training_artifacts(self) -> Payload:
+    def _get_and_check_train_artifacts(self) -> Payload:
         artifacts = self._coordinator.publish_train_artifacts()
         if not isinstance(artifacts, Payload):
             raise TypeError(

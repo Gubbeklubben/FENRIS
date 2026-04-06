@@ -1,10 +1,11 @@
-from abc import ABC, abstractmethod
+from abc import abstractmethod
 from collections.abc import Generator, Iterable
 
+from fedbench.core.component import Component
 from fedbench.core.payload import ArraysTarget, Payload
 
 
-class Coordinator(ABC):
+class Coordinator(Component):
     """Server side algorithm component."""
 
     def __repr__(self) -> str:

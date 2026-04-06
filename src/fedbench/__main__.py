@@ -1,4 +1,4 @@
-from enum import StrEnum
+import inspect
 from typing import Annotated, Literal
 import json
 import shutil
@@ -9,19 +9,10 @@ import typer
 import fedbench.runtime.runner as runner
 from fedbench.config.builder import build_config
 from fedbench.config.parsing import split_outside_brackets
+from fedbench.core.eval import Category
+from fedbench.core.eval.evaluator import EvaluatorDescriptor
 from fedbench.runtime.pipeline import pipeline
-from fedbench.runtime.registry import FactoryRegistry
-from fedbench.runtime.registry_builder import (
-    build_coordinator_registry,
-    build_evaluator_registry,
-    build_partitioner_registry,
-    build_synthesizer_registry,
-)
-
-synthesizers = build_synthesizer_registry()
-coordinators = build_coordinator_registry()
-partitioners = build_partitioner_registry()
-evaluators = build_evaluator_registry()
+from fedbench.runtime.registry import Group, Metadata
 
 app = typer.Typer()
 
@@ -49,19 +40,12 @@ def new(name: str) -> None:
     pass
 
 
-class Component(StrEnum):
-    SYNTHESIZERS = "synthesizers"
-    COORDINATORS = "coordinators"
-    PARTITIONERS = "partitioners"
-    EVALUATORS = "evaluators"
-
-
 @app.command()
 def show(
-    components: Annotated[
-        list[Component] | None,
+    groups: Annotated[
+        list[Group] | None,
         typer.Argument(
-            help="Components to show. If omitted, all are shown.",
+            help="Groups of components to show. If omitted, all are shown.",
         ),
     ] = None,
     include_locators: Annotated[
@@ -71,33 +55,98 @@ def show(
             help="Include factory locators (import paths) in the output.",
         ),
     ] = False,
+    include_details: Annotated[
+        bool,
+        typer.Option(
+            "--include-details",
+            help="Include keyword arguments or other detailed component information "
+            "in the output.",
+        ),
+    ] = False,
 ) -> None:
     """
     Show available components.
 
-    Examples:\n
-      fedbench show\n
-      fedbench show synthesizers\n
-      fedbench show synthesizers partitioners --include-locators
+    Examples:
+      fedbench show
+      fedbench show synthesizers
+      fedbench show synthesizers coordinators --include-locators
+      fedbench show partitioners evaluators --include-details
     """
 
-    selected = components if components else list(Component)
+    selected = groups if groups else list(Group)
 
-    def maybe_show[T](component: Component, registry: FactoryRegistry[T]) -> None:
-        if component not in selected:
+    def show_evaluators() -> None:
+        # Sort evaluator metadata by category
+        evaluators_by_category: dict[
+            Category, list[tuple[Metadata, EvaluatorDescriptor]]
+        ] = {category: [] for category in Category}
+        for evaluator in Group.EVALUATORS.get_registry().metadata():
+            evaluator_factory = Group.EVALUATORS.get_registry().load(evaluator.name)
+            metadata = evaluator_factory().metadata
+            evaluators_by_category[metadata.category].append((evaluator, metadata))
+
+        for category, entries in evaluators_by_category.items():
+            # Category title
+            title = f"{category.capitalize()} evaluators"
+            print()
+            print(f"{'':<2}{title}")
+            print(f"{'':<2}{'\u2500' * len(title)}")
+
+            for metadata, evaluator_metadata in entries:
+                # Evaluator title
+                print(f"{'':<4}{metadata.name}")
+
+                if include_locators:
+                    print(f"{'':<6}Locator: {metadata.locator}")
+
+                if include_details:
+                    eval_mode = evaluator_metadata.eval_mode.name or ""
+                    print(f"{'':<6}Evaluation mode: {eval_mode.lower()}")
+
+                    print(f"{'':<6}Metrics:")
+                    for metric in evaluator_metadata.metrics:
+                        print(f"{'':<8}{metric.key}", end="")
+                        print(
+                            f".<{metric.suffix_type}_column>"
+                            if metric.suffix_type
+                            else ""
+                        )
+                    print()
+
+    def maybe_show(group: Group) -> None:
+        if group not in selected:
             return
 
-        entries = list(registry.metadata())
-        width = max(len(e.name) for e in entries)
-        print(f"\n --- {component.value.upper()} ---")
-        for metadata in entries:
-            print(f"  {metadata.name:<{width}}", end="")
-            print(f"  {metadata.locator}" if include_locators else "")
+        # Component type heading
+        print()
+        print(group.name)
+        print("\u2500" * len(group.name))
 
-    maybe_show(Component.SYNTHESIZERS, synthesizers)
-    maybe_show(Component.COORDINATORS, coordinators)
-    maybe_show(Component.PARTITIONERS, partitioners)
-    maybe_show(Component.EVALUATORS, evaluators)
+        if group == Group.EVALUATORS:
+            show_evaluators()
+            return
+
+        registry = group.get_registry()
+        for metadata in registry.metadata():
+            # Component name
+            print(f"{'':<2}{metadata.name}")
+
+            if include_locators:
+                print(f"{'':<4}Locator: {metadata.locator}")
+
+            if include_details:
+                component_factory = registry.load(metadata.name)
+                if params := inspect.signature(component_factory).parameters.values():
+                    print(f"{'':<4}Parameters:")
+                    for param in params:
+                        print(f"{'':<6}{param}")
+                    print()
+
+    maybe_show(Group.SYNTHESIZERS)
+    maybe_show(Group.COORDINATORS)
+    maybe_show(Group.PARTITIONERS)
+    maybe_show(Group.EVALUATORS)
 
     print()
 
@@ -218,7 +267,7 @@ def run(
     synthesizer_kwargs: Annotated[
         str | None,
         typer.Option(
-            callback=parse_kwargs, help="Kwargs for the algorithm (key=value)."
+            callback=parse_kwargs, help="Kwargs for the synthesizer (key=value)."
         ),
     ] = None,
     coordinator_kwargs: Annotated[
@@ -240,7 +289,7 @@ def run(
         str | None,
         typer.Option(
             callback=parse_args,
-            help="Comma-separated sensitive columns for fairness/AIA.",
+            help="Comma-separated list of sensitive columns for fairness/AIA metrics.",
         ),
     ] = None,
     run_categories: Annotated[
@@ -254,10 +303,14 @@ def run(
     ] = None,
     stop_metric: Annotated[
         str | None,
-        typer.Option(help="Metric key to monitor (e.g., fidelity.corr_fro_diff)."),
+        typer.Option(help="Metric key to monitor (e.g., `fidelity.corr_fro_diff`)."),
     ] = None,
     stop_mode: Annotated[
-        Literal["min", "max"] | None, typer.Option(help="min or max.")
+        Literal["min", "max"] | None,
+        typer.Option(
+            help="Whether stop metric is expected to converge "
+            "towards a minimum or a maximum."
+        ),
     ] = None,
     stop_epsilon: Annotated[
         float | None, typer.Option(help="Minimum improvement required.")
@@ -282,7 +335,11 @@ def run(
         int | None, typer.Option(help="Maximum number of federated rounds.")
     ] = None,
     test_size: Annotated[
-        float | None, typer.Option(help="Fraction of data to hold out for testing.")
+        float | None,
+        typer.Option(
+            help="Fraction of data to hold out for testing. "
+            "This is used for both local and global holdout fractions."
+        ),
     ] = None,
     seed: Annotated[int | None, typer.Option(help="Master random seed.")] = None,
     outputdir: Annotated[
@@ -292,7 +349,7 @@ def run(
         int | None, typer.Option(help="Number of synthetic rows to generate.")
     ] = None,
     disable_pickle: Annotated[
-        bool | None, typer.Option(help="Disable pickle for dataset loading.")
+        bool | None, typer.Option(help="Whether to disable pickle for dataset loading.")
     ] = None,
 ) -> None:
 
@@ -301,7 +358,7 @@ def run(
         for key, value in locals().items()
         if value is not None
     }
-    config = build_config(cli_input, synthesizers, partitioners)
+    config = build_config(cli_input)
     runner.run(config, pipeline())
 
 

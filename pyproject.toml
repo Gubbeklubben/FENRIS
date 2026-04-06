@@ -42,7 +42,7 @@ fedbench = "fedbench.__main__:app"
 
 [project.entry-points."fedbench.synthesizers"]
 fed_hello    = "fedbench.builtins.synthesizers.fed_hello:FedHello"
-fed_tab_diff = "fedbench.builtins.synthesizers.fedtabdiff:FedTabDiff"
+fedtabdiff = "fedbench.builtins.synthesizers.fedtabdiff:FedTabDiff"
 fed_tgan     = "fedbench.builtins.synthesizers.fed_tgan:FedTGAN"
 
 [project.entry-points."fedbench.coordinators"]

@@ -557,7 +557,8 @@ def test_single_category_parsing(tmp_path, synthesizers, partitioners):
 
     config = build_config(cfg, synthesizers, partitioners)
 
-    assert config.metrics.run_categories == (Category.PRIVACY,)
+    assert Category.PRIVACY in config.metrics.run_categories
+    assert Category.SCALABILITY in config.metrics.run_categories
 
 
 def test_multiple_categories_parsing(

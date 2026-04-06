@@ -29,9 +29,12 @@ from fedbench.core.eval.evaluator import (
 
 class TSTREvaluator(Evaluator):
     @property
+    def name(self) -> str:
+        return "tstr"
+
+    @property
     def metadata(self) -> EvaluatorDescriptor:
         return EvaluatorDescriptor(
-            name="tstr",
             category=Category.UTILITY,
             eval_mode=EvaluationMode.BOTH,
             metrics=[

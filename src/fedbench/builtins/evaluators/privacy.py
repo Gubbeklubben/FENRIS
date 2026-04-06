@@ -102,9 +102,12 @@ class DirectOverlapDiagnosticEvaluator(Evaluator):
     """
 
     @property
+    def name(self) -> str:
+        return "direct_overlap_diagnostic"
+
+    @property
     def metadata(self) -> EvaluatorDescriptor:
         return EvaluatorDescriptor(
-            name="direct_overlap_diagnostic",
             category=Category.PRIVACY,
             eval_mode=EvaluationMode.FEDERATED,
             metrics=[
@@ -259,9 +262,12 @@ class MIANearestNeighborAttackEvaluator(Evaluator):
     """
 
     @property
+    def name(self) -> str:
+        return "mia_nearest_neighbor_attack"
+
+    @property
     def metadata(self) -> EvaluatorDescriptor:
         return EvaluatorDescriptor(
-            name="mia_nearest_neighbor_attack",
             category=Category.PRIVACY,
             eval_mode=EvaluationMode.BOTH,
             metrics=[
@@ -428,9 +434,12 @@ class AIASupervisedAttackEvaluator(Evaluator):
     """
 
     @property
+    def name(self) -> str:
+        return "aia_supervised_attack"
+
+    @property
     def metadata(self) -> EvaluatorDescriptor:
         return EvaluatorDescriptor(
-            name="aia_supervised_attack",
             category=Category.PRIVACY,
             eval_mode=EvaluationMode.BOTH,
             metrics=[
