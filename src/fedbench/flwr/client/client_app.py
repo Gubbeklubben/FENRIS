@@ -45,6 +45,7 @@ def train(message: Message, flwr_context: Context) -> Message:
         train_ctx = TrainContext(
             global_init_artifacts=artifacts,
             client_cache=cache,
+            seed=ctx.config.seed.training,
         )
         start_time = time.perf_counter_ns()
         reply = ctx.synthesizer.train(request, train_df, train_ctx)

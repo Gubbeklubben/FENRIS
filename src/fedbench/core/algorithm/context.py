@@ -14,6 +14,7 @@ class GlobalInitContext:
 class TrainContext:
     global_init_artifacts: Payload | None
     client_cache: Payload | None
+    seed: int
 
 
 @dataclass(frozen=True)

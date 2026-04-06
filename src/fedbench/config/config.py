@@ -79,10 +79,11 @@ class SeedConfig:
     """
 
     master: int
-    partitioning: int  # s + 1
-    init: int  # s + 2
-    sampling: int  # s + 3
-    evaluation: int  # s + 4
+    partitioning: int
+    init: int
+    training: int
+    sampling: int
+    evaluation: int
 
     @classmethod
     def from_master(cls, seed: int = 42) -> SeedConfig:
@@ -90,8 +91,9 @@ class SeedConfig:
             master=seed,
             partitioning=seed + 1,
             init=seed + 2,
-            sampling=seed + 3,
-            evaluation=seed + 4,
+            training=seed + 3,
+            sampling=seed + 4,
+            evaluation=seed + 5,
         )
 
 
