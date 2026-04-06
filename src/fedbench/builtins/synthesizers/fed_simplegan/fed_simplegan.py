@@ -23,6 +23,7 @@ from fedbench.core.algorithm import (
     TrainContext,
 )
 from fedbench.core.data import TableSchema
+from fedbench.core.logger import log_info
 from fedbench.core.payload import ArraysTarget, Payload
 
 
@@ -105,6 +106,10 @@ class FedSimpleGAN(Synthesizer):
         self._latent_dim = latent_dim
         self._local_epochs = local_epochs
         self._device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+        log_info(
+            str(self),
+            f"Initialized synthesizer with torch device {self._device.type.upper()}",
+        )
 
     @property
     def name(self) -> str:
