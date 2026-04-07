@@ -1,8 +1,12 @@
 import inspect
+import sys
 from abc import ABC
 from collections import defaultdict
+from collections.abc import Iterable, Iterator
 from dataclasses import dataclass, field
+from enum import IntEnum
 from pathlib import Path
+from typing import Self, cast
 
 import libcst as cst
 import libcst.matchers as m
@@ -17,18 +21,40 @@ from libcst.metadata import (
 )
 
 
-@dataclass
+class _ImportGroup(IntEnum):
+    STDLIB = 1
+    EXTLIB = 2
+    PROJECT = 3
+
+    @classmethod
+    def get_for_module(cls, module: str) -> Self:
+        base = module.split(".")[0]
+        if base in sys.stdlib_module_names:
+            return cls(1)
+        if base == __name__.split(".")[0]:
+            return cls(3)
+        return cls(2)
+
+
+@dataclass(frozen=True)
+class _ImportWrapper:
+    node: cst.SimpleStatementLine
+    group: _ImportGroup
+    module: str
+
+
+@dataclass(frozen=True)
 class _FunctionDefWrapper:
     node: cst.FunctionDef = field(repr=False)
-    module: str
     is_property: bool
     is_abstract: bool
     mro_index: int
     method_index: int
+    module: str
     accesses: list[Access] = field(default_factory=list)
 
 
-class SubclassBuilder(cst.CSTVisitor):
+class AbstractMethodCollector(cst.CSTVisitor):
     METADATA_DEPENDENCIES = (ScopeProvider, ExpressionContextProvider)
 
     def __init__(self, parent_cls: type) -> None:
@@ -40,6 +66,9 @@ class SubclassBuilder(cst.CSTVisitor):
         self._fn_defs: dict[str, list[_FunctionDefWrapper | None]] = defaultdict(
             lambda: [None for _ in self._mro]
         )
+
+    def __iter__(self) -> Iterator[_FunctionDefWrapper]:
+        yield from self.maybe_collect()
 
     @property
     def parent_cls(self) -> type:
@@ -89,15 +118,15 @@ class SubclassBuilder(cst.CSTVisitor):
         except IndexError:
             pass
 
-        wrapper = _FunctionDefWrapper(
+        fn_def = _FunctionDefWrapper(
             node,
-            self._curr_modulename,
             is_property,
             is_abstract,
             self._curr_mro_index,
             len(self._fn_defs),
+            self._curr_modulename,
         )
-        self._fn_defs[node.name.value][self._curr_mro_index] = wrapper
+        self._fn_defs[node.name.value][self._curr_mro_index] = fn_def
 
         # Visit decorators, params and returns in order to associate accesses
         # with the current FunctionDef.
@@ -111,6 +140,8 @@ class SubclassBuilder(cst.CSTVisitor):
         return False
 
     def leave_FunctionDef(self, node: cst.FunctionDef) -> None:
+        if not self._cls_stack:
+            return
         self._fn_stack.pop()
 
     def visit_Attribute(self, node: cst.Attribute) -> bool:
@@ -133,85 +164,26 @@ class SubclassBuilder(cst.CSTVisitor):
             return False
 
         scope = self.get_metadata(ScopeProvider, node)
-        wrapper = self._fn_defs[self._fn_stack[-1]][self._curr_mro_index]
+        if scope is None:
+            return False
 
+        fn_def = cast(
+            _FunctionDefWrapper, self._fn_defs[self._fn_stack[-1]][self._curr_mro_index]
+        )
         for access in scope.accesses[node]:
             if access.node is node:
-                wrapper.accesses.append(access)
+                fn_def.accesses.append(access)
 
         return True
 
-    def build(self) -> cst.Module:
+    def maybe_collect(self) -> Iterable[_FunctionDefWrapper]:
         self._maybe_parse_and_visit()
+        for fn_defs in self._fn_defs.values():
+            fn_def = next(fn for fn in fn_defs if fn is not None)
+            if fn_def.is_abstract:
+                yield fn_def
 
-        new_imports: dict[str, set[str]] = defaultdict(set[str])
-        imports: dict[cst.Import | cst.ImportFrom, set[str]] = defaultdict(set[str])
-        fn_defs = []
-
-        for name, wrappers in self._fn_defs.items():
-            wrapper = next(w for w in wrappers if w is not None)
-            if not wrapper.is_abstract:
-                continue
-
-            fn_defs.append(
-                wrapper.node.with_changes(
-                    decorators=wrapper.node.decorators[:-1],
-                    body=cst.IndentedBlock(
-                        body=[
-                            cst.SimpleStatementLine(
-                                body=[
-                                    cst.Raise(
-                                        exc=cst.Call(
-                                            func=cst.Name("NotImplementedError")
-                                        )
-                                    )
-                                ]
-                            )
-                        ]
-                    ),
-                )
-            )
-
-            for access in wrapper.accesses:
-                if len(access.referents) == 0:
-                    raise NameError(access.node.value)
-
-                if len(access.referents) > 1:
-                    raise ValueError(f"Reference {access.node.value} is ambiguous.")
-
-                assignment = next(iter(access.referents))
-                if isinstance(assignment, BuiltinAssignment):
-                    continue
-
-                if isinstance(assignment, Assignment):
-                    node = assignment.node
-                    if isinstance(node, cst.Import | cst.ImportFrom):
-                        try:
-                            relative = node.relative  # ImportFrom
-                        except AttributeError:
-                            relative = False  # Import
-                        if relative:
-                            raise NotImplementedError(
-                                "No support for resolving relative imports."
-                            )
-                        imports[node].add(assignment.name)
-                    else:
-                        new_imports[wrapper.module].add(assignment.name)
-
-        print(new_imports)
-        return cst.Module(
-            body=[
-                *[cst.SimpleStatementLine([imp]) for imp in imports],
-                cst.ClassDef(
-                    name=cst.Name(value="MyTest"),
-                    bases=[cst.Arg(value=cst.Name(value=self.parent_cls.__name__))],
-                    body=cst.IndentedBlock(body=[fn_def for fn_def in fn_defs]),
-                    leading_lines=[cst.EmptyLine(), cst.EmptyLine()],
-                ),
-            ]
-        )
-
-    def _maybe_parse_and_visit(self):
+    def _maybe_parse_and_visit(self) -> None:
         if self._curr_modulename:
             return
 
@@ -234,9 +206,188 @@ class SubclassBuilder(cst.CSTVisitor):
             processed.add(src_file)
 
 
-if __name__ == "__main__":
-    from fedbench.core.algorithm import Coordinator, SingleStepCoordinator, Synthesizer
+class Builder:
+    def __init__(self, collector: AbstractMethodCollector):
+        self._collector = collector
+        self._imports: tuple[_ImportWrapper, ...] | None = None
+        self._fn_defs: tuple[_FunctionDefWrapper, ...] | None = None
+        self._name: str | None = None
 
-    print(SubclassBuilder(Synthesizer).build().code)
-    print(SubclassBuilder(Coordinator).build().code)
-    print(SubclassBuilder(SingleStepCoordinator).build().code)
+    def with_name(self, name: str) -> Self:
+        self._name = name
+        return self
+
+    def build(self) -> cst.Module:
+        self._maybe_collect()
+        imports: list[cst.SimpleStatementLine] = []
+        fn_defs: list[cst.FunctionDef] = []
+
+        prev_imp_group: _ImportGroup | None = None
+        for imp in cast(tuple[_ImportWrapper, ...], self._imports):
+            imports.append(
+                imp.node.with_changes(
+                    leading_lines=[cst.EmptyLine()]
+                    if prev_imp_group and imp.group != prev_imp_group
+                    else []
+                )
+            )
+            prev_imp_group = imp.group
+
+        for idx, fn_def in enumerate(
+            cast(tuple[_FunctionDefWrapper, ...], self._fn_defs)
+        ):
+            fn_defs.append(
+                fn_def.node.with_changes(
+                    decorators=fn_def.node.decorators[:-1],
+                    body=cst.IndentedBlock(
+                        body=[
+                            cst.SimpleStatementLine(
+                                body=[
+                                    cst.Raise(
+                                        exc=cst.Call(
+                                            func=cst.Name("NotImplementedError")
+                                        )
+                                    )
+                                ]
+                            )
+                        ]
+                    ),
+                    leading_lines=[cst.EmptyLine()] if idx > 0 else [],
+                )
+            )
+        parent_cls_name = self._collector.parent_cls.__name__
+        name = self._name or f"MyAwesome{parent_cls_name}"
+        tree = cst.Module(
+            body=[
+                *imports,
+                cst.ClassDef(
+                    name=cst.Name(value=name),
+                    bases=[cst.Arg(value=cst.Name(value=parent_cls_name))],
+                    body=cst.IndentedBlock(body=fn_defs),
+                    leading_lines=[cst.EmptyLine(), cst.EmptyLine()],
+                ),
+            ]
+        )
+        self._name = None
+        return tree
+
+    def _maybe_collect(self) -> None:
+        if self._imports is not None:
+            return
+
+        def import_key(imp: _ImportWrapper) -> tuple[int, str]:
+            return imp.group.value, imp.module
+
+        def fn_def_key(fn_def: _FunctionDefWrapper) -> tuple[int, int, int]:
+            return int(not fn_def.is_property), -fn_def.mro_index, fn_def.method_index
+
+        imports = list(_resolve_imports(self._collector))
+        imports.append(
+            _ImportWrapper(
+                cst.ensure_type(
+                    cst.parse_statement(
+                        f"from {self._collector.parent_cls.__module__} "
+                        f"import {self._collector.parent_cls.__name__}"
+                    ),
+                    cst.SimpleStatementLine,
+                ),
+                _ImportGroup.PROJECT,
+                self._collector.parent_cls.__module__,
+            )
+        )
+        self._imports = tuple(sorted(imports, key=import_key))
+        self._fn_defs = tuple((sorted(self._collector, key=fn_def_key)))
+
+
+def _resolve_imports(
+    fn_defs: Iterable[_FunctionDefWrapper],
+) -> Iterable[_ImportWrapper]:
+
+    imports: dict[str | None, set[str]] = defaultdict(set[str])
+    for fn_def in fn_defs:
+        for access in fn_def.accesses:
+            if isinstance(access.node, cst.BaseString):
+                continue
+
+            if len(access.referents) == 0:
+                raise NameError(access.node.value)
+
+            if len(access.referents) > 1:
+                raise ValueError(f"Reference {access.node.value} is ambiguous.")
+
+            assignment = next(iter(access.referents))
+            if isinstance(assignment, BuiltinAssignment):
+                continue
+
+            if isinstance(assignment, Assignment):
+                module, aliases = _resolve_assignment(assignment, fn_def.module)
+                if aliases:
+                    imports[module].add(aliases)
+
+    return _create_import_wrappers(imports)
+
+
+def _resolve_assignment(
+    assignment: Assignment, src_module: str
+) -> tuple[str | None, str]:
+
+    def codegen(_node: cst.CSTNode) -> str:
+        if isinstance(_node, cst.ImportAlias):
+            _node = _node.with_changes(comma=cst.MaybeSentinel.DEFAULT)
+        return cst.Module([]).code_for_node(_node)
+
+    node = assignment.node
+    if isinstance(node, cst.Import | cst.ImportFrom):
+        if isinstance(node.names, cst.ImportStar):
+            raise ValueError("Please, do not use wildcard imports.")
+
+        if getattr(node, "relative", False):
+            raise NotImplementedError("No support for relative imports.")
+
+        module = None
+        if hasattr(node, "module"):
+            # Is not None because we already crashed if relative import
+            module = codegen(cast(cst.Attribute | cst.Name, node.module))
+
+        for alias in node.names:
+            if alias.asname is not None:
+                name = alias.asname.name
+            else:
+                name = alias.name  # type: ignore[assignment]
+
+            if not isinstance(name, cst.Name | cst.Attribute):
+                raise TypeError(f"AsName.name has unexpected type {type(name)}.")
+
+            if codegen(name) == assignment.name:
+                return module, codegen(alias)
+        return None, ""
+
+    return src_module, assignment.name
+
+
+def _create_import_wrappers(
+    imports: dict[str | None, set[str]],
+) -> Iterable[_ImportWrapper]:
+
+    for module, aliases in imports.items():
+        if module is None:
+            for alias in aliases:
+                _module = alias.split(" ")[0]
+                yield _ImportWrapper(
+                    cst.ensure_type(
+                        cst.parse_statement(f"import {alias}"), cst.SimpleStatementLine
+                    ),
+                    _ImportGroup.get_for_module(_module),
+                    _module,
+                )
+        else:
+            yield _ImportWrapper(
+                cst.ensure_type(
+                    cst.parse_statement(
+                        f"from {module} import {', '.join(sorted(aliases))}"
+                    ),
+                    cst.SimpleStatementLine,
+                ),
+                _ImportGroup.get_for_module(module),
+                module,
+            )
