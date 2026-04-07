@@ -124,7 +124,7 @@ class FedTGAN(SingleStepCoordinator):
 
         total = sum(count)
         if total <= 0:
-            raise ValueError(f"Total count: {count}, can not aggregate.")
+            raise ValueError(f"Total count: {total}, can not aggregate.")
 
         # Compute table similarity-aware weights
         weights = self._compute_aggregation_weights(
@@ -222,6 +222,7 @@ class FedTGAN(SingleStepCoordinator):
 
         return list(similarity_weights)
 
+    # noinspection PyMethodMayBeStatic
     def _compute_categorical_similarity(
         self,
         cat_distributions: list[dict[str, dict[str, float]]],

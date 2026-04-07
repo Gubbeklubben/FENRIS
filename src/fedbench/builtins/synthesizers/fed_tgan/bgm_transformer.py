@@ -118,6 +118,7 @@ class BGMTransformer:
                     weight_concentration_prior_type="dirichlet_process",
                     weight_concentration_prior=0.001,
                     n_init=1,
+                    max_iter=1000,  # Avoid sklearn convergence warnings
                     random_state=42,
                 )
                 gm.fit(data_array[:, id_].reshape(-1, 1))
