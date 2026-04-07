@@ -114,6 +114,8 @@ class Config:
     seed: SeedConfig = field(default_factory=SeedConfig.from_master)
     outputdir: str = ""
     num_synthetic_rows: int | None = None
+    client_cpus: float = 2.0
+    client_gpus: float = 0.5
     disable_pickle: bool = False
     metrics: MetricsConfig = field(default_factory=MetricsConfig)
 

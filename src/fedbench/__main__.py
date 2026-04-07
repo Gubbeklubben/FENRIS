@@ -145,7 +145,7 @@ def run(
     coordinator_kwargs: Annotated[
         str | None,
         typer.Option(
-            callback=parse_kwargs, help="Kwargs for the coordinator (key=value)"
+            callback=parse_kwargs, help="Kwargs for the coordinator (key=value)."
         ),
     ] = None,
     partitioner_kwargs: Annotated[
@@ -219,6 +219,22 @@ def run(
     ] = None,
     num_synthetic_rows: Annotated[
         int | None, typer.Option(help="Number of synthetic rows to generate.")
+    ] = None,
+    client_cpus: Annotated[
+        float | None,
+        typer.Option(
+            help="Number of CPUs to use per client. If the total CPU requirement "
+            "exceeds what is available, some operations will execute sequentially "
+            "rather than in parallel."
+        ),
+    ] = None,
+    client_gpus: Annotated[
+        float | None,
+        typer.Option(
+            help="Number of GPUs to use per client. If the total GPU requirement "
+            "exceeds what is available, some operations will execute sequentially "
+            "rather than in parallel."
+        ),
     ] = None,
     disable_pickle: Annotated[
         bool | None, typer.Option(help="Whether to disable pickle for dataset loading.")
