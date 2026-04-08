@@ -66,6 +66,7 @@ class BGMTransformer:
         data: pd.DataFrame,
         categorical_columns: list[str],
         continuous_columns: list[str],
+        random_state: int,
     ) -> None:
         """Fit BGM models to continuous columns.
 
@@ -77,6 +78,8 @@ class BGMTransformer:
             Names of categorical columns
         continuous_columns : list[str]
             Names of continuous columns
+        random_state : int
+            Seed for BayesianGaussianMixture
         """
         self.meta = []
         self.model = []
@@ -119,7 +122,7 @@ class BGMTransformer:
                     weight_concentration_prior=0.001,
                     n_init=1,
                     max_iter=1000,  # Avoid sklearn convergence warnings
-                    random_state=42,
+                    random_state=random_state,
                 )
                 gm.fit(data_array[:, id_].reshape(-1, 1))
                 self.model.append(gm)
@@ -139,13 +142,16 @@ class BGMTransformer:
                 self.output_info.append((info["size"], "softmax"))
                 self.output_dim += info["size"]
 
-    def transform(self, data: pd.DataFrame) -> np.ndarray:
+    def transform(self, data: pd.DataFrame, rng: np.random.Generator) -> np.ndarray:
         """Transform data using fitted BGM models.
 
         Parameters
         ----------
         data : pd.DataFrame
             Data to transform
+        rng : np.random.Generator
+            Local random number generator used for BGM mode selection
+            (for reproducibility)
 
         Returns
         -------
@@ -187,7 +193,7 @@ class BGMTransformer:
                 for i in range(len(data)):
                     pp = probs[i] + 1e-6
                     pp = pp / pp.sum()
-                    opt_sel[i] = np.random.choice(np.arange(n_opts), p=pp)
+                    opt_sel[i] = rng.choice(np.arange(n_opts), p=pp)
 
                 # Extract normalized value for selected mode
                 idx = np.arange(len(features))

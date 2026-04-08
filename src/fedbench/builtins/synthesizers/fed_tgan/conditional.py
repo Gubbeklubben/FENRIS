@@ -32,7 +32,9 @@ def maximum_interval(output_info: list[tuple[int, str]]) -> int:
     return max_interval
 
 
-def random_choice_prob_index(probs: np.ndarray, axis: int = 1) -> np.ndarray:
+def random_choice_prob_index(
+    probs: np.ndarray, rng: np.random.Generator, axis: int = 1
+) -> np.ndarray:
     """Sample indices from probability distributions.
 
     For each row, samples an index according to the probability distribution.
@@ -41,6 +43,8 @@ def random_choice_prob_index(probs: np.ndarray, axis: int = 1) -> np.ndarray:
     ----------
     probs : np.ndarray
         Probability matrix (rows are distributions)
+    rng : np.random.Generator
+        Local random number generator (for reproducibility)
     axis : int
         Axis along which to sample (default: 1)
 
@@ -49,7 +53,7 @@ def random_choice_prob_index(probs: np.ndarray, axis: int = 1) -> np.ndarray:
     np.ndarray
         Sampled indices for each row
     """
-    r = np.expand_dims(np.random.rand(probs.shape[1 - axis]), axis=axis)
+    r = np.expand_dims(rng.random(probs.shape[1 - axis]), axis=axis)
     result: np.ndarray = (probs.cumsum(axis=axis) > r).argmax(axis=axis)
     return result
 
@@ -131,7 +135,7 @@ class Cond:
         self.interval = np.asarray(interval_list)
 
     def sample(
-        self, batch_size: int
+        self, batch_size: int, rng: np.random.Generator
     ) -> tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray] | None:
         """Sample conditional vectors for a training batch.
 
@@ -142,6 +146,8 @@ class Cond:
         ----------
         batch_size : int
             Number of samples
+        rng : np.random.Generator
+            Local random number generator (for reproducibility)
 
         Returns
         -------
@@ -156,7 +162,7 @@ class Cond:
             return None
 
         # Randomly select which column to condition on for each sample
-        idx = np.random.choice(np.arange(self.n_col), batch_size)
+        idx = rng.choice(np.arange(self.n_col), batch_size)
 
         # Initialize conditional vector and mask
         vec = np.zeros((batch_size, self.n_opt), dtype=np.float32)
@@ -164,7 +170,7 @@ class Cond:
         mask[np.arange(batch_size), idx] = 1  # Mark selected column
 
         # Sample category within selected column according to frequency
-        opt = random_choice_prob_index(self.p[idx])
+        opt = random_choice_prob_index(self.p[idx], rng)
 
         # Set one-hot in conditional vector
         for i in range(batch_size):
@@ -172,7 +178,9 @@ class Cond:
 
         return vec, mask, idx, opt
 
-    def sample_original_training_data_prob(self, batch_size: int) -> np.ndarray | None:
+    def sample_original_training_data_prob(
+        self, batch_size: int, rng: np.random.Generator
+    ) -> np.ndarray | None:
         """Sample conditional vectors matching training data distribution.
 
         Used during sampling/generation to produce categories with frequencies
@@ -182,6 +190,8 @@ class Cond:
         ----------
         batch_size : int
             Number of samples
+        rng : np.random.Generator
+            Local random number generator (for reproducibility)
 
         Returns
         -------
@@ -195,12 +205,12 @@ class Cond:
         vec = np.zeros((batch_size, self.n_opt), dtype=np.float32)
 
         # Randomly select column
-        idx = np.random.choice(np.arange(self.n_col), batch_size)
+        idx = rng.choice(np.arange(self.n_col), batch_size)
 
         for i in range(batch_size):
             col = idx[i]
             # Pick a random category from observed training data for this column
-            pick = int(np.random.choice(self.model[col]))
+            pick = int(rng.choice(self.model[col]))
             vec[i, pick + self.interval[col, 0]] = 1
 
         return vec
