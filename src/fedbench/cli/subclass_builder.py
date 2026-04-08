@@ -61,6 +61,7 @@ class AbstractMethodCollector(cst.CSTVisitor):
         super().__init__()
         self._mro = tuple(c for c in parent_cls.mro() if c not in (ABC, object))
         self._curr_modulename: str = ""
+        self._collected: bool = False
         self._cls_stack: list[str] = []
         self._fn_stack: list[str] = []
         self._fn_defs: dict[str, list[_FunctionDefWrapper | None]] = defaultdict(
@@ -68,7 +69,10 @@ class AbstractMethodCollector(cst.CSTVisitor):
         )
 
     def __iter__(self) -> Iterator[_FunctionDefWrapper]:
-        yield from self.maybe_collect()
+        for fn_defs in self._fn_defs.values():
+            fn_def = next(fn for fn in fn_defs if fn is not None)
+            if fn_def.is_abstract:
+                yield fn_def
 
     @property
     def parent_cls(self) -> type:
@@ -177,16 +181,12 @@ class AbstractMethodCollector(cst.CSTVisitor):
         return True
 
     def maybe_collect(self) -> Iterable[_FunctionDefWrapper]:
-        self._maybe_parse_and_visit()
-        for fn_defs in self._fn_defs.values():
-            fn_def = next(fn for fn in fn_defs if fn is not None)
-            if fn_def.is_abstract:
-                yield fn_def
+        if not self._collected:
+            self._collect()
+            self._collected = True
+        yield from self
 
-    def _maybe_parse_and_visit(self) -> None:
-        if self._curr_modulename:
-            return
-
+    def _collect(self) -> None:
         processed = set()
         for cls in self._mro:
             src_file = inspect.getsourcefile(cls)
@@ -204,6 +204,7 @@ class AbstractMethodCollector(cst.CSTVisitor):
             wrapper = MetadataWrapper(cst.parse_module(code))
             wrapper.visit(self)
             processed.add(src_file)
+        self._curr_modulename = ""
 
 
 class Builder:
@@ -281,7 +282,7 @@ class Builder:
         def fn_def_key(fn_def: _FunctionDefWrapper) -> tuple[int, int, int]:
             return int(not fn_def.is_property), -fn_def.mro_index, fn_def.method_index
 
-        imports = list(_resolve_imports(self._collector))
+        imports = list(_resolve_imports(self._collector.maybe_collect()))
         imports.append(
             _ImportWrapper(
                 cst.ensure_type(
