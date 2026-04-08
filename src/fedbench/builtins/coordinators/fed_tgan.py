@@ -104,7 +104,8 @@ class FedTGAN(SingleStepCoordinator):
             yield cid, GlobalState(self._state).encode()
 
     def aggregate_train(self, replies: Iterable[tuple[int, Payload]]) -> None:
-        if not replies:
+        replies_list = list(replies)
+        if not replies_list:
             raise ValueError("No replies, can not aggregate.")
 
         count: list[int] = []
@@ -113,7 +114,7 @@ class FedTGAN(SingleStepCoordinator):
         self._client_num_distributions = []
         self._client_counts = []
 
-        for _, payload in replies:
+        for _, payload in replies_list:
             update = ClientUpdate.decode(payload)
             count.append(update.count)
             # noinspection PyUnnecessaryCast
@@ -147,6 +148,7 @@ class FedTGAN(SingleStepCoordinator):
                     else:
                         result = result + tensor * weight
 
+                assert result is not None
                 aggr_state[key] = result
 
         self._state = aggr_state
@@ -318,9 +320,7 @@ class FedTGAN(SingleStepCoordinator):
                 # Weight samples by data proportion
                 n_samples = int(len(samples) * data_weights[client_idx])
                 if n_samples > 0:
-                    # Sample with replacement to match proportion
-                    resampled = np.random.choice(samples, size=n_samples, replace=True)
-                    aggregated_samples.append(resampled)
+                    aggregated_samples.append(samples[:n_samples])
 
             aggregated = np.concatenate(aggregated_samples)
 

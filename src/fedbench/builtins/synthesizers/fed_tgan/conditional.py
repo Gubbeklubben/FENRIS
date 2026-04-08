@@ -10,6 +10,7 @@ mode collapse.
 
 import numpy as np
 import torch
+import torch.nn.functional as F
 
 
 def maximum_interval(output_info: list[tuple[int, str]]) -> int:
@@ -206,11 +207,11 @@ class Cond:
 
 
 def cond_loss(
-    data: "torch.Tensor",
+    data: torch.Tensor,
     output_info: list[tuple[int, str]],
-    c: "torch.Tensor",
-    m: "torch.Tensor",
-) -> "torch.Tensor":
+    c: torch.Tensor,
+    m: torch.Tensor,
+) -> torch.Tensor:
     """Compute conditional loss to enforce generator respects conditional vector.
 
     Computes cross-entropy between generator's output for the conditioned column
@@ -232,9 +233,6 @@ def cond_loss(
     torch.Tensor
         Conditional cross-entropy loss
     """
-    import torch
-    import torch.nn.functional as F
-
     loss = []
     st = 0
     st_c = 0

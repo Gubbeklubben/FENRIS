@@ -227,9 +227,9 @@ class BGMTransformer:
         pd.DataFrame
             Decoded data in original scale
         """
-        data_t = np.zeros([len(data), len(self.meta)])
-
+        columns: dict[str, Any] = {}
         st = 0
+
         for id_, info in enumerate(self.meta):
             if info["type"] == "continuous":
                 # Extract normalized value and mode one-hot
@@ -265,18 +265,16 @@ class BGMTransformer:
                 mean_t = means[p_argmax]
 
                 # Denormalize: x = u * 4σ + μ
-                tmp = u * 4 * std_t + mean_t
-                data_t[:, id_] = tmp
+                columns[info["name"]] = u * 4 * std_t + mean_t
 
             else:  # categorical
                 current = data[:, st : st + info["size"]]
                 st += info["size"]
                 idx = np.argmax(current, axis=1)
-                data_t[:, id_] = [info["i2s"][i] for i in idx]
+                # Store as list to preserve the original dtype
+                columns[info["name"]] = [info["i2s"][i] for i in idx]
 
-        # Convert back to DataFrame with column names
-        column_names = [info["name"] for info in self.meta]
-        return pd.DataFrame(data_t, columns=column_names)
+        return pd.DataFrame(columns)
 
     def get_output_info(self) -> list[tuple[int, str]]:
         """Get output information for each encoded column.
