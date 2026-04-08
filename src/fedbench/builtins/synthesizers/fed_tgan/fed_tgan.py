@@ -1,20 +1,16 @@
-from collections.abc import Mapping
 from dataclasses import dataclass
 from typing import Self, cast
 
 import numpy as np
-import pandas as pd
 import torch
+import torch.nn.functional as F
 from pandas import DataFrame
-from sklearn.preprocessing import LabelEncoder, MinMaxScaler
 
-from fedbench.builtins.coordinators.fedavg import ClientUpdate, GlobalState
+from fedbench.builtins.coordinators.fed_tgan import ClientUpdate, GlobalState
+from fedbench.builtins.synthesizers.fed_tgan.bgm_transformer import BGMTransformer
+from fedbench.builtins.synthesizers.fed_tgan.conditional import Cond, cond_loss
 from fedbench.builtins.synthesizers.fed_tgan.discriminator import Discriminator
 from fedbench.builtins.synthesizers.fed_tgan.generator import Generator
-from fedbench.builtins.synthesizers.fed_tgan.training import (
-    discriminator_step,
-    generator_step,
-)
 from fedbench.core.algorithm import (
     GlobalInitArtifacts,
     GlobalInitContext,
@@ -33,15 +29,211 @@ def split_cat_num(schema: TableSchema) -> tuple[list[str], list[str]]:
     return cat_attrs, num_attrs
 
 
+def compute_column_distributions(
+    data: DataFrame, cat_attrs: list[str], num_attrs: list[str]
+) -> tuple[dict[str, dict[str, float]], dict[str, np.ndarray]]:
+    """Compute categorical and continuous column distributions for table similarity.
+
+    Ported from the original Fed-TGAN implementation:
+    https://github.com/zhao-zilong/Fed-TGAN/blob/main/Server/dtds/distributed.py
+
+    Parameters
+    ----------
+    data : DataFrame
+        Raw client data (not transformed)
+    cat_attrs : list[str]
+        Categorical column names
+    num_attrs : list[str]
+        Numerical column names
+
+    Returns
+    -------
+    tuple[dict[str, dict[str, float]], dict[str, np.ndarray]]
+        (categorical_distributions, numerical_distributions)
+        - categorical_distributions: {column_name: {category: probability}}
+        - numerical_distributions: {column_name: sample_values}
+    """
+    cat_distributions = {}
+    num_distributions = {}
+
+    # Compute categorical distributions (normalized value counts as dict)
+    for col in cat_attrs:
+        value_counts = data[col].value_counts(normalize=True)
+        # Store as dictionary: {category: probability}
+        cat_distributions[col] = {str(k): float(v) for k, v in value_counts.items()}
+
+    # Store continuous column samples
+    for col in num_attrs:
+        num_distributions[col] = np.asarray(data[col].values, dtype=np.float32)
+
+    return cat_distributions, num_distributions
+
+
+def apply_activate(
+    data: torch.Tensor, output_info: list[tuple[int, str]]
+) -> torch.Tensor:
+    """Apply column-specific activations.
+
+    Ported from the original Fed-TGAN implementation:
+    https://github.com/zhao-zilong/Fed-TGAN/blob/main/Server/dtds/synthesizers/ctgan.py
+
+    For continuous columns: Apply tanh (maps to [-1, 1])
+    For categorical columns: Apply Gumbel-Softmax (differentiable sampling)
+
+    Parameters
+    ----------
+    data : torch.Tensor
+        Raw generator output
+    output_info : list[tuple[int, str]]
+        List of (dimension, activation_type) per column from BGMTransformer
+
+    Returns
+    -------
+    torch.Tensor
+        Activated data
+    """
+    data_t = []
+    st = 0
+    for dim, activation in output_info:
+        if activation == "tanh":
+            ed = st + dim
+            data_t.append(torch.tanh(data[:, st:ed]))
+            st = ed
+        elif activation == "softmax":
+            ed = st + dim
+            data_t.append(F.gumbel_softmax(data[:, st:ed], tau=0.2, hard=False))
+            st = ed
+        else:
+            raise ValueError(f"Unknown activation: {activation}")
+
+    return torch.cat(data_t, dim=1)
+
+
+class Sampler:
+    """Samples real data conditioned on a categorical column and category.
+
+    Ported from the original Fed-TGAN implementation (ctgan.py Sampler class):
+    https://github.com/zhao-zilong/Fed-TGAN/blob/main/Server/dtds/synthesizers/ctgan.py
+
+    For each categorical column, stores the row indices for each category,
+    enabling conditioned sampling to pair real data with fake data during training.
+    This is the training-by-sampling mechanism that prevents mode collapse.
+    """
+
+    def __init__(self, data: np.ndarray, output_info: list[tuple[int, str]]) -> None:
+        self._data = data
+        self._n = len(data)
+        # _model[col_idx][category_idx] -> array of row indices with that category
+        self._model: list[list[np.ndarray]] = []
+
+        st = 0
+        for dim, activation in output_info:
+            if activation == "tanh":
+                st += dim
+            elif activation == "softmax":
+                ed = st + dim
+                col_model = []
+                for j in range(dim):
+                    col_model.append(np.nonzero(data[:, st + j])[0])
+                self._model.append(col_model)
+                st = ed
+
+    def sample(
+        self,
+        n: int,
+        col: np.ndarray | None,
+        opt: np.ndarray | None,
+    ) -> np.ndarray:
+        """Sample n rows, optionally conditioned on column/category indices.
+
+        Parameters
+        ----------
+        n : int
+            Number of rows to sample
+        col : np.ndarray | None
+            Column indices to condition on (one per sample), or None for random
+        opt : np.ndarray | None
+            Category indices within each column, or None for random
+
+        Returns
+        -------
+        np.ndarray
+            Sampled rows from the training data
+        """
+        if col is None:
+            idx: np.ndarray = np.random.choice(np.arange(self._n), n)
+            # noinspection PyUnnecessaryCast
+            return cast(np.ndarray, self._data[idx])
+        assert opt is not None
+        idx = np.array([np.random.choice(self._model[c][o]) for c, o in zip(col, opt)])
+        # noinspection PyUnnecessaryCast
+        return cast(np.ndarray, self._data[idx])
+
+
+def _calc_gradient_penalty(
+    discriminator: Discriminator,
+    real: torch.Tensor,
+    fake: torch.Tensor,
+    device: torch.device,
+    pac: int = 10,
+    lambda_: float = 10.0,
+) -> torch.Tensor:
+    """WGAN-GP gradient penalty (Gulrajani et al. 2017).
+
+    Ported from the original Fed-TGAN implementation (ctgan.py calc_gradient_penalty):
+    https://github.com/zhao-zilong/Fed-TGAN/blob/main/Server/dtds/synthesizers/ctgan.py
+
+    Interpolates between real and fake samples and penalizes discriminator
+    gradients whose L2 norm deviates from 1, enforcing the Lipschitz constraint
+    required for stable WGAN training.
+
+    Parameters
+    ----------
+    discriminator : Discriminator
+        The PacGAN discriminator
+    real : torch.Tensor
+        Real data (with conditional vectors concatenated), shape (batch, dim)
+    fake : torch.Tensor
+        Fake data (with conditional vectors concatenated), shape (batch, dim)
+    device : torch.device
+        Computation device
+    pac : int
+        PacGAN pack size (must match discriminator.pack)
+    lambda_ : float
+        Gradient penalty coefficient
+
+    Returns
+    -------
+    torch.Tensor
+        Scalar gradient penalty
+    """
+    alpha = torch.rand(real.size(0), 1, device=device)
+    # Detach fake before interpolating so gradients only flow through interpolates
+    interpolates = (alpha * real + (1 - alpha) * fake.detach()).requires_grad_(True)
+    disc_interpolates = discriminator(interpolates)
+    gradients = torch.autograd.grad(
+        outputs=disc_interpolates,
+        inputs=interpolates,
+        grad_outputs=torch.ones(disc_interpolates.size(), device=device),
+        create_graph=True,
+        retain_graph=True,
+    )[0]
+    # Reshape for PacGAN: (batch/pac, pac*dim), then compute per-pack L2 norm
+    gradient_penalty = (
+        (gradients.view(-1, pac * real.size(1)).norm(2, dim=1) - 1) ** 2
+    ).mean() * lambda_
+    return gradient_penalty
+
+
 @dataclass(frozen=True)
 class _FedTGANArtifacts:
     cat_attrs: list[str]
     num_attrs: list[str]
-    input_dim: int
     output_dim: int
-    cat_max_values: Mapping[str, int]
-    label_encoders: Mapping[str, LabelEncoder]
-    num_scaler: MinMaxScaler
+    disc_input_dim: int  # output_dim + cond_dim; stored explicitly to avoid recomputing
+    transformer: BGMTransformer
+    output_info: list[tuple[int, str]]
+    cond: Cond  # Stored for use during sampling to reproduce training data distribution
 
     # noinspection PyUnnecessaryCast
     @classmethod
@@ -51,28 +243,28 @@ class _FedTGANArtifacts:
         return cls(
             cat_attrs=cast(list[str], extras["cat-attrs"]),
             num_attrs=cast(list[str], extras["num-attrs"]),
-            input_dim=cast(int, extras["input-dim"]),
             output_dim=cast(int, extras["output-dim"]),
-            cat_max_values=cast(Mapping[str, int], objects["cat-max-values"]),
-            label_encoders=cast(Mapping[str, LabelEncoder], objects["label-encoders"]),
-            num_scaler=cast(MinMaxScaler, objects["num-scaler"]),
+            disc_input_dim=cast(int, extras["disc-input-dim"]),
+            transformer=cast(BGMTransformer, objects["transformer"]),
+            output_info=cast(list[tuple[int, str]], objects["output-info"]),
+            cond=cast(Cond, objects["cond"]),
         )
 
     def encode(self) -> Payload:
         return Payload(
             objects={
                 "objects": {
-                    "cat-max-values": self.cat_max_values,
-                    "label-encoders": self.label_encoders,
-                    "num-scaler": self.num_scaler,
+                    "transformer": self.transformer,
+                    "output-info": self.output_info,
+                    "cond": self.cond,
                 }
             },
             extras={
                 "extras": {
                     "cat-attrs": self.cat_attrs,
                     "num-attrs": self.num_attrs,
-                    "input-dim": self.input_dim,
                     "output-dim": self.output_dim,
+                    "disc-input-dim": self.disc_input_dim,
                 }
             },
         )
@@ -81,15 +273,17 @@ class _FedTGANArtifacts:
 class FedTGAN(Synthesizer):
     def __init__(
         self,
-        batch_size: int = 32,
+        batch_size: int = 500,
         max_batches: int = 100,
         local_epochs: int = 5,
-        learning_rate: float = 1e-2,
+        learning_rate: float = 2e-4,
         latent_dim: int = 64,
     ) -> None:
 
         if batch_size < 1:
             raise ValueError("Expecting batch_size >= 1.")
+        if batch_size % 10 != 0:
+            raise ValueError("Expecting batch_size to be divisible by 10 (for PacGAN).")
         if max_batches < 1:
             raise ValueError("Expecting max_batches >= 1.")
         if local_epochs < 1:
@@ -116,7 +310,7 @@ class FedTGAN(Synthesizer):
 
     @property
     def supports_coordinators(self) -> set[str]:
-        return {"fedavg"}
+        return {"fed_tgan"}
 
     def global_init(
         self, dataset: DataFrame, context: GlobalInitContext
@@ -130,26 +324,30 @@ class FedTGAN(Synthesizer):
         # Split schema into categorical and numerical columns
         cat_attrs, num_attrs = split_cat_num(context.schema)
 
-        # Create separate label encoder for each categorical column
-        # and track max encoded value for normalization
-        label_encoders = {}
-        cat_max_values = {}
-        for col in cat_attrs:
-            unique_vals = sorted(dataset[col].astype(str).unique())
-            le = LabelEncoder()
-            le.fit(unique_vals)
-            label_encoders[col] = le
-            # Max encoded value = number of classes - 1
-            cat_max_values[col] = len(unique_vals) - 1
+        # Fit BGMTransformer
+        transformer = BGMTransformer(n_clusters=10, eps=0.005)
+        transformer.fit(dataset, cat_attrs, num_attrs)
 
-        # Calculate dimensions
-        n_cat_features = len(cat_attrs)
-        n_num_features = len(num_attrs)
-        input_dim = output_dim = n_cat_features + n_num_features
+        # Get output dimension and info from transformer
+        output_dim = transformer.get_output_dim()
+        output_info = transformer.get_output_info()
 
-        # Initialize models with correct dimensions
-        generator = Generator(latent_dim=self._latent_dim, output_dim=output_dim)
-        discriminator = Discriminator(input_dim=input_dim)
+        # Conditional dimension: sum of all softmax columns (categorical + BGM modes)
+        cond_dim = sum(dim for dim, act in output_info if act == "softmax")
+
+        # Discriminator input = data + conditional (ctgan.py line 353)
+        disc_input_dim = output_dim + cond_dim
+
+        # Build Cond from global data so sampling can reproduce the training
+        # distribution
+        x_global = transformer.transform(dataset).astype(np.float32)
+        cond = Cond(x_global, output_info)
+
+        # Generator input = latent + conditional (ctgan.py line 349)
+        generator = Generator(
+            latent_dim=self._latent_dim + cond_dim, output_dim=output_dim
+        )
+        discriminator = Discriminator(input_dim=disc_input_dim)
 
         # Pack both models into a single state_dict with prefixed keys
         packed_state: dict[str, torch.Tensor] = {}
@@ -158,20 +356,14 @@ class FedTGAN(Synthesizer):
         for k, v in discriminator.state_dict().items():
             packed_state[f"discriminator.{k}"] = v
 
-        # Fit scaler on numerical features
-        num_scaler = None
-        if num_attrs:
-            num_scaler = MinMaxScaler()
-            num_scaler.fit(dataset[num_attrs].values)
-
         artifacts = _FedTGANArtifacts(
             cat_attrs=cat_attrs,
             num_attrs=num_attrs,
-            input_dim=input_dim,
             output_dim=output_dim,
-            cat_max_values=cat_max_values,
-            label_encoders=label_encoders,
-            num_scaler=num_scaler,
+            disc_input_dim=disc_input_dim,
+            transformer=transformer,
+            output_info=output_info,
+            cond=cond,
         )
         return GlobalInitArtifacts(
             coordinator=GlobalState(packed_state).encode(),
@@ -189,13 +381,10 @@ class FedTGAN(Synthesizer):
 
         artifacts = _FedTGANArtifacts.decode(context.global_init_artifacts)
 
-        cat_attrs = artifacts.cat_attrs
-        num_attrs = artifacts.num_attrs
-        input_dim = artifacts.input_dim
         output_dim = artifacts.output_dim
-        cat_max_values = artifacts.cat_max_values
-        label_encoders = artifacts.label_encoders
-        num_scaler = artifacts.num_scaler
+        disc_input_dim = artifacts.disc_input_dim
+        transformer = artifacts.transformer
+        output_info = artifacts.output_info
 
         # Unpack generator and discriminator state_dicts from received state
         generator_state = {
@@ -209,46 +398,21 @@ class FedTGAN(Synthesizer):
             if k.startswith("discriminator.")
         }
 
-        # Preprocess data: label-encode categoricals, concatenate with numericals
-        processed_data = []
+        # Transform data with BGMTransformer
+        x = transformer.transform(data).astype(np.float32)
 
-        # Encode and normalize categorical columns
-        for col in cat_attrs:
-            if col in label_encoders:
-                encoded = label_encoders[col].transform(data[col].astype(str))
-                # Normalize to [0, 1] by dividing by max value
-                max_val = cat_max_values[col]
-                if max_val > 0:
-                    normalized = encoded / max_val
-                else:
-                    normalized = encoded  # Single-class column, stays 0
-                processed_data.append(normalized.reshape(-1, 1))
+        # Initialize conditional vector generator and conditioned data sampler
+        cond_generator = Cond(x, output_info)
+        data_sampler = Sampler(x, output_info)
 
-        # Add numerical columns (scaled)
-        if num_attrs and num_scaler is not None:
-            num_data = data[num_attrs].values
-            num_scaled = num_scaler.transform(num_data)
-            processed_data.append(num_scaled)
-        elif num_attrs:
-            # Fallback if no scaler (shouldn't happen)
-            num_data = data[num_attrs].values
-            processed_data.append(num_data)
-
-        # Concatenate all features
-        if processed_data:
-            x = np.hstack(processed_data).astype(np.float32)
-        else:
-            raise ValueError("No data to train on")
-
-        # Convert to torch tensor and create DataLoader
-        dataset = torch.utils.data.TensorDataset(torch.from_numpy(x))
-        dataloader = torch.utils.data.DataLoader(
-            dataset, batch_size=self._batch_size, shuffle=True
-        )
+        # Calculate conditional dimension
+        cond_dim = cond_generator.n_opt if cond_generator.n_col > 0 else 0
 
         # Initialize models
-        generator = Generator(latent_dim=self._latent_dim, output_dim=output_dim)
-        discriminator = Discriminator(input_dim=input_dim)
+        generator = Generator(
+            latent_dim=self._latent_dim + cond_dim, output_dim=output_dim
+        )
+        discriminator = Discriminator(input_dim=disc_input_dim)
 
         # Load weights from request
         generator.load_state_dict(generator_state)
@@ -258,53 +422,137 @@ class FedTGAN(Synthesizer):
         generator.to(self._device)
         discriminator.to(self._device)
 
-        # Create optimizers
-        optimizer_generator = torch.optim.SGD(
-            generator.parameters(), lr=self._learning_rate, momentum=0.9
+        # Adam optimizer matching ctgan.py lines 355-356
+        optimizer_generator = torch.optim.Adam(
+            generator.parameters(), lr=self._learning_rate, betas=(0.5, 0.9)
         )
-        optimizer_discriminator = torch.optim.SGD(
-            discriminator.parameters(), lr=self._learning_rate, momentum=0.9
+        optimizer_discriminator = torch.optim.Adam(
+            discriminator.parameters(), lr=self._learning_rate, betas=(0.5, 0.9)
         )
 
         train_loss_discriminator = 0.0
         train_loss_generator = 0.0
-        num_batches = 0
+        num_steps = 0
 
-        # Training loop
+        steps_per_epoch = max(1, len(x) // self._batch_size)
+
+        # Training loop ported from ctgan.py CTGANSynthesizer.fit (lines 362-433)
+        # and distributed.py MDGANClient.train_model (lines 328-417)
         for _ in range(self._local_epochs):
-            for (real_data_batch,) in dataloader:
-                real_data = real_data_batch.to(self._device)
+            for _ in range(steps_per_epoch):
+                # Sample conditional vectors for this step
+                condvec = cond_generator.sample(self._batch_size)
+                if condvec is not None:
+                    c1, _, col, opt = condvec
+                    c1 = torch.from_numpy(c1).to(self._device)
+                    # Sample real data conditioned on same column/category (shuffled
+                    # permutation avoids discriminator learning the pairing between
+                    # fake and real samples) (ctgan.py lines 377-380)
+                    perm = np.random.permutation(self._batch_size)
+                    real_np = data_sampler.sample(
+                        self._batch_size, col[perm], opt[perm]
+                    )
+                    real_data = torch.from_numpy(real_np.astype(np.float32)).to(
+                        self._device
+                    )
+                    c2 = c1[perm]
+                else:
+                    c1 = torch.zeros(self._batch_size, 0, device=self._device)
+                    c2 = c1
+                    real_np = data_sampler.sample(self._batch_size, None, None)
+                    real_data = torch.from_numpy(real_np.astype(np.float32)).to(
+                        self._device
+                    )
 
-                # Generate synthetic data
+                # ===== Train Discriminator =====
+                discriminator.train()
+
+                # Generate fake data conditioned on c1
                 noise = torch.randn(
-                    real_data.size(0), self._latent_dim, device=self._device
+                    self._batch_size, self._latent_dim, device=self._device
                 )
-                fake_data = generator(noise)
+                noise_c = torch.cat([noise, c1], dim=1) if c1.size(1) > 0 else noise
+                fake_data_raw = generator(noise_c)
+                fake_data = apply_activate(fake_data_raw, output_info)
 
-                # Train discriminator on combined data
-                train_loss_discriminator += discriminator_step(
+                # Concatenate conditional vectors to both real and fake before
+                # discriminator (ctgan.py lines 386-391)
+                if c1.size(1) > 0:
+                    fake_cat = torch.cat([fake_data, c1], dim=1)
+                    real_cat = torch.cat([real_data, c2], dim=1)
+                else:
+                    fake_cat = fake_data
+                    real_cat = real_data
+
+                y_fake = discriminator(fake_cat)
+                y_real = discriminator(real_cat)
+
+                # Wasserstein discriminator loss + gradient penalty
+                # (ctgan.py lines 396-402)
+                loss_d = -(torch.mean(y_real) - torch.mean(y_fake))
+                pen = _calc_gradient_penalty(
                     discriminator,
-                    real_data,
-                    fake_data.detach(),
-                    optimizer_discriminator,
+                    real_cat,
+                    fake_cat,
                     self._device,
+                    pac=discriminator.pack,
                 )
 
-                # Train the generator
-                noise_g = torch.randn(
-                    real_data.size(0), self._latent_dim, device=self._device
-                )
-                train_loss_generator += generator_step(
-                    generator, discriminator, noise_g, optimizer_generator, self._device
-                )
+                optimizer_discriminator.zero_grad()
+                pen.backward(retain_graph=True)
+                loss_d.backward()
+                optimizer_discriminator.step()
 
-                num_batches += 1
+                train_loss_discriminator += loss_d.item()
 
-                # Stop if max_batches reached
-                if num_batches >= self._max_batches:
+                # ===== Train Generator =====
+                # Resample condvec for generator update (ctgan.py lines 404-413)
+                condvec2 = cond_generator.sample(self._batch_size)
+                if condvec2 is not None:
+                    c1_g, m1_g, _, _ = condvec2
+                    c1_g = torch.from_numpy(c1_g).to(self._device)
+                    m1_g = torch.from_numpy(m1_g).to(self._device)
+                else:
+                    c1_g = torch.zeros(self._batch_size, 0, device=self._device)
+                    m1_g = torch.zeros(self._batch_size, 0, device=self._device)
+
+                generator.train()
+                discriminator.eval()
+
+                noise = torch.randn(
+                    self._batch_size, self._latent_dim, device=self._device
+                )
+                noise_c = torch.cat([noise, c1_g], dim=1) if c1_g.size(1) > 0 else noise
+                fake_data_raw = generator(noise_c)
+                fake_data = apply_activate(fake_data_raw, output_info)
+
+                # (ctgan.py lines 418-421)
+                if c1_g.size(1) > 0:
+                    y_fake_g = discriminator(torch.cat([fake_data, c1_g], dim=1))
+                else:
+                    y_fake_g = discriminator(fake_data)
+
+                # Wasserstein generator loss + conditional cross-entropy (ctgan.py lines
+                # 423-428)
+                loss_g_adv = -torch.mean(y_fake_g)
+                if condvec2 is not None and c1_g.size(1) > 0:
+                    loss_g: torch.Tensor = loss_g_adv + cond_loss(
+                        fake_data_raw, output_info, c1_g, m1_g
+                    )
+                else:
+                    loss_g = loss_g_adv
+
+                optimizer_generator.zero_grad()
+                loss_g.backward()
+                optimizer_generator.step()
+
+                train_loss_generator += loss_g.item()
+                num_steps += 1
+
+                if num_steps >= self._max_batches:
                     break
 
-            if num_batches >= self._max_batches:
+            if num_steps >= self._max_batches:
                 break
 
         # Pack both models into a single state_dict with prefixed keys
@@ -314,9 +562,16 @@ class FedTGAN(Synthesizer):
         for k, v in discriminator.state_dict().items():
             packed_state[f"discriminator.{k}"] = v
 
+        # Compute column distributions for table similarity
+        cat_distributions, num_distributions = compute_column_distributions(
+            data, artifacts.cat_attrs, artifacts.num_attrs
+        )
+
         reply = ClientUpdate(
             state=packed_state,
-            count=len(dataset),
+            count=len(x),
+            cat_distributions=cat_distributions,
+            num_distributions=num_distributions,
         )
         return reply.encode()
 
@@ -333,12 +588,10 @@ class FedTGAN(Synthesizer):
 
         artifacts = _FedTGANArtifacts.decode(context.global_init_artifacts)
 
-        cat_attrs = artifacts.cat_attrs
-        num_attrs = artifacts.num_attrs
         output_dim = artifacts.output_dim
-        cat_max_values = artifacts.cat_max_values
-        label_encoders = artifacts.label_encoders
-        num_scaler = artifacts.num_scaler
+        transformer = artifacts.transformer
+        output_info = artifacts.output_info
+        cond = artifacts.cond
 
         # Unpack generator state (only need generator for sampling)
         generator_state = {
@@ -347,49 +600,43 @@ class FedTGAN(Synthesizer):
             if k.startswith("generator.")
         }
 
-        # Initialize and load generator
-        generator = Generator(latent_dim=self._latent_dim, output_dim=output_dim)
+        # Calculate conditional dimension
+        cond_dim = sum(dim for dim, act in output_info if act == "softmax")
+
+        # Initialize and load generator (with conditional dimension)
+        generator = Generator(
+            latent_dim=self._latent_dim + cond_dim, output_dim=output_dim
+        )
         generator.load_state_dict(generator_state)
         generator.to(self._device)
         generator.eval()
 
-        # Generate synthetic data
+        # Generate synthetic data in batches (to handle arbitrary num_rows).
+        # Uses sample_original_training_data_prob() to match the reference
+        # (ctgan.py CTGANSynthesizer.sample, which calls sample_zero()).
+        all_chunks: list[np.ndarray] = []
+        remaining = context.num_rows
+
         with torch.no_grad():
-            noise = torch.randn(context.num_rows, self._latent_dim, device=self._device)
-            synthetic_data = generator(noise).cpu().numpy()
+            while remaining > 0:
+                batch = min(remaining, self._batch_size)
 
-        # Reverse preproc: decode categorical features and extract numerical features
-        decoded_data = {}
-        n_cat_features = len(cat_attrs)
+                noise = torch.randn(batch, self._latent_dim, device=self._device)
 
-        # Decode categorical columns
-        for i, col in enumerate(cat_attrs):
-            if col in label_encoders:
-                # Denormalize from [0, 1] back to integer range
-                max_val = cat_max_values[col]
-                denormalized = synthetic_data[:, i] * max_val
-                # Round to nearest integer for categorical encoding
-                encoded_values = np.round(denormalized).astype(int)
-                # Clip to valid range
-                encoded_values = np.clip(encoded_values, 0, max_val)
-                # Inverse transform to get original categorical values
-                decoded_data[col] = label_encoders[col].inverse_transform(
-                    encoded_values
-                )
+                # Sample conditional vectors from training data distribution
+                condvec = cond.sample_original_training_data_prob(batch)
+                if condvec is not None:
+                    c = torch.from_numpy(condvec).to(self._device)
+                    noise_c = torch.cat([noise, c], dim=1)
+                else:
+                    noise_c = noise
 
-        if num_attrs and num_scaler is not None:
-            # Extract numerical columns
-            num_synthetic = synthetic_data[
-                :, n_cat_features : n_cat_features + len(num_attrs)
-            ]
-            # Inverse transform to get back original scale
-            num_original = num_scaler.inverse_transform(num_synthetic)
-            # Add to decoded data
-            for i, col in enumerate(num_attrs):
-                decoded_data[col] = num_original[:, i]
-        elif num_attrs:
-            # Fallback if no scaler (shouldn't happen)
-            for i, col in enumerate(num_attrs):
-                decoded_data[col] = synthetic_data[:, n_cat_features + i]
+                synthetic_raw = generator(noise_c)
+                synthetic = apply_activate(synthetic_raw, output_info)
+                all_chunks.append(synthetic.cpu().numpy())
+                remaining -= batch
 
-        return pd.DataFrame(decoded_data)
+        synthetic_data_np = np.concatenate(all_chunks, axis=0)[: context.num_rows]
+
+        # Inverse transform with BGMTransformer
+        return transformer.inverse_transform(synthetic_data_np, sigmas=None)
