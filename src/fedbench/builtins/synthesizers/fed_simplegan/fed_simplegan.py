@@ -34,6 +34,17 @@ def split_cat_num(schema: TableSchema) -> tuple[list[str], list[str]]:
     return cat_attrs, num_attrs
 
 
+def _make_torch_generator(seed: int, device: torch.device) -> torch.Generator:
+    """Create a local, seeded torch.Generator pinned to the given device.
+
+    Using a local generator instead of torch.manual_seed() avoids mutating
+    global RNG state, keeping results independent of module import order.
+    """
+    generator = torch.Generator(device=device)
+    generator.manual_seed(seed)
+    return generator
+
+
 @dataclass(frozen=True)
 class _FedSimpleGANArtifacts:
     cat_attrs: list[str]
@@ -127,10 +138,7 @@ class FedSimpleGAN(Synthesizer):
         self, dataset: DataFrame, context: GlobalInitContext
     ) -> GlobalInitArtifacts:
 
-        np.random.seed(context.seed)
-        torch.manual_seed(context.seed)
-        if torch.cuda.is_available():
-            torch.cuda.manual_seed(context.seed)
+        rng = np.random.default_rng(context.seed)
 
         # Split schema into categorical and numerical columns
         cat_attrs, num_attrs = split_cat_num(context.schema)
@@ -151,6 +159,10 @@ class FedSimpleGAN(Synthesizer):
         n_cat_features = len(cat_attrs)
         n_num_features = len(num_attrs)
         input_dim = output_dim = n_cat_features + n_num_features
+
+        # Seed global torch RNG just before model init so that weight
+        # initialization (Kaiming uniform in Linear) is reproducible.
+        torch.manual_seed(int(rng.integers(2**31)))
 
         # Initialize models with correct dimensions
         generator = Generator(latent_dim=self._latent_dim, output_dim=output_dim)
@@ -245,10 +257,18 @@ class FedSimpleGAN(Synthesizer):
         else:
             raise ValueError("No data to train on")
 
+        rng = np.random.default_rng(context.seed)
+        loader_generator = _make_torch_generator(
+            int(rng.integers(2**31)), torch.device("cpu")
+        )
+
         # Convert to torch tensor and create DataLoader
         dataset = torch.utils.data.TensorDataset(torch.from_numpy(x))
         dataloader = torch.utils.data.DataLoader(
-            dataset, batch_size=self._batch_size, shuffle=True
+            dataset,
+            batch_size=self._batch_size,
+            shuffle=True,
+            generator=loader_generator,
         )
 
         # Initialize models
@@ -275,14 +295,20 @@ class FedSimpleGAN(Synthesizer):
         train_loss_generator = 0.0
         num_batches = 0
 
+        train_generator = _make_torch_generator(int(rng.integers(2**31)), self._device)
+
         # Training loop
         for _ in range(self._local_epochs):
             for (real_data_batch,) in dataloader:
                 real_data = real_data_batch.to(self._device)
+                batch_size = real_data.size(0)
 
                 # Generate synthetic data
                 noise = torch.randn(
-                    real_data.size(0), self._latent_dim, device=self._device
+                    batch_size,
+                    self._latent_dim,
+                    device=self._device,
+                    generator=train_generator,
                 )
                 fake_data = generator(noise)
 
@@ -297,7 +323,10 @@ class FedSimpleGAN(Synthesizer):
 
                 # Train the generator
                 noise_g = torch.randn(
-                    real_data.size(0), self._latent_dim, device=self._device
+                    batch_size,
+                    self._latent_dim,
+                    device=self._device,
+                    generator=train_generator,
                 )
                 train_loss_generator += generator_step(
                     generator, discriminator, noise_g, optimizer_generator, self._device
@@ -326,10 +355,8 @@ class FedSimpleGAN(Synthesizer):
         return reply.encode()
 
     def sample(self, request: Payload, context: SampleContext) -> DataFrame:
-        np.random.seed(context.seed)
-        torch.manual_seed(context.seed)
-        if torch.cuda.is_available():
-            torch.cuda.manual_seed(context.seed)
+        rng = np.random.default_rng(context.seed)
+        sample_generator = _make_torch_generator(int(rng.integers(2**31)), self._device)
 
         # noinspection PyUnnecessaryCast
         state = cast(dict[str, torch.Tensor], GlobalState.decode(request).state)
@@ -360,7 +387,12 @@ class FedSimpleGAN(Synthesizer):
 
         # Generate synthetic data
         with torch.no_grad():
-            noise = torch.randn(context.num_rows, self._latent_dim, device=self._device)
+            noise = torch.randn(
+                context.num_rows,
+                self._latent_dim,
+                device=self._device,
+                generator=sample_generator,
+            )
             synthetic_data = generator(noise).cpu().numpy()
 
         # Reverse preproc: decode categorical features and extract numerical features
