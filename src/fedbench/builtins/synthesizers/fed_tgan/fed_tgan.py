@@ -309,6 +309,8 @@ class _FedTGANArtifacts:
 
 
 class FedTGAN(Synthesizer):
+    SUPPORTS_COORDINATORS = {"fed_tgan"}
+
     def __init__(
         self,
         batch_size: int = 500,
@@ -349,10 +351,6 @@ class FedTGAN(Synthesizer):
     @property
     def arrays_target(self) -> ArraysTarget:
         return ArraysTarget.TORCH
-
-    @property
-    def supports_coordinators(self) -> set[str]:
-        return {"fed_tgan"}
 
     def global_init(
         self, dataset: DataFrame, context: GlobalInitContext

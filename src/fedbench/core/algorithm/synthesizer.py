@@ -23,8 +23,15 @@ class GlobalInitArtifacts:
 class Synthesizer(Component):
     """The framework view of the model to train and sample from."""
 
+    SUPPORTS_COORDINATORS: set[str]
+
     def __init_subclass__(cls, **kwargs: Any) -> None:
         super().__init_subclass__(**kwargs)
+        if not hasattr(cls, "SUPPORTS_COORDINATORS"):
+            raise TypeError(
+                f"{cls.__name__} must define the class attribute "
+                f"SUPPORTS_COORDINATORS: set[str]"
+            )
         if "sample" not in cls.__dict__:
             return
         original = cls.__dict__["sample"]
@@ -68,11 +75,6 @@ class Synthesizer(Component):
     @property
     @abstractmethod
     def arrays_target(self) -> ArraysTarget:
-        pass
-
-    @property
-    @abstractmethod
-    def supports_coordinators(self) -> set[str]:
         pass
 
     @abstractmethod

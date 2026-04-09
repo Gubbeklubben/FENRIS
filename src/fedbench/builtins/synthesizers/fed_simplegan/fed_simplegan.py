@@ -91,6 +91,8 @@ class _FedSimpleGANArtifacts:
 
 
 class FedSimpleGAN(Synthesizer):
+    SUPPORTS_COORDINATORS = {"fedavg"}
+
     def __init__(
         self,
         batch_size: int = 32,
@@ -129,10 +131,6 @@ class FedSimpleGAN(Synthesizer):
     @property
     def arrays_target(self) -> ArraysTarget:
         return ArraysTarget.TORCH
-
-    @property
-    def supports_coordinators(self) -> set[str]:
-        return {"fedavg"}
 
     def global_init(
         self, dataset: DataFrame, context: GlobalInitContext

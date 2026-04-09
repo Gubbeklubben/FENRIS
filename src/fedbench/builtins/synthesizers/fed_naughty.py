@@ -151,6 +151,8 @@ def _decode_schema_columns(artifacts: Payload | None) -> list[str] | None:
 class FedNaughty(Synthesizer):
     """CLI-configurable naughty synthesizer for framework testing."""
 
+    SUPPORTS_COORDINATORS = {"fedavg"}
+
     def __init__(
         self,
         scenario: str = "nan_columns",
@@ -174,10 +176,6 @@ class FedNaughty(Synthesizer):
     @property
     def arrays_target(self) -> ArraysTarget:
         return ArraysTarget.TORCH
-
-    @property
-    def supports_coordinators(self) -> set[str]:
-        return {"fedavg"}
 
     def global_init(
         self,

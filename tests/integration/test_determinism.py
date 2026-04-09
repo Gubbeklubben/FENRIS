@@ -29,14 +29,13 @@ def _synthesizer_names() -> list[str]:
 def _coordinator_for(synthesizer_name: str) -> str:
     """Return the first registered coordinator compatible with the synthesizer."""
     factory = Group.SYNTHESIZERS.get_registry().load(synthesizer_name)
-    instance = factory()
     coord_registry = Group.COORDINATORS.get_registry()
-    for coord_name in sorted(instance.supports_coordinators):
+    for coord_name in sorted(factory.SUPPORTS_COORDINATORS):
         if coord_name in coord_registry:
             return coord_name
     raise ValueError(
         f"No registered coordinator found for synthesizer {synthesizer_name!r}. "
-        f"Supported: {instance.supports_coordinators}"
+        f"Supported: {factory.SUPPORTS_COORDINATORS}"
     )
 
 
