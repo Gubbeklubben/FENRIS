@@ -153,9 +153,9 @@ class FedNaughty(Synthesizer):
 
     def __init__(
         self,
-        scenario: str = "crash",
-        point: str = "synth_train",
-        exception: str = "Exception",
+        scenario: str = "nan_columns",
+        point: str = "synth_sample",
+        exception: str = "",
     ) -> None:
         self._config = _NaughtyConfig(
             scenario=scenario,
