@@ -22,6 +22,9 @@ def new(
     _check_can_use_root_dir(_root_dir)
     _generate_toml(_root_dir, project_name=name)
 
+    project_dir = _root_dir.joinpath("src").joinpath(name)
+    project_dir.mkdir(parents=True, exist_ok=False)
+
 
 def _check_can_use_root_dir(root_dir: Path) -> None:
     if not root_dir.exists():
