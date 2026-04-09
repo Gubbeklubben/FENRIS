@@ -19,6 +19,7 @@ import pandas as pd
 from sklearn.linear_model import LogisticRegression
 
 from fedbench.builtins.evaluators._helpers import fit_tabular_model
+from fedbench.core.data import TableSchema
 from fedbench.core.eval import Category, Evaluator, LocalEvalContext
 from fedbench.core.eval.evalcontext import GlobalEvalContext
 from fedbench.core.eval.evaluator import (
@@ -188,6 +189,7 @@ class FairnessEvaluator(Evaluator):
         syn_df: pd.DataFrame,
         target_column: str,
         sensitive_column: str,
+        schema: TableSchema,
         seed: int,
         min_group_size: int = MIN_GROUP_SIZE,
     ) -> dict[str, _PerGroupConfusion]:
@@ -240,7 +242,7 @@ class FairnessEvaluator(Evaluator):
 
         model = LogisticRegression(max_iter=1000, solver="lbfgs", random_state=seed)
         try:
-            pipe = fit_tabular_model(x_syn, pd.Series(y_syn_enc), model)
+            pipe = fit_tabular_model(x_syn, pd.Series(y_syn_enc), model, schema)
         except ValueError as e:
             log_debug(
                 "Fairness",
@@ -270,6 +272,7 @@ class FairnessEvaluator(Evaluator):
                 syn_df=ctx.synthetic_df,
                 target_column=ctx.target_column,
                 sensitive_column=sensitive_column,
+                schema=ctx.schema,
                 seed=ctx.seed,
             )
 
@@ -302,6 +305,7 @@ class FairnessEvaluator(Evaluator):
                 syn_df=ctx.synthetic_df,
                 target_column=ctx.target_column,
                 sensitive_column=sensitive_column,
+                schema=ctx.schema,
                 seed=ctx.seed,
                 min_group_size=self.MIN_GROUP_SIZE,
             )

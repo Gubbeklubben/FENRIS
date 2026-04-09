@@ -17,11 +17,15 @@ from sklearn.impute import SimpleImputer
 from sklearn.pipeline import Pipeline
 from sklearn.preprocessing import OneHotEncoder, StandardScaler
 
+from fedbench.core.data import TableSchema
 
-def make_tabular_preprocessor(df: pd.DataFrame) -> ColumnTransformer:
+
+def make_tabular_preprocessor(
+    df: pd.DataFrame, schema: TableSchema
+) -> ColumnTransformer:
     """Returns a ColumnTransformer for numeric + categorical preprocessing."""
-    num_cols = df.select_dtypes(include="number").columns.tolist()
-    cat_cols = [c for c in df.columns if c not in num_cols]
+    num_cols = schema.numeric_columns(df)
+    cat_cols = schema.nominal_columns(df)
 
     preprocessor = ColumnTransformer(
         transformers=[(
@@ -49,8 +53,10 @@ def make_tabular_preprocessor(df: pd.DataFrame) -> ColumnTransformer:
     return preprocessor
 
 
-def fit_tabular_model(x: pd.DataFrame, y: pd.Series, model: BaseEstimator) -> Pipeline:
-    preprocessor = make_tabular_preprocessor(x)
+def fit_tabular_model(
+    x: pd.DataFrame, y: pd.Series, model: BaseEstimator, schema: TableSchema
+) -> Pipeline:
+    preprocessor = make_tabular_preprocessor(x, schema)
     pipe = Pipeline([("pre", preprocessor), ("model", model)])
     pipe.fit(x, y)
     return pipe

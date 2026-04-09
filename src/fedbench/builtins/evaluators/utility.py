@@ -78,7 +78,7 @@ class TSTREvaluator(Evaluator):
                 solver="lbfgs",
                 random_state=seed,
             )
-            pipe = fit_tabular_model(x_syn, y_syn, model)
+            pipe = fit_tabular_model(x_syn, y_syn, model, schema)
 
             if schema.kind_of(y_col) == "binary":
                 y_proba = pipe.predict_proba(x_test)[:, 1]
@@ -89,7 +89,7 @@ class TSTREvaluator(Evaluator):
 
         else:
             model = Ridge(random_state=seed)
-            pipe = fit_tabular_model(x_syn, y_syn, model)
+            pipe = fit_tabular_model(x_syn, y_syn, model, schema)
             y_pred = pipe.predict(x_test)
             metrics["tstr_rmse"] = np.sqrt(mean_squared_error(y_test, y_pred))
 
