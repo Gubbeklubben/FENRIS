@@ -8,6 +8,7 @@ import pandas as pd
 
 from fedbench.config import SeedConfig
 from fedbench.config.config import Config, DataConfig
+from fedbench.core.data import TableSchema
 from fedbench.runtime.pipeline import write_artifacts
 
 
@@ -15,7 +16,11 @@ def _make_config(tmp_path: Path) -> Config:
     return Config(
         synthesizer="fed_hello",
         coordinator="MISSING",
-        data=DataConfig(dataset="dummy.csv", partitioner="iid-partitioner"),
+        data=DataConfig(
+            dataset="dummy.csv",
+            schema="dummy.schema.json",
+            partitioner="iid-partitioner",
+        ),
         outputdir=str(tmp_path),
         seed=SeedConfig.from_master(42),
         num_rounds=3,
@@ -35,6 +40,7 @@ def _make_ctx(
         aggregated_metrics=aggregated_metrics or {},
         centralized_metrics=centralized_metrics or {},
         synthetic_df=pd.DataFrame({"a": [1, 2], "b": [3, 4]}),
+        dataset=SimpleNamespace(schema=TableSchema()),
     )
 
 

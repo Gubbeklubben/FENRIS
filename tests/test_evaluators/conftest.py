@@ -22,11 +22,12 @@ import math
 import numpy as np
 import pandas as pd
 
+import fedbench.core.data.schemas
 from fedbench.builtins.evaluators.fidelity import (
     DistributionSimilarityMetricsEvaluator,
     MomentReductionMetricsEvaluator,
 )
-from fedbench.core.data.schemas import ColumnSchema, TableSchema, infer_schema
+from fedbench.core.data.schemas import ColumnSchema, TableSchema, _infer_schema
 from fedbench.core.eval.evalcontext import (
     CentralizedEvalContext,
     GlobalEvalContext,
@@ -77,7 +78,7 @@ def make_ctx(
     ``holdout_df``).
     """
     if schema is None:
-        schema = infer_schema(train_df)
+        schema = _infer_schema(train_df)
     return GlobalEvalContext(
         schema=schema,
         holdout_df=train_df,
@@ -100,7 +101,7 @@ def make_local_ctx(
 ) -> LocalEvalContext:
     """Build a LocalEvalContext representing a single federated client."""
     if schema is None:
-        schema = infer_schema(train_df)
+        schema = _infer_schema(train_df)
     if test_df is None:
         test_df = train_df.copy()
     return LocalEvalContext(
@@ -133,7 +134,7 @@ def make_centralized_ctx(
     ``client_train_df`` is not provided it defaults to ``train_df``.
     """
     if schema is None:
-        schema = infer_schema(train_df)
+        schema = _infer_schema(train_df)
     if client_train_df is None:
         client_train_df = train_df
     return CentralizedEvalContext(
@@ -177,9 +178,9 @@ MIXED_DF = pd.concat([NUMERIC_DF, CATEGORICAL_DF], axis=1)
 # ---------------------------------------------------------------------------
 
 
-def make_schema(*col_defs: tuple[str, str]) -> TableSchema:
+def make_schema(*col_defs: tuple[str, fedbench.core.data.schemas.Kind]) -> TableSchema:
     """Shorthand: make_schema(("age", "continuous"), ("sex", "binary"))."""
-    return TableSchema(tuple(ColumnSchema(n, k) for n, k in col_defs))
+    return TableSchema(columns=tuple(ColumnSchema(n, k) for n, k in col_defs))
 
 
 # ---------------------------------------------------------------------------

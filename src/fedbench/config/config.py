@@ -12,12 +12,14 @@ type ConfigCls = type[DataConfig] | type[MetricsConfig] | type[Config]
 @dataclass(frozen=True)
 class DataConfig:
     dataset: str
+    schema: str
     partitioner: str
     partitioner_kwargs: dict[str, None | bool | str | float | int] = field(
         default_factory=dict
     )
     target_col: str | None = None
     sensitive_cols: tuple[str, ...] = field(default_factory=tuple)
+    generate_input_schema: bool = False
 
 
 @dataclass(frozen=True)

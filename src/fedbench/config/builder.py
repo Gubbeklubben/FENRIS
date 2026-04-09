@@ -37,6 +37,7 @@ def build_config(
     cfg = build_cli_dict(Config, cli_input)
 
     resolve_dataset_path(data_cfg)
+    resolve_schema_path(data_cfg)
     validate_column_names(data_cfg)
     resolve_outputdir(cfg)
     resolve_run_categories(metrics_cfg)
@@ -71,10 +72,32 @@ def resolve_dataset_path(data_cfg: dict[str, Any]) -> None:
     # Resolve canonical dataset path
     path = Path(data_cfg["dataset"]).expanduser().resolve()
     if path.is_dir():
-        raise IsADirectoryError(f"{path} is a directory")
+        raise IsADirectoryError(f"`{path}` is a directory")
     if not path.exists():
-        raise FileNotFoundError(f"Dataset {path} does not exist")
+        raise FileNotFoundError(f"Dataset file `{path}` does not exist")
     data_cfg["dataset"] = str(path)
+
+
+def resolve_schema_path(data_cfg: dict[str, Any]) -> None:
+    if data_cfg.get("schema"):
+        path = Path(data_cfg["schema"]).expanduser().resolve()
+        if not path.exists():
+            raise FileNotFoundError(f"Schema file `{path}` does not exist")
+    else:
+        path = Path(data_cfg["dataset"]).with_suffix(".schema.json")
+        if data_cfg.get("generate_input_schema") and path.exists():
+            raise FileExistsError(
+                f"Cannot generate input schema file. "
+                f"`{path}` already exists and would be overwritten."
+            )
+        # If we're not outputting an input schema file, we don't need to check whether
+        # file exists. Schema will then be auto-inferred during loading (and possibly
+        # written back as an input schema later) if the default file is not found.
+
+    if path.is_dir():
+        raise IsADirectoryError(f"`{path}` is a directory")
+
+    data_cfg["schema"] = str(path)
 
 
 def validate_column_names(data_cfg: dict[str, Any]) -> None:

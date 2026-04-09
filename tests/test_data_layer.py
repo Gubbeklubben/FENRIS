@@ -3,7 +3,7 @@ import pytest
 
 from fedbench.builtins.partitioners.flwr_delegates import FlwrDelegatePartitioner
 from fedbench.core.data import PartitionedDataset, load_csv
-from fedbench.core.data.schemas import infer_schema
+from fedbench.core.data.schemas import _infer_schema
 from tests.fake_components import FakePartitionerRegistry
 
 
@@ -42,7 +42,7 @@ def test_load_csv_and_schema(sample_df, tmp_path):
     sample_df.to_csv(csv_path, index=False)
 
     df = load_csv(csv_path)
-    schema = infer_schema(df)
+    schema = _infer_schema(df)
 
     assert df.shape == sample_df.shape
     # schema is deterministic
@@ -56,7 +56,7 @@ def test_load_csv_and_schema(sample_df, tmp_path):
 
 @pytest.fixture
 def partitioned_dataset(sample_df):
-    schema = infer_schema(sample_df)
+    schema = _infer_schema(sample_df)
     partitioner = FlwrDelegatePartitioner.with_iid_partitioner(num_partitions=2)
     return PartitionedDataset(sample_df, schema, partitioner, test_size=0.25, seed=42)
 
