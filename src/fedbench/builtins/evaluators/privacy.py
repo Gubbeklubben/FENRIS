@@ -498,7 +498,7 @@ class AIASupervisedAttackEvaluator(Evaluator):
                 solver="lbfgs",
                 random_state=seed,
             )
-            pipe = fit_tabular_model(x_syn, y_syn, model)
+            pipe = fit_tabular_model(x_syn, y_syn, model, schema)
             y_pred = pipe.predict(x_test)
             result.accuracy = accuracy_score(y_test, y_pred)
             if len(np.unique(y_syn)) == 2:
@@ -506,7 +506,7 @@ class AIASupervisedAttackEvaluator(Evaluator):
                 result.auc = roc_auc_score(y_test, y_proba)
         else:
             model = Ridge(random_state=seed)
-            pipe = fit_tabular_model(x_syn, y_syn, model)
+            pipe = fit_tabular_model(x_syn, y_syn, model, schema)
             y_pred = pipe.predict(x_test)
             result.rmse = math.sqrt(mean_squared_error(y_test, y_pred))
 
