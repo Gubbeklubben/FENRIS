@@ -138,7 +138,7 @@ class Strategy:
     ) -> None:
 
         internal_msg_type = msg_type.split(".")[-1]
-        replies: Iterable[tuple[int, Payload]] | None = None
+        replies: list[tuple[int, Payload]] | None = None
 
         while True:
             try:
@@ -169,7 +169,10 @@ class Strategy:
                     continue
 
                 src_id = reply.metadata.src_node_id
-                replies.append((src_id, self._serde.from_flwr(reply.content)))
+                payload = self._serde.from_flwr(reply.content)
+                # noinspection PyUnnecessaryCast
+                partition_id = cast(int, payload.metrics["metrics"]["partition_id"])
+                replies.append((partition_id, payload))
 
                 self._eventbus.emit(
                     ClientReply(
@@ -178,6 +181,11 @@ class Strategy:
                         byte_count=count_rdict_bytes(reply.content),
                     )
                 )
+
+            # Sort payloads by partition ID to ensure deterministic aggregation order
+            # between runs. This matters because floating point additions and
+            # multiplications are not guaranteed to be associative.
+            replies.sort(key=lambda r: r[0])
 
     def _get_and_check_train_artifacts(self) -> Payload:
         artifacts = self._coordinator.publish_train_artifacts()

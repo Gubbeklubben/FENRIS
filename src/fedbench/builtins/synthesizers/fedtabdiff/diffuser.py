@@ -55,20 +55,27 @@ class Diffuser:
         alphas = 1.0 - betas
         return alphas.to(self.device), betas.to(self.device)
 
-    def sample_timesteps(self, n: int) -> Tensor:
+    def sample_timesteps(self, n: int, generator: torch.Generator) -> Tensor:
         """Sample random timesteps.
 
         Args:
             n (int): number of timesteps
+            generator (torch.Generator): local generator for reproducibility
 
         Returns:
             Tensor: Sampled timesteps
         """
-        t = torch.randint(low=1, high=self._total_steps, size=(n,), device=self.device)
+        t = torch.randint(
+            low=1,
+            high=self._total_steps,
+            size=(n,),
+            device=self.device,
+            generator=generator,
+        )
         return t
 
     def add_gauss_noise(
-        self, x_num: Tensor, timesteps: Tensor
+        self, x_num: Tensor, timesteps: Tensor, generator: torch.Generator
     ) -> tuple[Tensor, Tensor]:
         """Add gaussian noise to the input data given a specific timestep
         value.
@@ -76,6 +83,7 @@ class Diffuser:
         Args:
             x_num (Tensor): input data tensor
             timesteps (Tensor): list of timesteps
+            generator (torch.Generator): local generator for reproducibility
 
         Returns:
             tuple[Tensor, Tensor]
@@ -83,12 +91,18 @@ class Diffuser:
         # numeric attributes
         sqrt_alpha_hat = torch.sqrt(self.alphas_hat[timesteps])[:, None]
         sqrt_one_minus_alpha_hat = torch.sqrt(1 - self.alphas_hat[timesteps])[:, None]
-        noise_num = torch.randn_like(x_num)
+        noise_num = torch.randn(
+            x_num.shape, dtype=x_num.dtype, device=x_num.device, generator=generator
+        )
         x_noise_num = sqrt_alpha_hat * x_num + sqrt_one_minus_alpha_hat * noise_num
         return x_noise_num, noise_num
 
     def p_sample_gauss(
-        self, model_out: Any, z_norm: Tensor, timesteps: Tensor
+        self,
+        model_out: Any,
+        z_norm: Tensor,
+        timesteps: Tensor,
+        generator: torch.Generator,
     ) -> Tensor:
         """
         Sampling or denoising step.
@@ -97,6 +111,7 @@ class Diffuser:
             model_out: trained model used for noise removal
             z_norm (Tensor): initial data tensor
             timesteps (Tensor): timesteps
+            generator (torch.Generator): local generator for reproducibility
 
         Returns:
             Tensor: denoised tensor
@@ -106,7 +121,9 @@ class Diffuser:
         sqrt_one_minus_alpha_hat_t = torch.sqrt(1 - self.alphas_hat[timesteps])[:, None]
         epsilon_t = torch.sqrt(self.betas[timesteps][:, None])
 
-        random_noise = torch.randn_like(z_norm)
+        random_noise = torch.randn(
+            z_norm.shape, dtype=z_norm.dtype, device=z_norm.device, generator=generator
+        )
         random_noise[timesteps == 0] = 0.0
 
         model_mean = (1 / sqrt_alpha_t) * (

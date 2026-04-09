@@ -20,6 +20,7 @@ from fedbench.core.algorithm import (
     TrainContext,
 )
 from fedbench.core.data import TableSchema
+from fedbench.core.logger import log_info
 from fedbench.core.payload import ArraysTarget, Payload
 
 
@@ -85,6 +86,18 @@ class _FedTabDiffArtifacts:
         )
 
 
+def _make_torch_generator(seed: int, device: torch.device) -> torch.Generator:
+    """Create a local, seeded torch.Generator pinned to the given device.
+
+    Using a local generator instead of torch.manual_seed() avoids mutating
+    the global RNG state, which would make metric values depend on module
+    import order rather than solely on the master seed.
+    """
+    generator = torch.Generator(device=device)
+    generator.manual_seed(seed)
+    return generator
+
+
 class FedTabDiff(Synthesizer):
     def __init__(
         self,
@@ -142,6 +155,10 @@ class FedTabDiff(Synthesizer):
         self._diffusion_beta_end = diffusion_beta_end
         self._scheduler = scheduler
         self._device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+        log_info(
+            str(self),
+            f"Initialized synthesizer with torch device {self._device.type.upper()}",
+        )
 
     @property
     def name(self) -> str:
@@ -159,11 +176,7 @@ class FedTabDiff(Synthesizer):
         self, dataset: DataFrame, context: GlobalInitContext
     ) -> GlobalInitArtifacts:
 
-        np.random.seed(context.seed)
-        torch.manual_seed(context.seed)
-
-        if torch.cuda.is_available():
-            torch.cuda.manual_seed(context.seed)
+        rng = np.random.default_rng(context.seed)
 
         cat_attrs, num_attrs = split_cat_num(context.schema)
         prefix_columns(dataset, cat_attrs)
@@ -171,7 +184,7 @@ class FedTabDiff(Synthesizer):
         num_scaler = QuantileTransformer(
             n_quantiles=len(dataset),
             output_distribution="normal",
-            random_state=context.seed,
+            random_state=int(rng.integers(2**31)),
         )
         num_scaler.fit(dataset[num_attrs].values)
 
@@ -194,6 +207,10 @@ class FedTabDiff(Synthesizer):
             num_scaler=num_scaler,
             label_encoder=label_encoder,
         )
+        # Seed the global torch RNG before model initialization so that
+        # Xavier and Embedding weight init (which don't accept a generator
+        # argument) are reproducible.
+        torch.manual_seed(int(rng.integers(2**31)))
         mlp_synth = self._create_mlp_synth(encoded_dim, n_cat_tokens)
 
         return GlobalInitArtifacts(
@@ -219,8 +236,16 @@ class FedTabDiff(Synthesizer):
             torch.tensor(cat_scaled.values, dtype=torch.long),
             torch.tensor(num_scaled, dtype=torch.float),
         )
+
+        rng = np.random.default_rng(context.seed)
+        loader_generator = _make_torch_generator(
+            int(rng.integers(2**31)), torch.device("cpu")
+        )
         torch_loader = DataLoader(
-            tensor_dataset, batch_size=self._batch_size, shuffle=True
+            tensor_dataset,
+            batch_size=self._batch_size,
+            shuffle=True,
+            generator=loader_generator,
         )
 
         # Adapt unsupervised fedbench training to orig alg loop
@@ -244,6 +269,8 @@ class FedTabDiff(Synthesizer):
         diffuser = self._create_diffuser()
         loss_fnc = nn.MSELoss()
 
+        train_generator = _make_torch_generator(int(rng.integers(2**31)), self._device)
+
         num_samples = 0
         for idx, (batch_cat, batch_num, batch_y) in enumerate(loader()):
             num_samples += len(batch_cat)  # len operates on 1st tensor dim
@@ -254,7 +281,9 @@ class FedTabDiff(Synthesizer):
                 batch_y = batch_y.to(self._device)
 
             # sample timestamps t
-            timesteps = diffuser.sample_timesteps(n=batch_cat.shape[0])
+            timesteps = diffuser.sample_timesteps(
+                n=batch_cat.shape[0], generator=train_generator
+            )
             # get cat embeddings
             batch_cat_emb = mlp_synth.embed_categorical(x_cat=batch_cat)
             # concat cat & num
@@ -263,6 +292,7 @@ class FedTabDiff(Synthesizer):
             batch_noise_t, noise_t = diffuser.add_gauss_noise(
                 x_num=batch_cat_num,
                 timesteps=timesteps,
+                generator=train_generator,
             )
             # conduct forward encoder/decoder pass
             predicted_noise = mlp_synth(
@@ -292,14 +322,10 @@ class FedTabDiff(Synthesizer):
         return reply.encode()
 
     def sample(self, request: Payload, context: SampleContext) -> DataFrame:
-        torch.manual_seed(context.seed)
-        if torch.cuda.is_available():
-            torch.cuda.manual_seed(context.seed)
-
-        state = GlobalState.decode(request).state
         if context.global_init_artifacts is None:
             raise RuntimeError("Missing preprocessing artifacts.")
 
+        state = GlobalState.decode(request).state
         artifacts = _FedTabDiffArtifacts.decode(context.global_init_artifacts)
 
         mlp_synth = self._create_mlp_synth(
@@ -310,12 +336,16 @@ class FedTabDiff(Synthesizer):
 
         diffuser = self._create_diffuser()
 
+        rng = np.random.default_rng(context.seed)
+        sample_generator = _make_torch_generator(int(rng.integers(2**31)), self._device)
+
         tensor = self._generate_samples(
             mlp_synth=mlp_synth,
             diffuser=diffuser,
             artifacts=artifacts,
             n_samples=context.num_rows,
             label=None,
+            generator=sample_generator,
         )
         return self._decode_samples(
             samples=tensor, embeddings=mlp_synth.get_embeddings(), artifacts=artifacts
@@ -348,6 +378,7 @@ class FedTabDiff(Synthesizer):
         mlp_synth: MLPSynthesizer,
         diffuser: Diffuser,
         artifacts: _FedTabDiffArtifacts,
+        generator: torch.Generator,
         n_samples: int | None = None,
         label: Tensor | None = None,
     ) -> Tensor:
@@ -360,8 +391,12 @@ class FedTabDiff(Synthesizer):
             label = label.to(self._device)
 
         # initialize noise
-        z_norm = torch.randn((n_samples, artifacts.encoded_dim)).float()
-        z_norm = z_norm.to(self._device)
+        z_norm = torch.randn(
+            (n_samples, artifacts.encoded_dim),
+            dtype=torch.float,
+            device=self._device,
+            generator=generator,
+        )
 
         # iterate over diffusion steps
         for i in reversed(range(0, self._diffusion_steps)):
@@ -370,7 +405,7 @@ class FedTabDiff(Synthesizer):
             # conduct forward encoder/decoder pass
             model_out = mlp_synth(z_norm, t, label)
             # reverse diffusion step, i.e. noise removal
-            z_norm = diffuser.p_sample_gauss(model_out, z_norm, t)
+            z_norm = diffuser.p_sample_gauss(model_out, z_norm, t, generator=generator)
 
         return z_norm
 

@@ -223,8 +223,9 @@ def test_static_defaults(tmp_path, synthesizers, coordinators, partitioners):
     assert config.test_size == 0.2
     assert config.seed.partitioning == 43
     assert config.seed.init == 44
-    assert config.seed.sampling == 45
-    assert config.seed.evaluation == 46
+    assert config.seed.training == 45
+    assert config.seed.sampling == 46
+    assert config.seed.evaluation == 47
     assert config.num_synthetic_rows is None
     assert config.disable_pickle is False
 

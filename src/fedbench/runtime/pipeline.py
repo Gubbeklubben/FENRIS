@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 import math
+import os
 import shutil
 from collections.abc import Iterable
 from dataclasses import asdict
@@ -17,6 +18,7 @@ from fedbench.core.data import PartitionedDataset
 from fedbench.core.data.schemas import load_or_infer_schema
 from fedbench.core.eval import CentralizedEvalContext, Evaluator
 from fedbench.core.logger import log_info, log_warning
+from fedbench.core.payload import ArraysTarget
 from fedbench.runtime.command import Command
 from fedbench.runtime.platform_info import collect_platform_info
 from fedbench.runtime.runcontext import RunContext
@@ -92,10 +94,27 @@ def federated_train_eval_loop(ctx: RunContext) -> None:
 
     from fedbench.flwr import client_app, make_server_app
 
+    num_cpus = ctx.config.client_cpus
+    num_gpus = 0.0
+
+    if (
+        ctx.synthesizer.arrays_target == ArraysTarget.TORCH
+        and os.environ.get("CUDA_VISIBLE_DEVICES", None) != ""
+    ):
+        from torch import cuda
+
+        if cuda.is_available():
+            num_gpus = ctx.config.client_gpus
+
+    os.environ["RAY_ACCEL_ENV_VAR_OVERRIDE_ON_ZERO"] = "0"
+
     run_simulation(
         client_app=client_app,
         server_app=make_server_app(ctx),
         num_supernodes=ctx.config.num_clients,
+        backend_config={
+            "client_resources": {"num_cpus": num_cpus, "num_gpus": num_gpus}
+        },
     )
 
 

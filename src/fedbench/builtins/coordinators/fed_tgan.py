@@ -287,6 +287,7 @@ class FedTGAN(SingleStepCoordinator):
         result: np.ndarray = np.sum(similarity_matrix, axis=1)
         return result
 
+    # noinspection PyMethodMayBeStatic
     def _compute_continuous_similarity(
         self,
         num_distributions: list[dict[str, np.ndarray]],
