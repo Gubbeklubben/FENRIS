@@ -81,6 +81,9 @@ class Strategy:
             )
 
         for reply in grid.send_and_receive(requests):
+            if not reply.has_content():
+                continue
+
             src_id = reply.metadata.src_node_id
             self._eventbus.emit(
                 ClientReply(
@@ -162,6 +165,9 @@ class Strategy:
 
             replies = []
             for reply in grid.send_and_receive(requests):
+                if not reply.has_content():
+                    continue
+
                 src_id = reply.metadata.src_node_id
                 replies.append((src_id, self._serde.from_flwr(reply.content)))
 

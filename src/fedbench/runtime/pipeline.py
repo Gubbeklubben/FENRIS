@@ -74,6 +74,13 @@ def global_init(ctx: RunContext) -> None:
     artifacts: GlobalInitArtifacts = ctx.synthesizer.global_init(df, init_ctx)
     ctx.global_init_artifacts = artifacts
 
+    if not isinstance(artifacts, GlobalInitArtifacts):
+        raise TypeError(
+            f"Invalid value type returned from {ctx.synthesizer}.global_init(). "
+            f"Expected: {GlobalInitArtifacts}. "
+            f"Actual: {type(artifacts)}."
+        )
+
     if artifacts.coordinator is not None:
         ctx.coordinator.attach_global_init_artifacts(artifacts.coordinator)
 
@@ -105,6 +112,7 @@ def global_sample(ctx: RunContext) -> None:
     sample_ctx = SampleContext(
         global_init_artifacts=ctx.global_init_artifacts.synthesizer,
         client_cache=None,
+        schema=ctx.dataset.schema,
         seed=ctx.config.seed.sampling,
         num_rows=ctx.config.num_synthetic_rows or ctx.dataset.global_holdout_size,
     )

@@ -3,13 +3,12 @@ import math
 import time
 from typing import cast
 
-from flwr.app import Context, Message, MetricRecord, RecordDict
+from flwr.app import Context, Message, RecordDict
 from flwr.clientapp import ClientApp
 
 from fedbench.core.algorithm import SampleContext, TrainContext
 from fedbench.core.encoder import FedbenchEncoder
 from fedbench.core.eval import LocalEvalContext
-from fedbench.core.logger import log_warning
 from fedbench.core.payload import Extras, Payload
 from fedbench.flwr.client.context import build_client_context
 from fedbench.flwr.namespace import Namespace
@@ -51,6 +50,13 @@ def train(message: Message, flwr_context: Context) -> Message:
         reply = ctx.synthesizer.train(request, train_df, train_ctx)
         train_seconds = (time.perf_counter_ns() - start_time) / 1e9
 
+        if not isinstance(reply, Payload):
+            raise TypeError(
+                f"Invalid value type returned from {ctx.synthesizer}.train(). "
+                f"Expected: {Payload}. "
+                f"Actual: {type(reply)}."
+            )
+
     with ctx.serde.use_deserialized(ctx.framework_cache) as cache:
         metrics = cast(
             dict[str, float],
@@ -79,17 +85,11 @@ def evaluate(message: Message, flwr_context: Context) -> Message:
         sample_ctx = SampleContext(
             global_init_artifacts=artifacts,
             client_cache=cache,
+            schema=ctx.dataset.schema,
             seed=ctx.config.seed.sampling,
             num_rows=ctx.config.num_synthetic_rows or ctx.dataset.global_holdout_size,
         )
         synthetic_df = ctx.synthesizer.sample(request, sample_ctx)
-
-    if synthetic_df.empty:
-        log_warning(__name__, f"Recv empty sample from {ctx.synthesizer}.")
-        return Message(
-            content=RecordDict({"metrics": MetricRecord()}),
-            reply_to=message,
-        )
 
     # noinspection PyUnnecessaryCast
     cached_metrics = cast(

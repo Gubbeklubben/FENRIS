@@ -148,6 +148,7 @@ class DirectOverlapDiagnosticEvaluator(Evaluator):
         return df.apply(hash_row, axis=1)
 
     def _count_matches(self, ctx: LocalEvalContext, cols: Iterable[str]) -> int:
+        cols = list(cols)
         h_train = set(self._canonical_row_hash(ctx.train_df[cols]))
         h_syn = self._canonical_row_hash(ctx.synthetic_df[cols])
         return int(sum(h in h_train for h in h_syn))
@@ -169,26 +170,31 @@ class DirectOverlapDiagnosticEvaluator(Evaluator):
 
     def local_evaluate(self, ctx: LocalEvalContext) -> _DirectOverlapResult | None:
         """Compute exact and partial match counts between train_df and syn_df."""
-        common = sorted(set(ctx.train_df.columns) & set(ctx.synthetic_df.columns))
-        if not common:
+        candidates = set(ctx.train_df.columns)
+        if not candidates:
             return None
 
-        excluded = set(ctx.sensitive_columns or [])
+        # Check exact matches against the complete set of columns
+        exact_matches = self._count_matches(ctx, candidates)
+
+        # Remove sensitive/target columns before checking partial matches
+        if ctx.sensitive_columns:
+            candidates -= set(ctx.sensitive_columns)
         if ctx.target_column:
-            excluded.add(ctx.target_column)
+            candidates -= {ctx.target_column}
 
-        candidates = [c for c in common if c not in excluded] or common
-        ranked = sorted(
-            candidates,
-            key=lambda c: ctx.train_df[c].nunique() / max(len(ctx.train_df), 1),
-            reverse=True,
-        )
-
-        exact_matches = self._count_matches(ctx, common)
-        partial_matches = {
-            str(k): self._count_matches(ctx, ranked[:k])  # nofmt
-            for k in (1, 2, 3)
-        }
+        # Only calculate partial matches if any columns remain
+        if candidates:
+            ranked = sorted(
+                candidates,
+                key=lambda c: ctx.train_df[c].nunique() / max(len(ctx.train_df), 1),
+                reverse=True,
+            )
+            partial_matches = {
+                str(k): self._count_matches(ctx, ranked[:k]) for k in (1, 2, 3)
+            }
+        else:
+            partial_matches = {str(k): 0 for k in (1, 2, 3)}
 
         return _DirectOverlapResult(
             exact_matches=exact_matches,
@@ -472,11 +478,7 @@ class AIASupervisedAttackEvaluator(Evaluator):
             qi -= {target_column}
         quasi_ids = sorted(qi)
 
-        if (
-            not quasi_ids
-            or sensitive_column not in test_df.columns
-            or sensitive_column not in syn_df.columns
-        ):
+        if not quasi_ids or sensitive_column not in test_df.columns:
             return result
 
         x_test = test_df[quasi_ids]

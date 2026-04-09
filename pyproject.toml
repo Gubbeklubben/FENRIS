@@ -41,10 +41,11 @@ builtins = [
 fedbench = "fedbench.__main__:app"
 
 [project.entry-points."fedbench.synthesizers"]
-fed_hello       = "fedbench.builtins.synthesizers.fed_hello:FedHello"
-fedtabdiff      = "fedbench.builtins.synthesizers.fedtabdiff:FedTabDiff"
-fed_tgan        = "fedbench.builtins.synthesizers.fed_tgan:FedTGAN"
-fed_simplegan   = "fedbench.builtins.synthesizers.fed_simplegan:FedSimpleGAN"
+fed_hello     = "fedbench.builtins.synthesizers.fed_hello:FedHello"
+fed_naughty   = "fedbench.builtins.synthesizers.fed_naughty:FedNaughty"
+fedtabdiff    = "fedbench.builtins.synthesizers.fedtabdiff:FedTabDiff"
+fed_tgan      = "fedbench.builtins.synthesizers.fed_tgan:FedTGAN"
+fed_simplegan = "fedbench.builtins.synthesizers.fed_simplegan:FedSimpleGAN"
 
 [project.entry-points."fedbench.coordinators"]
 fedavg = "fedbench.builtins.coordinators.fedavg:FedAvg"
@@ -82,6 +83,14 @@ build-backend = "poetry.core.masonry.api"
 
 [tool.poetry]
 packages = [{include = "fedbench", from = "src"}]
+
+# --- PYTEST CONFIG ---
+
+[tool.pytest.ini_options]
+addopts = "-m 'not integration'"
+markers = [
+    "integration: full end-to-end pipeline tests (slow; run with -m integration)",
+]
 
 # --- MYPY CONFIG ---
 

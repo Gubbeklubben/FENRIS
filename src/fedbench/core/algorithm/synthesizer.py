@@ -1,5 +1,7 @@
+import functools
 from abc import abstractmethod
 from dataclasses import dataclass
+from typing import Any
 
 from pandas import DataFrame
 
@@ -20,6 +22,45 @@ class GlobalInitArtifacts:
 
 class Synthesizer(Component):
     """The framework view of the model to train and sample from."""
+
+    def __init_subclass__(cls, **kwargs: Any) -> None:
+        super().__init_subclass__(**kwargs)
+        if "sample" not in cls.__dict__:
+            return
+        original = cls.__dict__["sample"]
+
+        @functools.wraps(original)
+        def wrapper(
+            self: Synthesizer, request: Payload, context: SampleContext
+        ) -> DataFrame:
+            synthetic_df = original(self, request, context)
+            if not isinstance(synthetic_df, DataFrame):
+                raise TypeError(
+                    f"{str(self)}.sample() must return a DataFrame "
+                    f"(got {type(synthetic_df)})."
+                )
+            if synthetic_df.empty:
+                raise ValueError(
+                    f"DataFrame returned from {str(self)}.sample() is empty. "
+                    f"Expected {context.num_rows} synthetic rows."
+                )
+            if len(synthetic_df) != context.num_rows:
+                raise ValueError(
+                    f"DataFrame returned from {str(self)}.sample() has "
+                    f"an incorrect number of synthetic rows. "
+                    f"Expected: {context.num_rows}. Actual: {len(synthetic_df)}."
+                )
+            schema_columns = {col.name for col in context.schema.columns}
+            if schema_columns != set(synthetic_df.columns):
+                raise ValueError(
+                    f"DataFrame returned from {str(self)}.sample() "
+                    f"does not match schema."
+                    f"\nSchema columns: {sorted(schema_columns)}"
+                    f"\nDataFrame columns: {sorted(synthetic_df.columns)}"
+                )
+            return synthetic_df
+
+        setattr(cls, "sample", wrapper)
 
     def __repr__(self) -> str:
         return f"<{self.__class__.__name__}>"

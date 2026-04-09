@@ -14,6 +14,10 @@ class GlobalState:
 
     @classmethod
     def decode(cls, payload: Payload) -> Self:
+        if "state" not in payload.arrays:
+            raise ValueError(
+                "Cannot decode to fedavg.GlobalState. Payload is missing state."
+            )
         return cls(payload.arrays["state"])
 
     def encode(self) -> Payload:
@@ -27,6 +31,19 @@ class ClientUpdate:
 
     @classmethod
     def decode(cls, payload: Payload) -> Self:
+        if "state" not in payload.arrays:
+            raise ValueError(
+                "Cannot decode to fedavg.ClientUpdate. Payload is missing state."
+            )
+        if "metrics" not in payload.metrics:
+            raise ValueError(
+                "Cannot decode to fedavg.ClientUpdate. Payload is missing metrics."
+            )
+        if "count" not in payload.metrics["metrics"]:
+            raise ValueError(
+                "Cannot decode to fedavg.ClientUpdate. "
+                "Payload is missing metrics count."
+            )
         # noinspection PyUnnecessaryCast
         return cls(
             state=payload.arrays["state"],
@@ -82,7 +99,7 @@ class FedAvg(SingleStepCoordinator):
 
         total = sum(count)
         if total <= 0:
-            raise ValueError(f"Total count: {count}, can not aggregate.")
+            raise ValueError(f"Total count: {total}, can not aggregate.")
 
         weights = tuple(float(n) / total for n in count)
         keys = tuple(state_dicts[0].keys())

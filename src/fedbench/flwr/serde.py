@@ -116,7 +116,9 @@ class FlwrSerde:
         payload = Payload()
 
         for key, arrays in rdict.array_records.items():
-            if list(arrays.values())[0].stype == self._object_serde.stype:
+            if not arrays:
+                payload.arrays[key] = {}
+            elif list(arrays.values())[0].stype == self._object_serde.stype:
                 payload.objects[key] = self._deserialize_objects(arrays)
             else:
                 if arrays_target == ArraysTarget.TORCH:
