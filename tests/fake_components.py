@@ -1,8 +1,9 @@
-from typing import Literal
+from typing import Generator, Iterable, Literal
 
 from pandas import DataFrame
 
 from fedbench.core.algorithm import (
+    Coordinator,
     GlobalInitArtifacts,
     GlobalInitContext,
     SampleContext,
@@ -38,6 +39,28 @@ class FakeSynthesizer(Synthesizer):
         pass
 
     def sample(self, request: Payload, context: SampleContext) -> DataFrame:
+        pass
+
+
+class FakeCoordinator(Coordinator):
+    @property
+    def name(self) -> str:
+        return "fake_coordinator"
+
+    @property
+    def arrays_target(self) -> ArraysTarget:
+        return ArraysTarget.NUMPY
+
+    def train(
+        self, client_ids: Iterable[int]
+    ) -> Generator[
+        Iterable[tuple[int, Payload]],
+        Iterable[tuple[int, Payload]],
+        None,
+    ]:
+        pass
+
+    def publish_train_artifacts(self) -> Payload:
         pass
 
 
@@ -86,6 +109,18 @@ class FakeSynthRegistry(Registry):
         self._entry_points = {
             self.KEY: FakeEntryPoint(
                 self.KEY, "", f"{__package__}.fake_synthesizers", FakeSynthesizer
+            )
+        }
+
+
+class FakeCoordinatorRegistry(Registry):
+    KEY = "fake_coordinator"
+
+    def __init__(self):
+        super().__init__(f"{__package__}.fake_coordinators")
+        self._entry_points = {
+            self.KEY: FakeEntryPoint(
+                self.KEY, "", f"{__package__}.fake_coordinators", FakeCoordinator
             )
         }
 

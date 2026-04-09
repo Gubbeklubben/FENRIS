@@ -1,9 +1,8 @@
 import csv
 import inspect
-from collections.abc import Mapping
 from dataclasses import fields
 from pathlib import Path
-from typing import Any
+from typing import Any, Callable
 
 from fedbench.config.config import (
     Config,
@@ -12,7 +11,7 @@ from fedbench.config.config import (
     MetricsConfig,
     SeedConfig,
 )
-from fedbench.config.parsing import parse_for_function
+from fedbench.config.parsing import parse_kwargs_for_function
 from fedbench.core.eval import Category
 from fedbench.core.eval.evaluator import EvaluationMode
 from fedbench.runtime.factory import create_evaluation_suite
@@ -22,6 +21,7 @@ from fedbench.runtime.registry import Group, Registry
 def build_config(
     cli_input: dict[str, Any],
     synthesizer_registry: Registry | None = None,
+    coordinator_registry: Registry | None = None,
     partitioner_registry: Registry | None = None,
 ) -> Config:
 
@@ -43,9 +43,12 @@ def build_config(
     validate_stop_metrics(metrics_cfg, data_cfg)
 
     synthesizer_registry = synthesizer_registry or Group.SYNTHESIZERS.get_registry()
+    coordinator_registry = coordinator_registry or Group.COORDINATORS.get_registry()
     partitioner_registry = partitioner_registry or Group.PARTITIONERS.get_registry()
-    parse_synthesizer_kwargs(cfg, synthesizer_registry)
-    parse_partitioner_kwargs(cfg, data_cfg, seed_cfg, partitioner_registry)
+
+    validate_synthesizer(synthesizer_registry, cfg)
+    validate_coordinator(coordinator_registry, cfg)
+    validate_partitioner(partitioner_registry, cfg, data_cfg, seed_cfg)
 
     # Build complete config object
     return Config(
@@ -144,91 +147,71 @@ def validate_stop_metrics(
         metrics_cfg["stop_mode"] = metric.default_stop_mode
 
 
-def parse_synthesizer_kwargs(
-    cfg: dict[str, Any], synthesizer_registry: Registry
+def validate_synthesizer(registry: Registry, cfg: dict[str, Any]) -> None:
+    validate_component("synthesizer", registry, cfg)
+
+
+def validate_coordinator(registry: Registry, cfg: dict[str, Any]) -> None:
+    validate_component("coordinator", registry, cfg)
+
+
+def validate_partitioner(
+    registry: Registry, cfg: dict[str, Any], data_cfg: dict[str, Any], seed: SeedConfig
 ) -> None:
 
-    name = cfg["synthesizer"]
-    # Check that specified synthesizer is registered
-    if name not in synthesizer_registry:
-        raise ValueError(f"Synthesizer {name} is not registered")
+    def callback(factory: Callable[..., Any]) -> None:
+        inject_partitioner_kwargs(factory, cfg, data_cfg, seed)
 
-    # Parse kwargs and map to correct types
-    cfg["synthesizer_kwargs"] = parse_for_function(
-        synthesizer_registry.load(name),
-        cfg.get("synthesizer_kwargs", {}),
-    )
+    validate_component("partitioner", registry, data_cfg, callback)
 
 
-def _get_config_value_or_default(
+def validate_component(
+    component_type: str,
+    registry: Registry,
     cfg: dict[str, Any],
-    param: str,
-) -> Any:
-    default = next(f.default for f in fields(Config) if f.name == param)
-    return cfg.get(param, default)
-
-
-def _reject_and_inject(
-    name: str,
-    value: Any,
-    raw_kwargs: dict[str, Any],
-    factory_params: Mapping[str, Any],
-    expected_type: type,
-    *,
-    required: bool = False,
+    preprocess_callback: Callable[[Callable[..., Any]], None] | None = None,
 ) -> None:
-    """Reject user-specified framework param; inject into raw kwargs before parse."""
-    if name in raw_kwargs:
+    # Check that specified component is registered in the associated registry
+    if cfg[component_type] not in registry:
         raise ValueError(
-            f"'{name}' must not be specified in --partitioner-kwargs. "
-            "It is controlled by the framework."
+            f"`{cfg[component_type]}` is not a registered {component_type}."
         )
-    if name not in factory_params:
-        if required:
-            raise ValueError(f"Partitioner must accept a '{name}' parameter.")
-        return
-    if factory_params[name].annotation is not expected_type:
-        raise TypeError(
-            f"Partitioner parameter '{name}' must have type {expected_type}."
-        )
-    raw_kwargs[name] = value
+
+    # Ensure kwargs dict exists
+    kwargs_key = f"{component_type}_kwargs"
+    cfg.setdefault(kwargs_key, {})
+
+    # Do component specific preprocessing like injecting partitioner kwargs
+    factory = registry.load(cfg[component_type])
+    if preprocess_callback:
+        preprocess_callback(factory)
+
+    # Parse kwargs from string values into their correct types
+    cfg[kwargs_key] = parse_kwargs_for_function(factory, cfg[kwargs_key])
 
 
-def parse_partitioner_kwargs(
+def inject_partitioner_kwargs(
+    factory: Callable[..., Any],
     cfg: dict[str, Any],
     data_cfg: dict[str, Any],
     seed: SeedConfig,
-    partitioner_registry: Registry,
 ) -> None:
-    # Check that specified partitioner is registered
-    if data_cfg["partitioner"] not in partitioner_registry:
-        raise ValueError(f"Partitioner {data_cfg['partitioner']} is not registered")
+    params = inspect.signature(factory).parameters
+    if "num_partitions" not in params:
+        raise ValueError(
+            f"{factory.__name__} must accept a `num_partitions` parameter."
+        )
 
-    partitioner_kwargs = data_cfg.get("partitioner_kwargs", {})
-    partitioner_factory = partitioner_registry.load(data_cfg["partitioner"])
-    params = inspect.signature(partitioner_factory).parameters
+    injected_kwargs = {"num_partitions": cfg.get("num_clients", Config.num_clients)}
+    if "seed" in params:
+        injected_kwargs["seed"] = seed.partitioning
 
-    # Inject framework-controlled parameters (reject if user specified).
-    num_partitions = _get_config_value_or_default(cfg, param="num_clients")
-    _reject_and_inject(
-        name="num_partitions",
-        value=num_partitions,
-        raw_kwargs=partitioner_kwargs,
-        factory_params=params,
-        expected_type=int,
-        required=True,
-    )
+    # Reject manually specified kwargs that should be framework-controlled
+    if rejected := set(data_cfg["partitioner_kwargs"]) & set(injected_kwargs.keys()):
+        raise ValueError(
+            f"The following parameters cannot be specified as kwargs for "
+            f"{factory.__name__}: {rejected}. "
+            f"They are injected directly by the framework."
+        )
 
-    _reject_and_inject(
-        name="seed",
-        value=seed.partitioning,
-        raw_kwargs=partitioner_kwargs,
-        factory_params=params,
-        expected_type=int,
-    )
-
-    # Validate and parse all kwargs (user + framework injected).
-    data_cfg["partitioner_kwargs"] = parse_for_function(
-        partitioner_factory,
-        partitioner_kwargs,
-    )
+    data_cfg["partitioner_kwargs"].update(injected_kwargs)

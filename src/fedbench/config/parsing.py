@@ -1,6 +1,24 @@
 import inspect
 from types import UnionType
-from typing import Any, Callable, Literal, Union, get_args, get_origin
+from typing import Any, Callable, Literal, Mapping, Union, get_args, get_origin
+
+
+def parse_kwargs(value: str) -> dict[str, str]:
+    if value is None:
+        return {}
+
+    result = {}
+
+    for item in split_outside_brackets(value):
+        key, val = item.split("=")
+        result[key] = val
+    return result
+
+
+def parse_args(value: str) -> list[str]:
+    if value is None:
+        return []
+    return value.split(",")
 
 
 def split_outside_brackets(s: str) -> list[str]:
@@ -103,35 +121,41 @@ def is_optional(annotation: Any) -> bool:
     return False
 
 
-def parse_for_function(
+def parse_kwargs_for_function(
     func: Callable[..., Any],
-    raw: dict[str, str],
+    kwargs: Mapping[str, Any],
 ) -> dict[str, Any]:
-    sig = inspect.signature(func)
-    params = sig.parameters
 
     # Reject unknown parameters
-    unknown = set(raw) - set(params)
+    params = inspect.signature(func).parameters
+    unknown = set(kwargs) - set(params)
     if unknown:
-        raise TypeError(
-            f"Unknown parameters for {func.__name__}: {', '.join(sorted(unknown))}"
+        raise ValueError(
+            f"Unknown parameters for {func.__name__}: {', '.join(sorted(unknown))}\n"
+            f"Valid parameters: {', '.join(sorted(params))}"
         )
 
     # Parse and validate required params
-    parsed = {}
+    parsed: dict[str, Any] = {}
     for name, param in params.items():
-        has_default = param.default is not inspect.Parameter.empty
-        optional = has_default or is_optional(param.annotation)
-
-        if name in raw:
+        # Is component parameter specified in kwargs?
+        if name in kwargs:
+            # If param lacks type hint, pass value unchanged, otherwise coerce
             if param.annotation is inspect.Parameter.empty:
-                parsed[name] = raw[name]
+                parsed[name] = kwargs[name]
             else:
-                parsed[name] = coerce(raw[name], param.annotation)
+                parsed[name] = coerce(kwargs[name], param.annotation)
+
+        # If parameter has a default value, use it
+        elif param.default is not inspect.Parameter.empty:
+            parsed[name] = param.default
+
+        # If parameter is allowed to be None, set it to None
+        elif is_optional(param.annotation):
+            parsed[name] = None
+
+        # Parameter is required, but missing and has no default value
         else:
-            if not optional:
-                raise TypeError(
-                    f"Missing required parameter for {func.__name__}: {name}"
-                )
+            raise TypeError(f"Missing required parameter for {func.__name__}: {name}")
 
     return parsed
