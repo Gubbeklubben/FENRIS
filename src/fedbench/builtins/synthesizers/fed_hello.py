@@ -98,11 +98,12 @@ class FedHello(Synthesizer):
         # noinspection PyUnnecessaryCast
         schema_jsons = cast(str, artifacts.extras["extras"]["schema"])
         return self._dummy_df(
-            json.loads(schema_jsons, object_hook=FedbenchEncoder.decode)
+            json.loads(schema_jsons, object_hook=FedbenchEncoder.decode),
+            context.num_rows,
         )
 
     @staticmethod
-    def _dummy_df(schema: TableSchema) -> pd.DataFrame:
+    def _dummy_df(schema: TableSchema, num_rows: int) -> pd.DataFrame:
         defaults = {
             "continuous": 0.0,
             "integer": 0,
@@ -113,4 +114,4 @@ class FedHello(Synthesizer):
             c.name: defaults.get(getattr(c.kind, "value", c.kind), None)
             for c in schema.columns
         }
-        return pd.DataFrame([row], columns=[c.name for c in schema.columns])
+        return pd.DataFrame([row] * num_rows, columns=[c.name for c in schema.columns])
