@@ -2,9 +2,14 @@ from __future__ import annotations
 
 import importlib
 from dataclasses import dataclass
-from enum import StrEnum
+from enum import Enum
 from importlib.metadata import entry_points
 from typing import Any, Iterator, Self
+
+from fedbench.core.algorithm import Coordinator, Synthesizer
+from fedbench.core.component import Component
+from fedbench.core.data import Partitioner
+from fedbench.core.eval import Evaluator
 
 _ROOT_PKG = __package__.split(".")[0]
 
@@ -15,14 +20,32 @@ class Metadata:
     locator: str
 
 
-class Group(StrEnum):
-    SYNTHESIZERS = "synthesizers"
-    COORDINATORS = "coordinators"
-    PARTITIONERS = "partitioners"
-    EVALUATORS = "evaluators"
+# PyCharm static analysis is most pleased if using Enum not StrEnum,
+# typer is happy as long as _value_ is str.
+class Group(Enum):
+    SYNTHESIZERS = ("synthesizers", Synthesizer)
+    COORDINATORS = ("coordinators", Coordinator)
+    PARTITIONERS = ("partitioners", Partitioner)
+    EVALUATORS = ("evaluators", Evaluator)
+
+    def __new__(cls, name: str, base: type[Component]) -> Self:
+        obj = object.__new__(cls)
+        obj._value_ = name
+        return obj
+
+    def __init__(self, _: str, base: type[Component]) -> None:
+        self._base = base
+
+    @property
+    def base(self) -> type[Component]:
+        return self._base
+
+    @property
+    def entry_point(self) -> str:
+        return f"{_ROOT_PKG}.{self.value}"
 
     def get_registry(self) -> Registry:
-        return Registry.get(f"{_ROOT_PKG}.{self.value}")
+        return Registry.get(f"{self.entry_point}")
 
 
 class Registry:
