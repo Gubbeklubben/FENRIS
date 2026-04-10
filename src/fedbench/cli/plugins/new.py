@@ -21,18 +21,16 @@ def new(
         typer.Argument(
             parser=_Component.parse,
             metavar=f"{_Component.arg_syntax} ...",
-            help="Generate entry point declarations and plugins "
+            help="Generate entry point declarations and scaffold "
             "implementations for supplied arguments. If no arguments, "
             "one Synthesizer is generated.",
         ),
     ] = None,
 ) -> None:
-    """Create a new plugin project.
+    """Create a new plugin project under the current working directory.
 
     A plugin project can supply any number of components to any available
-    entry point. If no root directory is provided, the current working directory
-    is used. If the resolved root directory already contains a pyproject.toml,
-    or any other file/directory that would be overwritten, the operation is aborted.
+    entry point.
     """
 
     parent = Path.cwd()
