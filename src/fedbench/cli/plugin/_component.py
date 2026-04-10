@@ -3,20 +3,26 @@ from typing import ClassVar, Self
 
 import typer
 
+from fedbench.cli.plugin._util import parse_identifier
 from fedbench.runtime.registry import Group
 from fedbench.scaffold.subclass_builder import AbstractMethodCollector, Builder
 
 
 @dataclass(frozen=True)
 class _Component:
-    arg_syntax: ClassVar[str] = "group:identifier"
+    parser_syntax: ClassVar[str] = "group:[module.]*name"
     group: Group
-    identifier: str
+    module: tuple[str, ...]
+    class_name: str
+
+    @property
+    def name(self) -> str:
+        return self.module[-1]
 
     @classmethod
     def parse(cls, arg: str) -> Self:
         try:
-            group_keyword, identifier = arg.split(":")
+            group_keyword, module = arg.split(":", maxsplit=1)
         except ValueError:
             raise typer.BadParameter("Syntax error, missing ':'.")
         try:
@@ -26,30 +32,27 @@ class _Component:
         except ValueError:
             raise typer.BadParameter(f"Invalid group: {group_keyword}.")
 
-        if not identifier.isidentifier():
-            raise typer.BadParameter(
-                f"Syntax error, '{identifier}' is not a valid identifier."
-            )
-        return cls(group, identifier)
+        module_parts = tuple(parse_identifier(m.lower()) for m in module.split("."))
+        if len(module_parts) == 1:  # Enforce some structure
+            module_parts = (group.value, module[0])
+        class_name = parse_identifier(_to_cap_words(module_parts[-1]))
+
+        return cls(group, module_parts, class_name)
 
     @classmethod
     def default(cls) -> Self:
-        return cls(Group.SYNTHESIZERS, "my_synthesizer")
-
-
-def fully_qualified_name(project_name: str, component: _Component) -> str:
-    return f"{module_name(project_name, component)}:{class_name(component)}"
-
-
-def module_name(project_name: str, component: _Component) -> str:
-    return f"{project_name}.{component.group.value}.{component.identifier.lower()}"
-
-
-def class_name(component: _Component) -> str:
-    return "".join(w.capitalize() for w in component.identifier.split("_"))
+        return cls(
+            Group.SYNTHESIZERS,
+            (Group.SYNTHESIZERS.value, "my_synthesizer"),
+            "MySynthesizer",
+        )
 
 
 def codegen(component: _Component) -> str:
     collector = AbstractMethodCollector(component.group.base)
     builder = Builder(collector)
-    return builder.with_name(class_name(component)).build().code
+    return builder.with_name(component.class_name).build().code
+
+
+def _to_cap_words(identifier: str) -> str:
+    return "".join(w.capitalize() for w in identifier.split("_"))

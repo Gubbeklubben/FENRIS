@@ -3,7 +3,7 @@ from typing import Annotated
 
 import typer
 
-from fedbench.cli.plugins._component import _Component
+from fedbench.cli.plugin._component import _Component
 
 app = typer.Typer()
 
@@ -14,8 +14,8 @@ def add(
         list[_Component],
         typer.Argument(
             parser=_Component.parse,
-            metavar=f"{_Component.arg_syntax} ...",
-            help="Generate entry point declarations and plugins "
+            metavar=f"{_Component.parser_syntax} ...",
+            help="Generate entry point declarations and plugin "
             "implementations for supplied arguments. If no arguments, "
             "one Synthesizer is generated.",
         ),
