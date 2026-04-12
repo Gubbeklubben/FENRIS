@@ -46,8 +46,8 @@ class _FedTabDiffArtifacts:
     cat_dim: int
     encoded_dim: int
     vocab_per_attr: dict[str, set[int]]
-    num_scaler: QuantileTransformer
-    label_encoder: LabelEncoder
+    num_scaler: QuantileTransformer | None
+    label_encoder: LabelEncoder | None
 
     # noinspection PyUnnecessaryCast
     @classmethod
@@ -61,8 +61,8 @@ class _FedTabDiffArtifacts:
             cat_dim=cast(int, extras["cat-dim"]),
             encoded_dim=cast(int, extras["encoded-dim"]),
             vocab_per_attr=objects["vocab-per-attr"],
-            num_scaler=cast(QuantileTransformer, objects["num-scaler"]),
-            label_encoder=cast(LabelEncoder, objects["label-encoder"]),
+            num_scaler=cast(QuantileTransformer | None, objects["num-scaler"]),
+            label_encoder=cast(LabelEncoder | None, objects["label-encoder"]),
         )
 
     def encode(self) -> Payload:
@@ -181,19 +181,27 @@ class FedTabDiff(Synthesizer):
         cat_attrs, num_attrs = split_cat_num(context.schema)
         prefix_columns(dataset, cat_attrs)
 
-        num_scaler = QuantileTransformer(
-            n_quantiles=len(dataset),
-            output_distribution="normal",
-            random_state=int(rng.integers(2**31)),
-        )
-        num_scaler.fit(dataset[num_attrs].values)
+        num_scaler: QuantileTransformer | None = None
+        if num_attrs:
+            num_scaler = QuantileTransformer(
+                n_quantiles=len(dataset),
+                output_distribution="normal",
+                random_state=int(rng.integers(2**31)),
+            )
+            num_scaler.fit(dataset[num_attrs].values)
 
-        vocab_classes = sorted(np.unique(dataset[cat_attrs]))
-        label_encoder = LabelEncoder().fit(vocab_classes)
-        cat_scaled = dataset[cat_attrs].apply(label_encoder.transform)
+        label_encoder: LabelEncoder | None
+        if cat_attrs:
+            vocab_classes = sorted(np.unique(dataset[cat_attrs]))
+            label_encoder = LabelEncoder().fit(vocab_classes)
+            cat_scaled = dataset[cat_attrs].apply(label_encoder.transform)
+            vocab_per_attr = {attr: set(cat_scaled[attr]) for attr in cat_attrs}
+            n_cat_tokens = len(vocab_classes)
+        else:
+            label_encoder = None
+            vocab_per_attr = {}
+            n_cat_tokens = 0
 
-        vocab_per_attr = {attr: set(cat_scaled[attr]) for attr in cat_attrs}
-        n_cat_tokens = len(vocab_classes)
         cat_dim = self._n_cat_emb * len(cat_attrs)
         encoded_dim = cat_dim + len(num_attrs)
 
@@ -228,14 +236,26 @@ class FedTabDiff(Synthesizer):
 
         artifacts = _FedTabDiffArtifacts.decode(context.global_init_artifacts)
 
-        prefix_columns(data, artifacts.cat_attrs)
-        cat_scaled = data[artifacts.cat_attrs].apply(artifacts.label_encoder.transform)
-        num_scaled = artifacts.num_scaler.transform(data[artifacts.num_attrs].values)
+        if artifacts.cat_attrs:
+            prefix_columns(data, artifacts.cat_attrs)
+            assert isinstance(artifacts.label_encoder, LabelEncoder)
+            cat_scaled = data[artifacts.cat_attrs].apply(
+                artifacts.label_encoder.transform
+            )
+            cat_tensor = torch.tensor(cat_scaled.values, dtype=torch.long)
+        else:
+            cat_tensor = torch.zeros((len(data), 0), dtype=torch.long)
 
-        tensor_dataset = TensorDataset(
-            torch.tensor(cat_scaled.values, dtype=torch.long),
-            torch.tensor(num_scaled, dtype=torch.float),
-        )
+        if artifacts.num_attrs:
+            assert isinstance(artifacts.num_scaler, QuantileTransformer)
+            num_scaled = artifacts.num_scaler.transform(
+                data[artifacts.num_attrs].values
+            )
+            num_tensor = torch.tensor(num_scaled, dtype=torch.float)
+        else:
+            num_tensor = torch.zeros((len(data), 0), dtype=torch.float)
+
+        tensor_dataset = TensorDataset(cat_tensor, num_tensor)
 
         rng = np.random.default_rng(context.seed)
         loader_generator = _make_torch_generator(
@@ -285,7 +305,12 @@ class FedTabDiff(Synthesizer):
                 n=batch_cat.shape[0], generator=train_generator
             )
             # get cat embeddings
-            batch_cat_emb = mlp_synth.embed_categorical(x_cat=batch_cat)
+            if artifacts.cat_attrs:
+                batch_cat_emb = mlp_synth.embed_categorical(x_cat=batch_cat)
+            else:
+                batch_cat_emb = torch.zeros(
+                    (len(batch_cat), 0), dtype=torch.float, device=self._device
+                )
             # concat cat & num
             batch_cat_num = torch.cat((batch_cat_emb, batch_num), dim=1)
             # add noise
@@ -347,8 +372,9 @@ class FedTabDiff(Synthesizer):
             label=None,
             generator=sample_generator,
         )
+        embeddings = mlp_synth.get_embeddings() if artifacts.cat_attrs else None
         return self._decode_samples(
-            samples=tensor, embeddings=mlp_synth.get_embeddings(), artifacts=artifacts
+            samples=tensor, embeddings=embeddings, artifacts=artifacts
         )
 
     def _create_mlp_synth(self, encoded_dim: int, n_cat_tokens: int) -> MLPSynthesizer:
@@ -412,58 +438,74 @@ class FedTabDiff(Synthesizer):
     # https://github.com/sattarov/FedTabDiff/blob/main/fedtabdiff_modules.py
     # noinspection PyUnnecessaryCast
     def _decode_samples(
-        self, samples: Tensor, embeddings: Tensor, artifacts: _FedTabDiffArtifacts
+        self,
+        samples: Tensor,
+        embeddings: Tensor | None,
+        artifacts: _FedTabDiffArtifacts,
     ) -> DataFrame:
 
         # split sample into numeric and categorical parts
         samples_num = samples[:, artifacts.cat_dim :]
         samples_cat = samples[:, : artifacts.cat_dim]
 
-        # denormalize numeric attributes
-        z_norm_upscaled = artifacts.num_scaler.inverse_transform(
-            samples_num.cpu().numpy()
-        )
-        z_norm_df = DataFrame(z_norm_upscaled, columns=artifacts.num_attrs)
-
-        # reshape back to batch_size * n_dim_cat * cat_emb_dim
-        samples_cat = samples_cat.reshape(-1, len(artifacts.cat_attrs), self._n_cat_emb)
-        # Compute batch-wise distances; large embedding token counts
-        # can be memory-hungry when done in a single pass.
-        batch_size = 2048
         n_samples = len(samples)
-        z_cat_df_list = []
 
-        # iterate over generated categorical samples
-        for i in range(0, n_samples, batch_size):
-            # get batch of samples
-            samples_cat_subset = samples_cat[i : i + batch_size]
-            # compute pairwise distances between embeddings and generated samples
-            distances = torch.cdist(x1=embeddings, x2=samples_cat_subset)
-            # create temp dataframes for collection of intermediate results
-            z_cat_df_temp = DataFrame(
-                index=range(len(samples_cat_subset)), columns=artifacts.cat_attrs
+        # denormalize numeric attributes
+        if artifacts.num_attrs:
+            assert isinstance(artifacts.num_scaler, QuantileTransformer)
+            z_norm_upscaled = artifacts.num_scaler.inverse_transform(
+                samples_num.cpu().numpy()
             )
+            z_norm_df = DataFrame(z_norm_upscaled, columns=artifacts.num_attrs)
+        else:
+            z_norm_df = DataFrame(index=range(n_samples))
 
-            for attr_idx, attr_name in enumerate(artifacts.cat_attrs):
-                # get vocab indices for attribute
-                attr_emb_idx = list(artifacts.vocab_per_attr[attr_name])
-                # get distances for attribute
-                attr_distances = distances[:, attr_emb_idx, attr_idx]
-                # get nearest embedding index
-                _, nearest_idx = torch.min(attr_distances, dim=1)
-                # convert to numpy
-                nearest_idx = nearest_idx.cpu().numpy()
-                # map emb indices back to column indices
-                z_cat_df_temp[attr_name] = np.array(attr_emb_idx)[nearest_idx]
+        # decode categorical attributes
+        if artifacts.cat_attrs:
+            # reshape back to batch_size * n_dim_cat * cat_emb_dim
+            samples_cat = samples_cat.reshape(
+                -1, len(artifacts.cat_attrs), self._n_cat_emb
+            )
+            # Compute batch-wise distances; large embedding token counts
+            # can be memory-hungry when done in a single pass.
+            batch_size = 2048
+            z_cat_df_list = []
 
-            # collect temp DFs
-            z_cat_df_list.append(z_cat_df_temp)
+            # iterate over generated categorical samples
+            for i in range(0, n_samples, batch_size):
+                # get batch of samples
+                samples_cat_subset = samples_cat[i : i + batch_size]
+                # compute pairwise distances between embeddings and generated samples
+                distances = torch.cdist(x1=embeddings, x2=samples_cat_subset)
+                # create temp dataframes for collection of intermediate results
+                z_cat_df_temp = DataFrame(
+                    index=range(len(samples_cat_subset)), columns=artifacts.cat_attrs
+                )
 
-        # concat DFs
-        z_cat_df = pd.concat(z_cat_df_list, ignore_index=True)
-        # inverse transform categorical attributes
-        z_cat_df = z_cat_df.apply(artifacts.label_encoder.inverse_transform)
-        remove_col_prefixes(z_cat_df, artifacts.cat_attrs)
+                for attr_idx, attr_name in enumerate(artifacts.cat_attrs):
+                    # get vocab indices for attribute
+                    attr_emb_idx = list(artifacts.vocab_per_attr[attr_name])
+                    # get distances for attribute
+                    attr_distances = distances[:, attr_emb_idx, attr_idx]
+                    # get nearest embedding index
+                    _, nearest_idx = torch.min(attr_distances, dim=1)
+                    # convert to numpy
+                    nearest_idx = nearest_idx.cpu().numpy()
+                    # map emb indices back to column indices
+                    z_cat_df_temp[attr_name] = np.array(attr_emb_idx)[nearest_idx]
+
+                # collect temp DFs
+                z_cat_df_list.append(z_cat_df_temp)
+
+            # concat DFs
+            z_cat_df = pd.concat(z_cat_df_list, ignore_index=True)
+            # inverse transform categorical attributes
+            assert isinstance(artifacts.label_encoder, LabelEncoder)
+            z_cat_df = z_cat_df.apply(artifacts.label_encoder.inverse_transform)
+            remove_col_prefixes(z_cat_df, artifacts.cat_attrs)
+        else:
+            z_cat_df = DataFrame(index=range(n_samples))
+
         # concat numeric and categorical attributes
         sample_decoded = pd.concat([z_cat_df, z_norm_df], axis=1)
 
