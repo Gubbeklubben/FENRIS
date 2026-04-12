@@ -1,5 +1,6 @@
 import functools
 import inspect
+from collections import defaultdict
 from collections.abc import Callable, Iterable
 from typing import Any
 
@@ -53,9 +54,13 @@ def create_evaluators(
 ) -> Iterable[Evaluator]:
 
     registry = registry or Group.EVALUATORS.get_registry()
+    evaluators = defaultdict(list)
+    # noinspection PyTypeChecker
     for name in registry:
         evaluator = create_evaluator(name, registry)
-        if evaluator.metadata.category in categories:
+        evaluators[evaluator.metadata.category].append(evaluator)
+    for category in categories:
+        for evaluator in evaluators[category]:
             yield evaluator
 
 
