@@ -472,7 +472,7 @@ class FedTabDiff(Synthesizer):
 
 def prefix_columns(df: DataFrame, cat_attrs: Iterable[str]) -> None:
     for cat_attr in cat_attrs:
-        df[cat_attr] = cat_attr + "_" + df[cat_attr].astype("str")
+        df[cat_attr] = cat_attr + "_" + df[cat_attr].fillna("nan").astype("str")
 
 
 def remove_col_prefixes(df: DataFrame, cat_attrs: Iterable[str]) -> None:
