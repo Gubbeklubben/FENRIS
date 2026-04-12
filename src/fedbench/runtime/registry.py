@@ -6,7 +6,7 @@ from enum import Enum
 from importlib.metadata import entry_points
 from typing import Any, Iterator, Self
 
-from fedbench.core.algorithm import Coordinator, Synthesizer
+from fedbench.core.algorithm import Coordinator, SingleStepCoordinator, Synthesizer
 from fedbench.core.component import Component
 from fedbench.core.data import Partitioner
 from fedbench.core.eval import Evaluator
@@ -23,22 +23,22 @@ class Metadata:
 # PyCharm static analysis is most pleased if using Enum not StrEnum,
 # typer is happy as long as _value_ is str.
 class Group(Enum):
-    SYNTHESIZERS = ("synthesizers", Synthesizer)
-    COORDINATORS = ("coordinators", Coordinator)
-    PARTITIONERS = ("partitioners", Partitioner)
-    EVALUATORS = ("evaluators", Evaluator)
+    SYNTHESIZERS = ("synthesizers", (Synthesizer,))
+    COORDINATORS = ("coordinators", (Coordinator, SingleStepCoordinator))
+    PARTITIONERS = ("partitioners", (Partitioner,))
+    EVALUATORS = ("evaluators", (Evaluator,))
 
-    def __new__(cls, name: str, base: type[Component]) -> Self:
+    def __new__(cls, name: str, bases: tuple[type[Component]]) -> Self:
         obj = object.__new__(cls)
         obj._value_ = name
         return obj
 
-    def __init__(self, _: str, base: type[Component]) -> None:
-        self._base = base
+    def __init__(self, _: str, bases: tuple[type[Component]]) -> None:
+        self._bases = bases
 
     @property
-    def base(self) -> type[Component]:
-        return self._base
+    def bases(self) -> tuple[type[Component]]:
+        return self._bases
 
     @property
     def entry_point(self) -> str:

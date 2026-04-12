@@ -3,7 +3,7 @@ import keyword
 import typer
 
 
-def parse_identifier(arg: str) -> str:
+def validate_identifier(arg: str) -> str:
     if keyword.iskeyword(arg):
         raise typer.BadParameter(f"'{arg}' is a reserved keyword.")
 
