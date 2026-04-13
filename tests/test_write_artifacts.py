@@ -41,6 +41,7 @@ def _make_ctx(
         centralized_metrics=centralized_metrics or {},
         synthetic_df=pd.DataFrame({"a": [1, 2], "b": [3, 4]}),
         dataset=SimpleNamespace(schema=TableSchema()),
+        components=(),
     )
 
 
@@ -82,7 +83,7 @@ def test_platform_metadata_in_metrics(tmp_path: Path) -> None:
     write_artifacts(ctx)  # type: ignore[arg-type]
 
     outdir = tmp_path / "test-run"
-    data = json.loads(outdir.joinpath("metadata.json").read_text())
+    data = json.loads(outdir.joinpath("platform_info.json").read_text())
     assert "platform.os" in data
     assert "platform.python_version" in data
     assert "platform.cpu_count" in data
