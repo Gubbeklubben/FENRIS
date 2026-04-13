@@ -39,7 +39,7 @@ def new(
         print(f"{root} already exists.", file=sys.stderr)
         raise typer.Abort()
 
-    root.mkdir()
+    root.mkdir(parents=True)
     with root.joinpath("pyproject.toml").open("w") as f:
         tomlkit.dump(_create_toml(name.lower()), f)
 

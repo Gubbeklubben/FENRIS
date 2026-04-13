@@ -49,7 +49,8 @@ def extend(
     package: Annotated[
         str | None,
         typer.Option(
-            help="The subpackage in which to put generated modules.",
+            help="The subpackage in which to put generated modules. Accepts dot "
+            "separated python identifiers.",
             callback=_validate_package,
         ),
     ] = None,
@@ -63,9 +64,9 @@ def extend(
     no_group: Annotated[
         bool,
         typer.Option(
-            help="If the default behaviour of grouping components in per entry point "
-            "packages is not desirable, pass this flag (Only affects the new "
-            "component)."
+            "--no-group",
+            help="Pass this flag if the default behaviour of grouping components by "
+            "entry point is not desirable.",
         ),
     ] = False,
 ) -> None:
@@ -89,7 +90,7 @@ def extend(
         print(f"Error in {py_proj}: {str(exc)}", file=sys.stderr)
         raise typer.Abort()
 
-    for name in set(n.lower() for n in names):
+    for name in names:
         path = _descend_and_create_as_needed(root_pkg, packages[1:])
         path = path.joinpath(name.lower()).with_suffix(".py")
         if path.exists():

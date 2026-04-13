@@ -297,7 +297,7 @@ class Builder:
             )
         )
         self._imports = tuple(sorted(imports, key=import_key))
-        self._fn_defs = tuple((sorted(self._collector, key=fn_def_key)))
+        self._fn_defs = tuple(sorted(self._collector, key=fn_def_key))
 
 
 def _resolve_imports(
