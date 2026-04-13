@@ -1,10 +1,10 @@
 import inspect
+from collections import defaultdict
 from dataclasses import fields
 from typing import Annotated
 
 import typer
 
-from fedbench.core.eval import Category, EvaluatorDescriptor
 from fedbench.runtime.registry import Group, Metadata
 
 app = typer.Typer()
@@ -47,13 +47,16 @@ def show(
 
     def show_evaluators() -> None:
         # Sort evaluator metadata by category
-        evaluators_by_category: dict[
-            Category, list[tuple[Metadata, EvaluatorDescriptor]]
-        ] = {category: [] for category in Category}
+        evaluators_by_category = defaultdict(list)
         for evaluator in Group.EVALUATORS.get_registry().metadata():
             evaluator_factory = Group.EVALUATORS.get_registry().load(evaluator.name)
-            metadata = evaluator_factory().metadata
-            evaluators_by_category[metadata.category].append((evaluator, metadata))
+            try:
+                metadata = evaluator_factory().metadata
+                category = metadata.category
+            except NotImplementedError:
+                metadata = None
+                category = "Uncategorized"
+            evaluators_by_category[category].append((evaluator, metadata))
 
         for category, entries in evaluators_by_category.items():
             # Category title
@@ -68,6 +71,10 @@ def show(
 
                 if show_metadata:
                     _show_metadata(metadata, indent=6)
+
+                    if not evaluator_metadata:
+                        print(f"{'':<6}Error: Metadata missing for this evaluator.")
+                        continue
 
                     eval_mode = evaluator_metadata.eval_mode.name or ""
                     print(f"{'':<6}Evaluation mode: {eval_mode.lower()}")
