@@ -27,7 +27,7 @@ from fedbench.builtins.evaluators.fidelity import (
     DistributionSimilarityMetricsEvaluator,
     MomentReductionMetricsEvaluator,
 )
-from fedbench.core.data.schemas import ColumnSchema, TableSchema, _infer_schema
+from fedbench.core.data.schemas import ColumnSchema, TableSchema, infer_schema
 from fedbench.core.eval.evalcontext import (
     CentralizedEvalContext,
     GlobalEvalContext,
@@ -78,7 +78,7 @@ def make_ctx(
     ``holdout_df``).
     """
     if schema is None:
-        schema = _infer_schema(train_df)
+        schema = infer_schema(train_df)
     return GlobalEvalContext(
         schema=schema,
         holdout_df=train_df,
@@ -101,7 +101,7 @@ def make_local_ctx(
 ) -> LocalEvalContext:
     """Build a LocalEvalContext representing a single federated client."""
     if schema is None:
-        schema = _infer_schema(train_df)
+        schema = infer_schema(train_df)
     if test_df is None:
         test_df = train_df.copy()
     return LocalEvalContext(
@@ -134,7 +134,7 @@ def make_centralized_ctx(
     ``client_train_df`` is not provided it defaults to ``train_df``.
     """
     if schema is None:
-        schema = _infer_schema(train_df)
+        schema = infer_schema(train_df)
     if client_train_df is None:
         client_train_df = train_df
     return CentralizedEvalContext(

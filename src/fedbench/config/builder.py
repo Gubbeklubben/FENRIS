@@ -90,14 +90,8 @@ def resolve_schema_path(data_cfg: dict[str, Any]) -> None:
             raise FileNotFoundError(f"Schema file `{path}` does not exist")
     else:
         path = Path(data_cfg["dataset"]).with_suffix(".schema.json")
-        if data_cfg.get("generate_input_schema") and path.exists():
-            raise FileExistsError(
-                f"Cannot generate input schema file. "
-                f"`{path}` already exists and would be overwritten."
-            )
-        # If we're not outputting an input schema file, we don't need to check whether
-        # file exists. Schema will then be auto-inferred during loading (and possibly
-        # written back as an input schema later) if the default file is not found.
+        # No need to check whether default schema file exists.
+        # Schema will be auto-inferred during loading if the default file is not found.
 
     if path.is_dir():
         raise IsADirectoryError(f"`{path}` is a directory")

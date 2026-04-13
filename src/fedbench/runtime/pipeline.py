@@ -3,7 +3,6 @@ from __future__ import annotations
 import json
 import math
 import os
-import shutil
 from collections.abc import Iterable
 from dataclasses import asdict
 from pathlib import Path
@@ -17,7 +16,7 @@ from fedbench.core.algorithm import (
 from fedbench.core.data import PartitionedDataset
 from fedbench.core.data.schemas import load_or_infer_schema
 from fedbench.core.eval import CentralizedEvalContext, Evaluator
-from fedbench.core.logger import log_info, log_warning
+from fedbench.core.logger import log_info
 from fedbench.core.payload import ArraysTarget
 from fedbench.runtime.command import Command
 from fedbench.runtime.platform_info import collect_platform_info
@@ -177,22 +176,6 @@ def write_artifacts(ctx: RunContext) -> None:
 
     with outputdir.joinpath("components.json").open("w") as f:
         json.dump(component_meta, f, indent=4)
-
-    # Generate input schema file if requested by user
-    if ctx.config.data.generate_input_schema:
-        input_schema_path = Path(ctx.config.data.dataset).with_suffix(".schema.json")
-        if input_schema_path.exists():
-            # Config builder already checks this, but it doesn't hurt to double-check,
-            # since some time could pass between the start and end of a run
-            log_warning(
-                __name__,
-                f"Input schema file already exists "
-                f"and will not be overwritten: {input_schema_path}",
-            )
-        shutil.copy(
-            outputdir.joinpath("schema.json"),
-            input_schema_path,
-        )
 
     # Synthetic data
     ctx.synthetic_df.to_csv(outputdir.joinpath("synthetic.csv"), index=False)
