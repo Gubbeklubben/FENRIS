@@ -1,4 +1,5 @@
 import inspect
+from dataclasses import fields
 from typing import Annotated
 
 import typer
@@ -17,19 +18,19 @@ def show(
             help="Groups of components to show. If omitted, all are shown.",
         ),
     ] = None,
-    include_locators: Annotated[
+    show_metadata: Annotated[
         bool,
         typer.Option(
-            "--include-locators",
-            help="Include factory locators (import paths) in the output.",
+            "--metadata",
+            help="Include factory metadata in the output.",
         ),
     ] = False,
-    include_details: Annotated[
+    keywords: Annotated[
         bool,
         typer.Option(
-            "--include-details",
-            help="Include keyword arguments or other detailed component information "
-            "in the output.",
+            "--keywords",
+            help="Include valid factory keyword arguments and their default values in "
+            "the output.",
         ),
     ] = False,
 ) -> None:
@@ -39,8 +40,7 @@ def show(
     Examples:
       fedbench show
       fedbench show synthesizers
-      fedbench show synthesizers coordinators --include-locators
-      fedbench show partitioners evaluators --include-details
+      fedbench show synthesizers coordinators --metadata
     """
 
     selected = groups if groups else list(Group)
@@ -66,10 +66,9 @@ def show(
                 # Evaluator title
                 print(f"{'':<4}{metadata.name}")
 
-                if include_locators:
-                    print(f"{'':<6}Locator: {metadata.locator}")
+                if show_metadata:
+                    _show_metadata(metadata, indent=6)
 
-                if include_details:
                     eval_mode = evaluator_metadata.eval_mode.name or ""
                     print(f"{'':<6}Evaluation mode: {eval_mode.lower()}")
 
@@ -101,10 +100,10 @@ def show(
             # Component name
             print(f"{'':<2}{metadata.name}")
 
-            if include_locators:
-                print(f"{'':<4}Locator: {metadata.locator}")
+            if show_metadata:
+                _show_metadata(metadata, indent=4)
 
-            if include_details:
+            if keywords:
                 component_factory = registry.load(metadata.name)
                 if params := inspect.signature(component_factory).parameters.values():
                     print(f"{'':<4}Parameters:")
@@ -117,4 +116,12 @@ def show(
     maybe_show(Group.PARTITIONERS)
     maybe_show(Group.EVALUATORS)
 
+    print()
+
+
+def _show_metadata(metadata: Metadata, indent: int) -> None:
+    for f in fields(metadata):
+        if f.name in ("value", "group"):
+            continue
+        print(f"{'':<{indent}}{f.name}: {getattr(metadata, f.name)}")
     print()

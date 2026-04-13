@@ -1,12 +1,13 @@
 from __future__ import annotations
 
-from collections.abc import Callable
+from collections.abc import Callable, Iterable
 from typing import Any, Mapping, cast, overload
 
 from pandas import DataFrame
 
 from fedbench.config import Config
 from fedbench.core.algorithm import Coordinator, GlobalInitArtifacts, Synthesizer
+from fedbench.core.component import Component
 from fedbench.core.data import PartitionedDataset, Partitioner
 from fedbench.core.eval import EvaluationSuite
 from fedbench.core.payload import Payload
@@ -108,3 +109,11 @@ class RunContext:
     @property
     def scalability_collector(self) -> ScalabilityCollector:
         return self._scalability_collector
+
+    @property
+    def components(self) -> Iterable[Component]:
+        for value in self.__dict__.values():
+            if isinstance(value, Component):
+                yield value
+            if isinstance(value, EvaluationSuite):
+                yield from value

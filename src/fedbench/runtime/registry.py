@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-import importlib
+import importlib.metadata
 from dataclasses import dataclass
 from enum import Enum
 from importlib.metadata import entry_points
@@ -11,13 +11,18 @@ from fedbench.core.component import Component
 from fedbench.core.data import Partitioner
 from fedbench.core.eval import Evaluator
 
-_ROOT_PKG = __package__.split(".")[0]
+_ROOT_PKG = __name__.split(".")[0]
 
 
 @dataclass(frozen=True)
 class Metadata:
     name: str
-    locator: str
+    group: str
+    value: str
+    module: str
+    attr: str
+    dist_name: str
+    dist_version: str
 
 
 # PyCharm static analysis is most pleased if using Enum not StrEnum,
@@ -35,6 +40,13 @@ class Group(Enum):
 
     def __init__(self, _: str, bases: tuple[type[Component]]) -> None:
         self._bases = bases
+
+    @classmethod
+    def from_type(cls, type_: type[Component]) -> Group:
+        for group in cls:
+            if issubclass(type_, group.bases[0]):
+                return group
+        raise TypeError(f"{type_} is not a valid component type")
 
     @property
     def bases(self) -> tuple[type[Component]]:
@@ -85,14 +97,25 @@ class Registry:
 
     def metadata(self) -> Iterator[Metadata]:
         for ep in self._entry_points.values():
-            yield Metadata(name=ep.name, locator=ep.value)
+            yield self.get_metadata(ep.name)
+
+    def get_metadata(self, name: str) -> Metadata:
+        entry_point = self._get_entry_point(name)
+        return Metadata(
+            name=entry_point.name,
+            group=entry_point.group,
+            value=entry_point.value,
+            module=entry_point.module,
+            attr=entry_point.attr,
+            dist_name=getattr(entry_point.dist, "name", ""),
+            dist_version=getattr(entry_point.dist, "version", ""),
+        )
 
     def load(self, name: str) -> Any:
-        try:
-            entry_point = self._entry_points[name]
-        except KeyError:
-            raise ValueError(
-                f"No registry entry for component named '{name}'"
-            ) from None
+        return self._get_entry_point(name).load()
 
-        return entry_point.load()
+    def _get_entry_point(self, name: str) -> importlib.metadata.EntryPoint:
+        try:
+            return self._entry_points[name]
+        except KeyError:
+            raise KeyError(f"No registry entry for component named '{name}'") from None

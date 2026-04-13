@@ -21,6 +21,7 @@ from fedbench.core.logger import log_info, log_warning
 from fedbench.core.payload import ArraysTarget
 from fedbench.runtime.command import Command
 from fedbench.runtime.platform_info import collect_platform_info
+from fedbench.runtime.registry import Group
 from fedbench.runtime.runcontext import RunContext
 
 
@@ -162,12 +163,20 @@ def write_artifacts(ctx: RunContext) -> None:
         json.dump(ctx.config.jsondict(), f, indent=4)
 
     # Platform metadata
-    with outputdir.joinpath("metadata.json").open("w") as f:
+    with outputdir.joinpath("platform_info.json").open("w") as f:
         json.dump(collect_platform_info(), f, indent=4, allow_nan=False)
 
     # Document which schema was used
     with outputdir.joinpath("schema.json").open("w") as f:
         json.dump(asdict(ctx.dataset.schema), f, indent=4, allow_nan=False)
+
+    component_meta = {}
+    for comp in ctx.components:
+        reg = Group.from_type(type(comp)).get_registry()
+        component_meta[comp.name] = asdict(reg.get_metadata(comp.name))
+
+    with outputdir.joinpath("components.json").open("w") as f:
+        json.dump(component_meta, f, indent=4)
 
     # Generate input schema file if requested by user
     if ctx.config.data.generate_input_schema:
