@@ -87,9 +87,10 @@ packages = [{include = "fedbench", from = "src"}]
 # --- PYTEST CONFIG ---
 
 [tool.pytest.ini_options]
-addopts = "-m 'not integration'"
+addopts = "-m 'not integration and not torch'"
 markers = [
     "integration: full end-to-end pipeline tests (slow; run with -m integration)",
+    "torch: tests that require PyTorch to be installed",
 ]
 
 # --- MYPY CONFIG ---

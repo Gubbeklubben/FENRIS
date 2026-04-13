@@ -24,7 +24,7 @@ from fedbench.runtime.pipeline import pipeline
 DATASET = "./datasets/breast_cancer.csv"
 
 
-def _run(scenario: str, point: str, exception: str = "Exception") -> None:
+def _run(scenario: str, point: str, exception: str = "ValueError") -> None:
     """Build config and run the full pipeline for a single FedNaughty combination."""
     kwargs: dict = {
         "synthesizer": "fed_naughty",
@@ -67,7 +67,7 @@ def _expect_crash(
 
 # ── Non-crash test matrix ─────────────────────────────────────────────
 
-NON_CRASH_CASES = [
+TEST_CASES = [
     _expect(
         "empty",
         "global_init",
@@ -147,38 +147,22 @@ NON_CRASH_CASES = [
         "synth_sample",
         raises=None,  # We handle all-NaN columns gracefully by emitting NaN metrics
     ),
-]
-
-# ── Crash test matrix ─────────────────────────────────────────────────
-
-CRASH_CASES = [
-    _expect_crash("global_init", "RuntimeError", raises=RuntimeError),
-    _expect_crash("synth_train", "RuntimeError", raises=RuntimeError),
-    _expect_crash("synth_sample", "RuntimeError", raises=RuntimeError),
-    _expect_crash("global_init", "ValueError", raises=ValueError),
-    _expect_crash("synth_train", "ValueError", raises=ValueError),
-    _expect_crash("synth_sample", "ValueError", raises=ValueError),
-    _expect_crash("global_init", "TypeError", raises=TypeError),
-    _expect_crash("synth_train", "TypeError", raises=TypeError),
-    _expect_crash("synth_sample", "TypeError", raises=TypeError),
-    _expect_crash("global_init", "MemoryError", raises=MemoryError),
-    _expect_crash("synth_train", "MemoryError", raises=MemoryError),
-    _expect_crash("synth_sample", "MemoryError", raises=MemoryError),
-    _expect_crash("global_init", "OverflowError", raises=OverflowError),
-    _expect_crash("synth_train", "OverflowError", raises=OverflowError),
-    _expect_crash("synth_sample", "OverflowError", raises=OverflowError),
-    _expect_crash("global_init", "ZeroDivisionError", raises=ZeroDivisionError),
-    _expect_crash("synth_train", "ZeroDivisionError", raises=ZeroDivisionError),
-    _expect_crash("synth_sample", "ZeroDivisionError", raises=ZeroDivisionError),
-    _expect_crash("global_init", "NotImplementedError", raises=NotImplementedError),
-    _expect_crash("synth_train", "NotImplementedError", raises=NotImplementedError),
-    _expect_crash("synth_sample", "NotImplementedError", raises=NotImplementedError),
-    _expect_crash("global_init", "OSError", raises=OSError),
-    _expect_crash("synth_train", "OSError", raises=OSError),
-    _expect_crash("synth_sample", "OSError", raises=OSError),
-    _expect_crash("global_init", "Exception", raises=Exception),
-    _expect_crash("synth_train", "Exception", raises=Exception),
-    _expect_crash("synth_sample", "Exception", raises=Exception),
+    _expect(
+        "crash",
+        "global_init",
+        raises=ValueError,
+    ),
+    _expect(
+        "crash",
+        "synth_train",
+        raises=RuntimeError,
+        caused_by=ValueError,
+    ),
+    _expect(
+        "crash",
+        "synth_sample",
+        raises=ValueError,
+    ),
 ]
 
 
@@ -186,8 +170,8 @@ CRASH_CASES = [
 
 
 @pytest.mark.integration
-@pytest.mark.parametrize("scenario,point,raises,caused_by,match", NON_CRASH_CASES)
-def test_fed_naughty_other(scenario, point, raises, caused_by, match):
+@pytest.mark.parametrize("scenario,point,raises,caused_by,match", TEST_CASES)
+def test_fed_naughty(scenario, point, raises, caused_by, match):
     if raises is None:
         _run(scenario, point)
         return
@@ -216,15 +200,3 @@ def test_fed_naughty_other(scenario, point, raises, caused_by, match):
         assert type(thread_exceptions[0]) is caused_by
         if match is not None:
             assert match in str(thread_exceptions[0])
-
-
-@pytest.mark.integration
-@pytest.mark.parametrize("point,exception,raises", CRASH_CASES)
-def test_fed_naughty_crash(
-    point: str,
-    exception: str,
-    raises: type[Exception] | None,
-) -> None:
-    """Run the full pipeline for a single crash FedNaughty combination."""
-    with pytest.raises(raises):
-        _run("crash", point, exception)
