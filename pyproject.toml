@@ -20,7 +20,9 @@ dependencies = [
     "flwr-datasets (>=0.6.0,<0.7.0)",
     "datasets (>=4.5.0,<5.0.0)",
     "scipy (>=1.17.0,<2.0.0)",
-    "scikit-learn (>=1.8.0,<2.0.0)"
+    "scikit-learn (>=1.8.0,<2.0.0)",
+    "libcst (>=1.8.6,<2.0.0)",
+    "tomlkit (>=0.14.0,<0.15.0)",
 ]
 
 [dependency-groups]
@@ -38,7 +40,7 @@ builtins = [
 ]
 
 [project.scripts]
-fedbench = "fedbench.__main__:app"
+fedbench = "fedbench.cli.main:app"
 
 [project.entry-points."fedbench.synthesizers"]
 fed_hello     = "fedbench.builtins.synthesizers.fed_hello:FedHello"
