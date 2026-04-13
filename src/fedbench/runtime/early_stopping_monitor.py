@@ -3,11 +3,10 @@ from typing import Callable
 
 from fedbench.config import MetricsConfig
 from fedbench.core.logger import log_debug, log_error, log_info
-from fedbench.core.payload import Payload
 
 
 class EarlyStoppingMonitor:
-    def __init__(self, config: MetricsConfig, evaluate_fn: Callable[[Payload], float]):
+    def __init__(self, config: MetricsConfig, evaluate_fn: Callable[[], float]):
         self._config = config
         self._evaluate_fn = evaluate_fn
 
@@ -43,8 +42,8 @@ class EarlyStoppingMonitor:
         rounds_since_first_run = current_round - self._config.stop_min_rounds
         return rounds_since_first_run % self._config.stop_eval_every == 0
 
-    def run(self, train_artifacts: Payload) -> None:
-        value = self._evaluate_fn(train_artifacts)
+    def run(self) -> None:
+        value = self._evaluate_fn()
 
         if math.isnan(value):
             # NaN counts as no improvement, but neither increments nor resets patience
