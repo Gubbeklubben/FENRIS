@@ -187,7 +187,12 @@ def validate_synthesizer(registry: Registry, cfg: dict[str, Any]) -> None:
             raise ValueError(
                 f"Synthesizer {cfg['synthesizer']} does not support "
                 f"coordinator {cfg['coordinator']}. "
-                f"Supported coordinators: {', '.join(factory.SUPPORTS_COORDINATORS)}"
+                f"Supported coordinators: "
+                f"{
+                    None
+                    if not factory.SUPPORTS_COORDINATORS
+                    else ', '.join(factory.SUPPORTS_COORDINATORS)
+                }."
             )
 
     validate_component(Synthesizer, registry, cfg, callback)  # type: ignore[type-abstract]

@@ -1,7 +1,7 @@
 import functools
 from abc import abstractmethod
 from dataclasses import dataclass
-from typing import Any
+from typing import Any, ClassVar
 
 from pandas import DataFrame
 
@@ -23,15 +23,10 @@ class GlobalInitArtifacts:
 class Synthesizer(Component):
     """The framework view of the model to train and sample from."""
 
-    SUPPORTS_COORDINATORS: set[str]
+    SUPPORTS_COORDINATORS: ClassVar[set[str]] = set()
 
     def __init_subclass__(cls, **kwargs: Any) -> None:
         super().__init_subclass__(**kwargs)
-        if not hasattr(cls, "SUPPORTS_COORDINATORS"):
-            raise TypeError(
-                f"{cls.__name__} must define the class attribute "
-                f"SUPPORTS_COORDINATORS: set[str]"
-            )
         if "sample" not in cls.__dict__:
             return
         original = cls.__dict__["sample"]
