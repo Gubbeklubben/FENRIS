@@ -309,7 +309,7 @@ class _FedTGANArtifacts:
 
 
 class FedTGAN(Synthesizer):
-    SUPPORTS_COORDINATORS = {"fed_tgan"}
+    SUPPORTED_COORDINATORS = {"fed_tgan"}
 
     def __init__(
         self,

@@ -99,7 +99,7 @@ def _make_torch_generator(seed: int, device: torch.device) -> torch.Generator:
 
 
 class FedTabDiff(Synthesizer):
-    SUPPORTS_COORDINATORS = {"fedavg"}
+    SUPPORTED_COORDINATORS = {"fedavg"}
 
     def __init__(
         self,

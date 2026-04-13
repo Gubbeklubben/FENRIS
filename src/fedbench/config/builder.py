@@ -178,20 +178,15 @@ def validate_stop_metrics(
 def validate_synthesizer(registry: Registry, cfg: dict[str, Any]) -> None:
 
     def callback(factory: type[Synthesizer]) -> None:
-        if not hasattr(factory, "SUPPORTS_COORDINATORS"):
-            raise AttributeError(
-                f"Synthesizer `{cfg['synthesizer']}` does not declare supported "
-                f"coordinators via the SUPPORTS_COORDINATORS attribute."
-            )
-        if cfg["coordinator"] not in factory.SUPPORTS_COORDINATORS:
+        if cfg["coordinator"] not in factory.SUPPORTED_COORDINATORS:
             raise ValueError(
                 f"Synthesizer {cfg['synthesizer']} does not support "
                 f"coordinator {cfg['coordinator']}. "
                 f"Supported coordinators: "
                 f"{
                     None
-                    if not factory.SUPPORTS_COORDINATORS
-                    else ', '.join(factory.SUPPORTS_COORDINATORS)
+                    if not factory.SUPPORTED_COORDINATORS
+                    else ', '.join(factory.SUPPORTED_COORDINATORS)
                 }."
             )
 

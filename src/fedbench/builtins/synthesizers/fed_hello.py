@@ -22,7 +22,7 @@ from fedbench.core.payload import ArraysTarget, Payload
 class FedHello(Synthesizer):
     """Say a federated hello."""
 
-    SUPPORTS_COORDINATORS = {"fedavg"}
+    SUPPORTED_COORDINATORS = {"fedavg"}
 
     def __init__(self, name: str = "Stranger") -> None:
         self._name = name

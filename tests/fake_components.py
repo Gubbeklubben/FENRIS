@@ -16,7 +16,7 @@ from fedbench.runtime.registry import Registry
 
 
 class FakeSynthesizer(Synthesizer):
-    SUPPORTS_COORDINATORS = {"fake_coordinator"}
+    SUPPORTED_COORDINATORS = {"fake_coordinator"}
 
     @property
     def name(self) -> str:

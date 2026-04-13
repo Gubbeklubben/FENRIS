@@ -23,7 +23,7 @@ class GlobalInitArtifacts:
 class Synthesizer(Component):
     """The framework view of the model to train and sample from."""
 
-    SUPPORTS_COORDINATORS: ClassVar[set[str]] = set()
+    SUPPORTED_COORDINATORS: ClassVar[set[str]] = set()
 
     def __init_subclass__(cls, **kwargs: Any) -> None:
         super().__init_subclass__(**kwargs)

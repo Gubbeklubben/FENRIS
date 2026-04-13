@@ -151,7 +151,7 @@ def _decode_schema_columns(artifacts: Payload | None) -> list[str] | None:
 class FedNaughty(Synthesizer):
     """CLI-configurable naughty synthesizer for framework testing."""
 
-    SUPPORTS_COORDINATORS = {"fedavg"}
+    SUPPORTED_COORDINATORS = {"fedavg"}
 
     def __init__(
         self,

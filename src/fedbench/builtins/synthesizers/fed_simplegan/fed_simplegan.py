@@ -91,7 +91,7 @@ class _FedSimpleGANArtifacts:
 
 
 class FedSimpleGAN(Synthesizer):
-    SUPPORTS_COORDINATORS = {"fedavg"}
+    SUPPORTED_COORDINATORS = {"fedavg"}
 
     def __init__(
         self,
