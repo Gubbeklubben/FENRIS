@@ -16,6 +16,8 @@ from fedbench.runtime.registry import Registry
 
 
 class FakeSynthesizer(Synthesizer):
+    SUPPORTED_COORDINATORS = {"fake_coordinator"}
+
     @property
     def name(self) -> str:
         return "fake_synthesizer"
@@ -23,10 +25,6 @@ class FakeSynthesizer(Synthesizer):
     @property
     def arrays_target(self) -> ArraysTarget:
         return ArraysTarget.NUMPY
-
-    @property
-    def supports_coordinators(self) -> set[str]:
-        return set()
 
     def global_init(
         self, dataset: DataFrame, context: GlobalInitContext

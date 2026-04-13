@@ -99,6 +99,8 @@ def _make_torch_generator(seed: int, device: torch.device) -> torch.Generator:
 
 
 class FedTabDiff(Synthesizer):
+    SUPPORTED_COORDINATORS = {"fedavg"}
+
     def __init__(
         self,
         batch_size: int = 128,
@@ -167,10 +169,6 @@ class FedTabDiff(Synthesizer):
     @property
     def arrays_target(self) -> ArraysTarget:
         return ArraysTarget.TORCH
-
-    @property
-    def supports_coordinators(self) -> set[str]:
-        return {"fedavg"}
 
     def global_init(
         self, dataset: DataFrame, context: GlobalInitContext

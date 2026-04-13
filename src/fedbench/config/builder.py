@@ -2,7 +2,7 @@ import csv
 import inspect
 from dataclasses import fields
 from pathlib import Path
-from typing import Any, Callable
+from typing import Any, Callable, TypeVar
 
 from fedbench.config.config import (
     Config,
@@ -12,10 +12,15 @@ from fedbench.config.config import (
     SeedConfig,
 )
 from fedbench.config.parsing import parse_kwargs_for_function
+from fedbench.core.algorithm import Coordinator, Synthesizer
+from fedbench.core.component import Component
+from fedbench.core.data import Partitioner
 from fedbench.core.eval import Category
 from fedbench.core.eval.evaluator import EvaluationMode
 from fedbench.runtime.factory import create_evaluation_suite
 from fedbench.runtime.registry import Group, Registry
+
+ComponentT = TypeVar("ComponentT", bound=Component)
 
 
 def build_config(
@@ -171,41 +176,56 @@ def validate_stop_metrics(
 
 
 def validate_synthesizer(registry: Registry, cfg: dict[str, Any]) -> None:
-    validate_component("synthesizer", registry, cfg)
+
+    def callback(factory: type[Synthesizer]) -> None:
+        if cfg["coordinator"] not in factory.SUPPORTED_COORDINATORS:
+            raise ValueError(
+                f"Synthesizer {cfg['synthesizer']} does not support "
+                f"coordinator {cfg['coordinator']}. "
+                f"Supported coordinators: "
+                f"{
+                    None
+                    if not factory.SUPPORTED_COORDINATORS
+                    else ', '.join(factory.SUPPORTED_COORDINATORS)
+                }."
+            )
+
+    validate_component(Synthesizer, registry, cfg, callback)  # type: ignore[type-abstract]
 
 
 def validate_coordinator(registry: Registry, cfg: dict[str, Any]) -> None:
-    validate_component("coordinator", registry, cfg)
+    validate_component(Coordinator, registry, cfg)  # type: ignore[type-abstract]
 
 
 def validate_partitioner(
     registry: Registry, cfg: dict[str, Any], data_cfg: dict[str, Any], seed: SeedConfig
 ) -> None:
 
-    def callback(factory: Callable[..., Any]) -> None:
+    def callback(factory: type[Partitioner]) -> None:
         inject_partitioner_kwargs(factory, cfg, data_cfg, seed)
 
-    validate_component("partitioner", registry, data_cfg, callback)
+    validate_component(Partitioner, registry, data_cfg, callback)  # type: ignore[type-abstract]
 
 
 def validate_component(
-    component_type: str,
+    component_type: type[ComponentT],
     registry: Registry,
     cfg: dict[str, Any],
-    preprocess_callback: Callable[[Callable[..., Any]], None] | None = None,
+    preprocess_callback: Callable[[type[ComponentT]], None] | None = None,
 ) -> None:
+    _component_type = component_type.__name__.lower()
     # Check that specified component is registered in the associated registry
-    if cfg[component_type] not in registry:
+    if cfg[_component_type] not in registry:
         raise ValueError(
-            f"`{cfg[component_type]}` is not a registered {component_type}."
+            f"`{cfg[_component_type]}` is not a registered {_component_type}."
         )
 
     # Ensure kwargs dict exists
-    kwargs_key = f"{component_type}_kwargs"
+    kwargs_key = f"{_component_type}_kwargs"
     cfg.setdefault(kwargs_key, {})
 
     # Do component specific preprocessing like injecting partitioner kwargs
-    factory = registry.load(cfg[component_type])
+    factory = registry.load(cfg[_component_type])
     if preprocess_callback:
         preprocess_callback(factory)
 

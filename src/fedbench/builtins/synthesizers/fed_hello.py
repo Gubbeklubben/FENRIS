@@ -22,6 +22,8 @@ from fedbench.core.payload import ArraysTarget, Payload
 class FedHello(Synthesizer):
     """Say a federated hello."""
 
+    SUPPORTED_COORDINATORS = {"fedavg"}
+
     def __init__(self, name: str = "Stranger") -> None:
         self._name = name
 
@@ -32,10 +34,6 @@ class FedHello(Synthesizer):
     @property
     def arrays_target(self) -> ArraysTarget:
         return ArraysTarget.NUMPY
-
-    @property
-    def supports_coordinators(self) -> set[str]:
-        return {"fedavg"}
 
     def global_init(
         self, dataset: DataFrame, context: GlobalInitContext
