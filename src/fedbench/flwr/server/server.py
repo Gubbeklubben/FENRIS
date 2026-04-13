@@ -1,7 +1,7 @@
 import json
 import time
 from collections.abc import Generator, Iterable
-from typing import Any, Self, cast
+from typing import Any, Callable, Self, cast
 
 from flwr.app import ConfigRecord, Message, RecordDict
 from flwr.serverapp import Grid
@@ -36,9 +36,12 @@ class Strategy:
         eventbus: EventBus,
         coordinator: Coordinator,
         monitor: EarlyStoppingMonitor,
+        validate_fn: Callable[[], None],
     ) -> Self:
 
-        return cls(seed_config.init, schema, serde, eventbus, coordinator, monitor)
+        return cls(
+            seed_config.init, schema, serde, eventbus, coordinator, monitor, validate_fn
+        )
 
     def __init__(
         self,
@@ -48,6 +51,7 @@ class Strategy:
         eventbus: EventBus,
         coordinator: Coordinator,
         monitor: EarlyStoppingMonitor,
+        validate_fn: Callable[[], None],
     ) -> None:
 
         self._init_seed = init_seed
@@ -56,6 +60,7 @@ class Strategy:
         self._eventbus = eventbus
         self._coordinator = coordinator
         self._monitor = monitor
+        self._validate_fn = validate_fn
         self._per_client_metrics: dict[int, Metrics] = {}
 
     def train(self, grid: Grid) -> None:
@@ -116,9 +121,13 @@ class Strategy:
             self._eventbus.emit(RoundCompleted(curr_round, num_rounds))
             log_info(__name__, f"Training round {curr_round}/{num_rounds} completed")
 
+            # Validate schema against D_syn after one round of training
+            if curr_round == 1:
+                self._validate_fn()
+
             # Check early stopping
             if self._monitor.should_run(curr_round, num_rounds):
-                self._monitor.run(self._get_and_check_train_artifacts())
+                self._monitor.run()
                 if self._monitor.early_stop_triggered:
                     break
 
