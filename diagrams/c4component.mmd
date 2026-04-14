@@ -1,0 +1,37 @@
+C4Component
+    UpdateLayoutConfig($c4ShapeInRow="2", $c4BoundaryInRow="2")
+    Person(user, "User", "")
+    Container_Boundary(framework, "Application", "") {
+        Component(cli, "CLI")
+        Component(run, "Runner", "module", "Executes a sequence<br/> of commands.")
+        Component(ep, "EntryPoint", "importlib.metadata.EntryPoint", "Plugin
+            discovery.")
+        Component(pipeline, "Pipeline", "module", "Defines a sequence<br/> of
+        commands.")
+        Component(reg, "Registry", "module", "Loads and provides<br/> registered
+            objects.")
+        Component(comp, "Component", "object", "Synthesizer |
+            Coordinator<br/>| Partitioner | Evaluator")
+        Component(factory, "Factory", "module", "Creates component<br/>
+            instances.")
+    }
+    Container_Boundary(flwr, "flwr", "") {
+        Component(server_app, "flwr ServerApp")
+        Component(server, "Server", "thread")
+        Component(client_app, "flwr ClientApp")
+        Component(client, "Client", "process")
+    }
+    Rel(user, cli, "Invokes")
+    Rel(cli, run, "Invokes")
+    Rel(reg, ep, "Uses")
+    Rel(factory, reg, "Uses")
+    Rel(factory, comp, "Creates")
+    Rel(client_app, comp, "Uses")
+    Rel(server_app, comp, "Uses")
+    Rel(pipeline, comp, "Uses")
+    Rel(pipeline, factory, "Uses")
+    Rel(pipeline, client_app, "Creates")
+    Rel(pipeline, server_app, "Creates")
+    Rel(run, pipeline, "Executes")
+    Rel(client, client_app, "Executes")
+    Rel(server, server_app, "Executes")

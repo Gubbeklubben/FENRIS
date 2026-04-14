@@ -1,0 +1,11 @@
+C4Context
+    Person(researcher, "Researcher")
+    Person(dev, "Researcher/Developer")
+    System(framework, "Framework", "Simulates federated training, samples from<br/>
+        the trained model, and evaluates<br/> the synthetic data.")
+
+
+    Rel(researcher, framework, "Executes runs and <br/>analyses results")
+    Rel(dev, framework, "Implements components.")
+    UpdateLayoutConfig($c4ShapeInRow="2")
+
