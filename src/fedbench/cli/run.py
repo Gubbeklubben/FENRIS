@@ -128,13 +128,6 @@ def run(
             "will be inferred."
         ),
     ] = None,
-    generate_input_schema: Annotated[
-        bool | None,
-        typer.Option(
-            help="Whether to write back the inferred schema as a .schema.json file "
-            "next to the input dataset. File must not already exist."
-        ),
-    ] = None,
 ) -> None:
 
     cli_input = {

@@ -69,7 +69,7 @@ def load_or_infer_schema(schema_path: Path, fallback_df: pd.DataFrame) -> TableS
     if schema_path.exists():
         return _load_schema(schema_path)
     else:
-        return _infer_schema(fallback_df)
+        return infer_schema(fallback_df)
 
 
 def _load_schema(schema_path: Path) -> TableSchema:
@@ -87,7 +87,7 @@ def _load_schema(schema_path: Path) -> TableSchema:
     return TableSchema(**root, columns=tuple(ColumnSchema(**col) for col in cols))
 
 
-def _infer_schema(df: pd.DataFrame) -> TableSchema:
+def infer_schema(df: pd.DataFrame) -> TableSchema:
     """Create a `TableSchema` from a pandas DataFrame.
 
     Rules:

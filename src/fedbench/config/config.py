@@ -19,7 +19,6 @@ class DataConfig:
     )
     target_col: str | None = None
     sensitive_cols: tuple[str, ...] = field(default_factory=tuple)
-    generate_input_schema: bool = False
 
 
 @dataclass(frozen=True)
