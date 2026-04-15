@@ -25,14 +25,14 @@ class ClientContext:
     synthesizer: Synthesizer
     eval_suite: EvaluationSuite
     serde: FlwrSerde
-    framework_cache: RDictNamespaceView
-    artifacts_cache: RDictNamespaceView
-    synthesizer_cache: RDictNamespaceView
+    framework_storage: RDictNamespaceView
+    artifacts_storage: RDictNamespaceView
+    synthesizer_storage: RDictNamespaceView
 
 
-def build_client_context(flwr_cache: RecordDict) -> ClientContext:
-    framework_cache = Namespace.FRAMEWORK.view(flwr_cache)
-    config = _get_config(framework_cache)
+def build_client_context(flwr_storage: RecordDict) -> ClientContext:
+    framework_storage = Namespace.FRAMEWORK.view(flwr_storage)
+    config = _get_config(framework_storage)
     dataset = _get_dataset(config)
 
     synthesizer = factory.create_synthesizer(
@@ -49,18 +49,18 @@ def build_client_context(flwr_cache: RecordDict) -> ClientContext:
         synthesizer,
         eval_suite,
         serde,
-        framework_cache,
-        Namespace.GLOBAL_INIT_ARTIFACTS.view(flwr_cache),
-        Namespace.SYNTHESIZER.view(flwr_cache),
+        framework_storage,
+        Namespace.GLOBAL_INIT_ARTIFACTS.view(flwr_storage),
+        Namespace.SYNTHESIZER.view(flwr_storage),
     )
 
 
-def _get_config(cache: RDictNamespaceView) -> Config:
+def _get_config(storage: RDictNamespaceView) -> Config:
     global _config
     if _config is not None:
         return _config
 
-    config = cache.config_records.get("config", None)
+    config = storage.config_records.get("config", None)
     if config is None:
         raise RuntimeError("Missing config, can not build client context.")
 

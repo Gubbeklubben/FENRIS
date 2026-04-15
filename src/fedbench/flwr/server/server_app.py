@@ -25,7 +25,7 @@ def make_server_app(ctx: RunContext) -> ServerApp:
         )
         sample_ctx = SampleContext(
             global_init_artifacts=ctx.global_init_artifacts.synthesizer,
-            client_cache=None,
+            client_storage=None,
             schema=ctx.dataset.schema,
             seed=ctx.config.seed.sampling,
             num_rows=num_synthetic_rows,

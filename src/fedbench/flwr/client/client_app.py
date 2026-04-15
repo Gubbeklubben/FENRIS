@@ -38,13 +38,13 @@ def train(message: Message, flwr_context: Context) -> Message:
     partition_id = get_partition_id(flwr_context)
     train_df = ctx.dataset.load_train_partition(partition_id)
 
-    artifacts = ctx.serde.from_flwr(ctx.artifacts_cache)
+    artifacts = ctx.serde.from_flwr(ctx.artifacts_storage)
     request = ctx.serde.from_flwr(message.content)
 
-    with ctx.serde.use_deserialized(ctx.synthesizer_cache) as cache:
+    with ctx.serde.use_deserialized(ctx.synthesizer_storage) as storage:
         train_ctx = TrainContext(
             global_init_artifacts=artifacts,
-            client_cache=cache,
+            client_storage=storage,
             seed=ctx.config.seed.training,
         )
         start_time = time.perf_counter_ns()
@@ -58,10 +58,10 @@ def train(message: Message, flwr_context: Context) -> Message:
                 f"Actual: {type(reply)}."
             )
 
-    with ctx.serde.use_deserialized(ctx.framework_cache) as cache:
+    with ctx.serde.use_deserialized(ctx.framework_storage) as storage:
         metrics = cast(
             dict[str, float],
-            cache.metrics.setdefault(
+            storage.metrics.setdefault(
                 "metrics", {"local_train_seconds": 0, "local_train_rounds": 0}
             ),
         )
@@ -85,13 +85,13 @@ def evaluate(message: Message, flwr_context: Context) -> Message:
     train_df = ctx.dataset.load_train_partition(partition_id)
     test_df = ctx.dataset.load_test_partition(partition_id)
 
-    artifacts = ctx.serde.from_flwr(ctx.artifacts_cache)
+    artifacts = ctx.serde.from_flwr(ctx.artifacts_storage)
     request = ctx.serde.from_flwr(message.content)
 
-    with ctx.serde.use_deserialized(ctx.synthesizer_cache) as cache:
+    with ctx.serde.use_deserialized(ctx.synthesizer_storage) as storage:
         sample_ctx = SampleContext(
             global_init_artifacts=artifacts,
-            client_cache=cache,
+            client_storage=storage,
             schema=ctx.dataset.schema,
             seed=ctx.config.seed.sampling,
             num_rows=ctx.config.num_synthetic_rows or ctx.dataset.global_holdout_size,
@@ -99,12 +99,12 @@ def evaluate(message: Message, flwr_context: Context) -> Message:
         synthetic_df = ctx.synthesizer.sample(request, sample_ctx)
 
     # noinspection PyUnnecessaryCast
-    cached_metrics = cast(
+    stored_metrics = cast(
         dict[str, float],
-        ctx.serde.from_flwr(ctx.framework_cache).metrics.get("metrics", {}),
+        ctx.serde.from_flwr(ctx.framework_storage).metrics.get("metrics", {}),
     )
-    local_train_seconds = cached_metrics.get("local_train_seconds", math.nan)
-    local_train_rounds = cached_metrics.get("local_train_rounds", math.nan)
+    local_train_seconds = stored_metrics.get("local_train_seconds", math.nan)
+    local_train_rounds = stored_metrics.get("local_train_rounds", math.nan)
 
     eval_ctx = LocalEvalContext(
         train_df=train_df,

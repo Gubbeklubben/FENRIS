@@ -61,13 +61,13 @@ class FedHello(Synthesizer):
         context: TrainContext,
     ) -> Payload:
 
-        if context.client_cache is not None:
+        if context.client_storage is not None:
             try:
-                context.client_cache.metrics["counters"]["train"] += 1  # type: ignore[operator]
+                context.client_storage.metrics["counters"]["train"] += 1  # type: ignore[operator]
             except KeyError:
-                context.client_cache.metrics["counters"] = {"train": 1}
+                context.client_storage.metrics["counters"] = {"train": 1}
 
-            count = context.client_cache.metrics["counters"]["train"]
+            count = context.client_storage.metrics["counters"]["train"]
             log_info(str(self), f"Hello {count} from train, {self._name}!")
         else:
             log_info(str(self), f"Hello from train {self._name}!")
@@ -80,13 +80,13 @@ class FedHello(Synthesizer):
         context: SampleContext,
     ) -> pd.DataFrame:
 
-        if context.client_cache is not None:
+        if context.client_storage is not None:
             try:
-                context.client_cache.metrics["counters"]["sample"] += 1  # type: ignore[operator]
+                context.client_storage.metrics["counters"]["sample"] += 1  # type: ignore[operator]
             except KeyError:
-                context.client_cache.metrics["counters"] = {"sample": 1}
+                context.client_storage.metrics["counters"] = {"sample": 1}
 
-            count = context.client_cache.metrics["counters"]["sample"]
+            count = context.client_storage.metrics["counters"]["sample"]
             log_info(str(self), f"Hello {count} from sample, {self._name}!")
         else:
             log_info(str(self), f"Hello from sample {self._name}!")

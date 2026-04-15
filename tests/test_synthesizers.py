@@ -44,7 +44,7 @@ def _run_global_init_and_train(synth, df: pd.DataFrame, schema: TableSchema) -> 
 
     train_ctx = TrainContext(
         global_init_artifacts=artifacts.synthesizer,
-        client_cache=None,
+        client_storage=None,
         seed=1,
     )
     synth.train(artifacts.coordinator, df.copy(), train_ctx)
