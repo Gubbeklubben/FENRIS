@@ -13,14 +13,14 @@ class GlobalInitContext:
 @dataclass(frozen=True)
 class TrainContext:
     global_init_artifacts: Payload | None
-    client_cache: Payload | None
+    client_storage: Payload | None
     seed: int
 
 
 @dataclass(frozen=True)
 class SampleContext:
     global_init_artifacts: Payload | None
-    client_cache: Payload | None
+    client_storage: Payload | None
     schema: TableSchema
     seed: int
     num_rows: int
