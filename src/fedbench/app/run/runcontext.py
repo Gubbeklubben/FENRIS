@@ -27,7 +27,7 @@ class _RunCtxField[T]:
     - Get before set -> AttributeError.
     - Set more than once -> RuntimeError.
 
-    Deliberately assumes app checking of types is someone else's
+    Deliberately assumes runtime checking of types is someone else's
     responsibility and does no such thing.
     """
 
