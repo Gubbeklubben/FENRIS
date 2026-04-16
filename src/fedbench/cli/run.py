@@ -117,7 +117,7 @@ def run(
         ),
     ] = None,
     disable_pickle: Annotated[
-        bool | None, typer.Option(help="Whether to disable pickle for dataset loading.")
+        bool | None, typer.Option(help="Disable pickle based serialization.")
     ] = None,
     schema: Annotated[
         str | None,
