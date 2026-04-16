@@ -63,7 +63,7 @@ class BGMTransformer:
 
     def fit(
         self,
-        data: pd.DataFrame,
+        df: pd.DataFrame,
         categorical_columns: list[str],
         continuous_columns: list[str],
         random_state: int,
@@ -72,7 +72,7 @@ class BGMTransformer:
 
         Parameters
         ----------
-        data : pd.DataFrame
+        df : pd.DataFrame
             Training data
         categorical_columns : list[str]
             Names of categorical columns
@@ -88,9 +88,9 @@ class BGMTransformer:
         self.output_dim = 0
 
         # Build metadata
-        for col in data.columns:
+        for col in df.columns:
             if col in categorical_columns:
-                unique_vals = data[col].value_counts().index.tolist()
+                unique_vals = df[col].value_counts().index.tolist()
                 self.meta.append(
                     {
                         "name": col,
@@ -104,15 +104,15 @@ class BGMTransformer:
                     {
                         "name": col,
                         "type": "continuous",
-                        "min": float(data[col].min()),
-                        "max": float(data[col].max()),
+                        "min": float(df[col].min()),
+                        "max": float(df[col].max()),
                     }
                 )
             else:
                 raise ValueError(f"Column {col} not in categorical or continuous lists")
 
         # Fit models
-        data_array = data.values
+        data_array = df.values
         for id_, info in enumerate(self.meta):
             if info["type"] == "continuous":
                 # Fit Bayesian GMM
@@ -142,12 +142,12 @@ class BGMTransformer:
                 self.output_info.append((info["size"], "softmax"))
                 self.output_dim += info["size"]
 
-    def transform(self, data: pd.DataFrame, rng: np.random.Generator) -> np.ndarray:
+    def transform(self, df: pd.DataFrame, rng: np.random.Generator) -> np.ndarray:
         """Transform data using fitted BGM models.
 
         Parameters
         ----------
-        data : pd.DataFrame
+        df : pd.DataFrame
             Data to transform
         rng : np.random.Generator
             Local random number generator used for BGM mode selection
@@ -158,7 +158,7 @@ class BGMTransformer:
         np.ndarray
             Transformed data: [normalized_values, mode_one_hots, category_one_hots]
         """
-        data_array = data.values
+        data_array = df.values
         values = []
 
         for id_, info in enumerate(self.meta):
@@ -189,8 +189,8 @@ class BGMTransformer:
                 probs = probs[:, components]
 
                 # Sample mode for each value
-                opt_sel = np.zeros(len(data), dtype=int)
-                for i in range(len(data)):
+                opt_sel = np.zeros(len(df), dtype=int)
+                for i in range(len(df)):
                     pp = probs[i] + 1e-6
                     pp = pp / pp.sum()
                     opt_sel[i] = rng.choice(np.arange(n_opts), p=pp)
@@ -209,9 +209,9 @@ class BGMTransformer:
 
             else:  # categorical
                 # One-hot encode
-                col_t = np.zeros([len(data), info["size"]])
+                col_t = np.zeros([len(df), info["size"]])
                 idx = np.array([info["i2s"].index(val) for val in current])
-                col_t[np.arange(len(data)), idx] = 1
+                col_t[np.arange(len(df)), idx] = 1
                 values.append(col_t)
 
         return np.concatenate(values, axis=1).astype(np.float32)

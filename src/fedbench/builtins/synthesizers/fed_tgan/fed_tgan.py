@@ -60,7 +60,7 @@ def split_cat_num(schema: TableSchema) -> tuple[list[str], list[str]]:
 
 
 def compute_column_distributions(
-    data: DataFrame, cat_attrs: list[str], num_attrs: list[str]
+    df: DataFrame, cat_attrs: list[str], num_attrs: list[str]
 ) -> tuple[dict[str, dict[str, float]], dict[str, np.ndarray]]:
     """Compute categorical and continuous column distributions for table similarity.
 
@@ -69,7 +69,7 @@ def compute_column_distributions(
 
     Parameters
     ----------
-    data : DataFrame
+    df : DataFrame
         Raw client data (not transformed)
     cat_attrs : list[str]
         Categorical column names
@@ -88,13 +88,13 @@ def compute_column_distributions(
 
     # Compute categorical distributions (normalized value counts as dict)
     for col in cat_attrs:
-        value_counts = data[col].value_counts(normalize=True)
+        value_counts = df[col].value_counts(normalize=True)
         # Store as dictionary: {category: probability}
         cat_distributions[col] = {str(k): float(v) for k, v in value_counts.items()}
 
     # Store continuous column samples
     for col in num_attrs:
-        num_distributions[col] = np.asarray(data[col].values, dtype=np.float32)
+        num_distributions[col] = np.asarray(df[col].values, dtype=np.float32)
 
     return cat_distributions, num_distributions
 

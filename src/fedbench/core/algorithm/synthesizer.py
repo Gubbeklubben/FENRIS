@@ -121,13 +121,15 @@ class Synthesizer(Component):
     ) -> GlobalInitArtifacts:
         """Preprocessing hook.
 
-        Called before initiating a federated simulation. The input dataset is the
-        union of all train partitions.
+        Called before initiating a federated simulation.
 
         Parameters
         ----------
         df : `pandas.DataFrame`
+            The union of all train partitions.
         context : `fedbench.core.algorithm.context.GlobalInitContext`
+            A context object holding relevant information like the table schema and the
+            derived seed to use for stochastic operations during initialization.
 
         Returns
         -------
