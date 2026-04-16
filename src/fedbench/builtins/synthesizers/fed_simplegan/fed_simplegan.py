@@ -133,7 +133,7 @@ class FedSimpleGAN(Synthesizer):
         return ArraysTarget.TORCH
 
     def global_init(
-        self, dataset: DataFrame, context: GlobalInitContext
+        self, df: DataFrame, context: GlobalInitContext
     ) -> GlobalInitArtifacts:
 
         rng = np.random.default_rng(context.seed)
@@ -146,7 +146,7 @@ class FedSimpleGAN(Synthesizer):
         label_encoders = {}
         cat_max_values = {}
         for col in cat_attrs:
-            unique_vals = sorted(dataset[col].astype(str).unique())
+            unique_vals = sorted(df[col].astype(str).unique())
             le = LabelEncoder()
             le.fit(unique_vals)
             label_encoders[col] = le
@@ -177,7 +177,7 @@ class FedSimpleGAN(Synthesizer):
         num_scaler = None
         if num_attrs:
             num_scaler = MinMaxScaler()
-            num_scaler.fit(dataset[num_attrs].values)
+            num_scaler.fit(df[num_attrs].values)
 
         artifacts = _FedSimpleGANArtifacts(
             cat_attrs=cat_attrs,
@@ -193,9 +193,7 @@ class FedSimpleGAN(Synthesizer):
             synthesizer=artifacts.encode(),
         )
 
-    def train(
-        self, request: Payload, data: DataFrame, context: TrainContext
-    ) -> Payload:
+    def train(self, request: Payload, df: DataFrame, context: TrainContext) -> Payload:
 
         # noinspection PyUnnecessaryCast
         state = cast(dict[str, torch.Tensor], GlobalState.decode(request).state)
@@ -230,7 +228,7 @@ class FedSimpleGAN(Synthesizer):
         # Encode and normalize categorical columns
         for col in cat_attrs:
             if col in label_encoders:
-                encoded = label_encoders[col].transform(data[col].astype(str))
+                encoded = label_encoders[col].transform(df[col].astype(str))
                 # Normalize to [0, 1] by dividing by max value
                 max_val = cat_max_values[col]
                 if max_val > 0:
@@ -241,12 +239,12 @@ class FedSimpleGAN(Synthesizer):
 
         # Add numerical columns (scaled)
         if num_attrs and num_scaler is not None:
-            num_data = data[num_attrs].values
+            num_data = df[num_attrs].values
             num_scaled = num_scaler.transform(num_data)
             processed_data.append(num_scaled)
         elif num_attrs:
             # Fallback if no scaler (shouldn't happen)
-            num_data = data[num_attrs].values
+            num_data = df[num_attrs].values
             processed_data.append(num_data)
 
         # Concatenate all features

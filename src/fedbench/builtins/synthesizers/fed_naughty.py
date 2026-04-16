@@ -179,7 +179,7 @@ class FedNaughty(Synthesizer):
 
     def global_init(
         self,
-        dataset: DataFrame,
+        df: DataFrame,
         context: GlobalInitContext,
     ) -> GlobalInitArtifacts:
         if self._config.point == "global_init":
@@ -205,7 +205,7 @@ class FedNaughty(Synthesizer):
     def train(
         self,
         request: Payload,
-        data: DataFrame,
+        df: DataFrame,
         context: TrainContext,
     ) -> Payload:
         config = _decode_config(context.global_init_artifacts) or self._config
@@ -224,7 +224,7 @@ class FedNaughty(Synthesizer):
                 return Payload()
 
         return ClientUpdate(
-            state=GlobalState.decode(request).state, count=len(data)
+            state=GlobalState.decode(request).state, count=len(df)
         ).encode()
 
     def sample(

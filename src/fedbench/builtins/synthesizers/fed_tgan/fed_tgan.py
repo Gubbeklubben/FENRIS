@@ -353,7 +353,7 @@ class FedTGAN(Synthesizer):
         return ArraysTarget.TORCH
 
     def global_init(
-        self, dataset: DataFrame, context: GlobalInitContext
+        self, df: DataFrame, context: GlobalInitContext
     ) -> GlobalInitArtifacts:
 
         rng = np.random.default_rng(context.seed)
@@ -364,7 +364,7 @@ class FedTGAN(Synthesizer):
         # Fit BGMTransformer
         transformer = BGMTransformer(n_clusters=10, eps=0.005)
         transformer.fit(
-            dataset,
+            df,
             cat_attrs,
             num_attrs,
             random_state=int(rng.integers(2**31)),
@@ -382,7 +382,7 @@ class FedTGAN(Synthesizer):
 
         # Build Cond from global data so sampling can reproduce the training
         # distribution
-        x_global = transformer.transform(dataset, rng).astype(np.float32)
+        x_global = transformer.transform(df, rng).astype(np.float32)
         cond = Cond(x_global, output_info)
 
         # Seed global torch RNG just before model init so that weight
@@ -416,9 +416,7 @@ class FedTGAN(Synthesizer):
             synthesizer=artifacts.encode(),
         )
 
-    def train(
-        self, request: Payload, data: DataFrame, context: TrainContext
-    ) -> Payload:
+    def train(self, request: Payload, df: DataFrame, context: TrainContext) -> Payload:
 
         # noinspection PyUnnecessaryCast
         state = cast(dict[str, torch.Tensor], GlobalState.decode(request).state)
@@ -463,7 +461,7 @@ class FedTGAN(Synthesizer):
         torch.manual_seed(int(rng.integers(2**31)))
 
         # Transform data with BGMTransformer
-        x = transformer.transform(data, rng).astype(np.float32)
+        x = transformer.transform(df, rng).astype(np.float32)
 
         # Initialize conditional vector generator and conditioned data sampler
         cond_generator = Cond(x, output_info)
@@ -637,7 +635,7 @@ class FedTGAN(Synthesizer):
 
         # Compute column distributions for table similarity
         cat_distributions, num_distributions = compute_column_distributions(
-            data, artifacts.cat_attrs, artifacts.num_attrs
+            df, artifacts.cat_attrs, artifacts.num_attrs
         )
 
         reply = ClientUpdate(

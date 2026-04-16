@@ -27,13 +27,11 @@ class FakeSynthesizer(Synthesizer):
         return ArraysTarget.NUMPY
 
     def global_init(
-        self, dataset: DataFrame, context: GlobalInitContext
+        self, df: DataFrame, context: GlobalInitContext
     ) -> GlobalInitArtifacts:
         pass
 
-    def train(
-        self, request: Payload, data: DataFrame, context: TrainContext
-    ) -> Payload:
+    def train(self, request: Payload, df: DataFrame, context: TrainContext) -> Payload:
         pass
 
     def sample(self, request: Payload, context: SampleContext) -> DataFrame:
