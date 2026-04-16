@@ -13,12 +13,12 @@ from fedbench.core.algorithm import (
     GlobalInitContext,
     SampleContext,
 )
-from fedbench.core.data import PartitionedDataset
 from fedbench.core.data.schemas import load_or_infer_schema
 from fedbench.core.eval import CentralizedEvalContext, Evaluator
 from fedbench.core.logger import log_info
 from fedbench.core.payload import ArraysTarget
 from fedbench.runtime.command import Command
+from fedbench.runtime.partitioned_dataset import PartitionedDataset
 from fedbench.runtime.platform_info import collect_platform_info
 from fedbench.runtime.registry import Group
 from fedbench.runtime.runcontext import RunContext
