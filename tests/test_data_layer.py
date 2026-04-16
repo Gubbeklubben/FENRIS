@@ -2,8 +2,9 @@ import pandas as pd
 import pytest
 
 from fedbench.builtins.partitioners.flwr_delegates import FlwrDelegatePartitioner
-from fedbench.core.data import PartitionedDataset, load_csv
+from fedbench.core.data import load_csv
 from fedbench.core.data.schemas import infer_schema
+from fedbench.runtime.partitioned_dataset import PartitionedDataset
 from tests.fake_components import FakePartitionerRegistry
 
 

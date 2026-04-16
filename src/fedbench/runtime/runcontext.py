@@ -8,10 +8,11 @@ from pandas import DataFrame
 from fedbench.config import Config
 from fedbench.core.algorithm import Coordinator, GlobalInitArtifacts, Synthesizer
 from fedbench.core.component import Component
-from fedbench.core.data import PartitionedDataset, Partitioner
+from fedbench.core.data import Partitioner
 from fedbench.core.eval import EvaluationSuite
 from fedbench.core.payload import Payload
 from fedbench.runtime.eventbus import EventBus
+from fedbench.runtime.partitioned_dataset import PartitionedDataset
 from fedbench.runtime.scalability_collector import ScalabilityCollector
 
 
