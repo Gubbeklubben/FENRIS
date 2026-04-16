@@ -4,6 +4,8 @@ from dataclasses import fields
 from pathlib import Path
 from typing import Any, Callable, TypeVar
 
+from fedbench.app.factory import create_evaluation_suite
+from fedbench.app.registry import Group, Registry
 from fedbench.config.config import (
     Config,
     ConfigCls,
@@ -17,8 +19,6 @@ from fedbench.core.component import Component
 from fedbench.core.data import Partitioner
 from fedbench.core.eval import Category
 from fedbench.core.eval.evaluator import EvaluationMode
-from fedbench.runtime.factory import create_evaluation_suite
-from fedbench.runtime.registry import Group, Registry
 
 ComponentT = TypeVar("ComponentT", bound=Component)
 

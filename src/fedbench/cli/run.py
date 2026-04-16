@@ -2,10 +2,10 @@ from typing import Annotated, Literal
 
 import typer
 
-import fedbench.runtime.runner as runner
+import fedbench.app.run.runner as runner
+from fedbench.app.run.pipeline import pipeline
 from fedbench.config.builder import build_config
 from fedbench.config.parsing import parse_args, parse_kwargs
-from fedbench.runtime.pipeline import pipeline
 
 app = typer.Typer()
 

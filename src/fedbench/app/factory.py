@@ -6,11 +6,11 @@ from typing import Any
 
 from pandas import DataFrame
 
+from fedbench.app.registry import Group, Registry
 from fedbench.core.algorithm import Coordinator, Synthesizer
 from fedbench.core.component import Component
 from fedbench.core.data import Partitioner, load_csv
 from fedbench.core.eval import Category, EvaluationSuite, Evaluator
-from fedbench.runtime.registry import Group, Registry
 
 
 # Wrap up loading in a partial for easy replay in client subprocs.

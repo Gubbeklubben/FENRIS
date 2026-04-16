@@ -7,7 +7,12 @@ from collections.abc import Iterable
 from dataclasses import asdict
 from pathlib import Path
 
-import fedbench.runtime.factory as factory
+import fedbench.app.factory as factory
+from fedbench.app.registry import Group
+from fedbench.app.run.command import Command
+from fedbench.app.run.partitioned_dataset import PartitionedDataset
+from fedbench.app.run.platform_info import collect_platform_info
+from fedbench.app.run.runcontext import RunContext
 from fedbench.core.algorithm import (
     GlobalInitArtifacts,
     GlobalInitContext,
@@ -17,11 +22,6 @@ from fedbench.core.data.schemas import load_or_infer_schema
 from fedbench.core.eval import CentralizedEvalContext, Evaluator
 from fedbench.core.logger import log_info
 from fedbench.core.payload import ArraysTarget
-from fedbench.runtime.command import Command
-from fedbench.runtime.partitioned_dataset import PartitionedDataset
-from fedbench.runtime.platform_info import collect_platform_info
-from fedbench.runtime.registry import Group
-from fedbench.runtime.runcontext import RunContext
 
 
 def create_components(ctx: RunContext) -> None:
