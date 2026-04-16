@@ -4,7 +4,8 @@ from typing import cast
 
 from flwr.app import RecordDict
 
-import fedbench.runtime.factory as factory
+import fedbench.app.factory as factory
+from fedbench.app.run.partitioned_dataset import PartitionedDataset
 from fedbench.config import Config
 from fedbench.core.algorithm import Synthesizer
 from fedbench.core.data.schemas import load_or_infer_schema
@@ -12,7 +13,6 @@ from fedbench.core.eval import EvaluationSuite
 from fedbench.flwr.namespace import Namespace
 from fedbench.flwr.rdict import RDictNamespaceView
 from fedbench.flwr.serde import FlwrSerde, Pickle
-from fedbench.runtime.partitioned_dataset import PartitionedDataset
 
 _config: Config | None = None
 _dataset: PartitionedDataset | None = None

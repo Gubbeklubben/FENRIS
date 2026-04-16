@@ -3,7 +3,7 @@ from collections.abc import Iterable
 import pytest
 
 # noinspection PyProtectedMember
-from fedbench.runtime.runcontext import RunContext, _RunCtxField
+from fedbench.app.run.runcontext import RunContext, _RunCtxField
 
 
 @pytest.fixture

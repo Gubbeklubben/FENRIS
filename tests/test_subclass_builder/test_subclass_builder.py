@@ -3,7 +3,7 @@ from typing import Literal
 
 import pytest
 
-from fedbench.scaffold.subclass_builder import AbstractMethodCollector, Builder
+from fedbench.app.scaffold import AbstractMethodCollector, Builder
 from tests.test_subclass_builder.components.base import Base
 from tests.test_subclass_builder.components.override_abstract_with_abstract import (
     OverrideAbstractWithAbstract,

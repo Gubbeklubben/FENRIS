@@ -3,6 +3,10 @@ from collections.abc import Iterable
 from datetime import datetime
 from pathlib import Path
 
+from fedbench.app.run.command import Command
+from fedbench.app.run.eventbus import EventBus
+from fedbench.app.run.runcontext import RunContext
+from fedbench.app.run.scalability_collector import ScalabilityCollector
 from fedbench.config import Config
 from fedbench.core.events import (
     ClientReply,
@@ -17,10 +21,6 @@ from fedbench.core.events import (
     TrainEvalLoopStarted,
 )
 from fedbench.core.logger import log_debug, log_error
-from fedbench.runtime.command import Command
-from fedbench.runtime.eventbus import EventBus
-from fedbench.runtime.runcontext import RunContext
-from fedbench.runtime.scalability_collector import ScalabilityCollector
 
 
 def run(config: Config, commands: Iterable[Command]) -> None:

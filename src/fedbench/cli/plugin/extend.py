@@ -10,10 +10,10 @@ import typer
 from tomlkit import TOMLDocument
 from tomlkit.items import Table
 
+from fedbench.app.registry import Group
+from fedbench.app.scaffold import AbstractMethodCollector, Builder
 from fedbench.cli.plugin._util import validate_identifier
 from fedbench.core.component import Component
-from fedbench.runtime.registry import Group
-from fedbench.scaffold.subclass_builder import AbstractMethodCollector, Builder
 
 app = typer.Typer()
 

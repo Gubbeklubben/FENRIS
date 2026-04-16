@@ -5,7 +5,7 @@ from typing import Annotated
 
 import typer
 
-from fedbench.runtime.registry import Group, Metadata
+from fedbench.app.registry import Group, Metadata
 
 app = typer.Typer()
 

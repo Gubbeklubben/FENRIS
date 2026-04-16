@@ -6,7 +6,7 @@ from typing import TYPE_CHECKING, Any
 
 from numpy.typing import NDArray
 
-# Avoid importing torch at runtime
+# Avoid importing torch at app
 if TYPE_CHECKING:
     import torch
 

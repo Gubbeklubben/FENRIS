@@ -2,6 +2,7 @@ from typing import Generator, Iterable, Literal
 
 from pandas import DataFrame
 
+from fedbench.app.registry import Registry
 from fedbench.core.algorithm import (
     Coordinator,
     GlobalInitArtifacts,
@@ -12,7 +13,6 @@ from fedbench.core.algorithm import (
 )
 from fedbench.core.data import Partitioner
 from fedbench.core.payload import ArraysTarget, Payload
-from fedbench.runtime.registry import Registry
 
 
 class FakeSynthesizer(Synthesizer):

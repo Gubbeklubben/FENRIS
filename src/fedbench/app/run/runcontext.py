@@ -5,15 +5,15 @@ from typing import Any, Mapping, cast, overload
 
 from pandas import DataFrame
 
+from fedbench.app.run.eventbus import EventBus
+from fedbench.app.run.partitioned_dataset import PartitionedDataset
+from fedbench.app.run.scalability_collector import ScalabilityCollector
 from fedbench.config import Config
 from fedbench.core.algorithm import Coordinator, GlobalInitArtifacts, Synthesizer
 from fedbench.core.component import Component
 from fedbench.core.data import Partitioner
 from fedbench.core.eval import EvaluationSuite
 from fedbench.core.payload import Payload
-from fedbench.runtime.eventbus import EventBus
-from fedbench.runtime.partitioned_dataset import PartitionedDataset
-from fedbench.runtime.scalability_collector import ScalabilityCollector
 
 
 class _RunCtxField[T]:
@@ -27,7 +27,7 @@ class _RunCtxField[T]:
     - Get before set -> AttributeError.
     - Set more than once -> RuntimeError.
 
-    Deliberately assumes runtime checking of types is someone else's
+    Deliberately assumes app checking of types is someone else's
     responsibility and does no such thing.
     """
 
