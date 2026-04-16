@@ -36,7 +36,7 @@ class FedHello(Synthesizer):
         return ArraysTarget.NUMPY
 
     def global_init(
-        self, dataset: DataFrame, context: GlobalInitContext
+        self, df: DataFrame, context: GlobalInitContext
     ) -> GlobalInitArtifacts:
 
         rng = np.random.default_rng(context.seed)
@@ -57,7 +57,7 @@ class FedHello(Synthesizer):
     def train(
         self,
         request: Payload,
-        data: DataFrame,
+        df: DataFrame,
         context: TrainContext,
     ) -> Payload:
 

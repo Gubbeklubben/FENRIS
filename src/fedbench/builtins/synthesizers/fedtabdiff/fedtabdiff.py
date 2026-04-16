@@ -171,28 +171,28 @@ class FedTabDiff(Synthesizer):
         return ArraysTarget.TORCH
 
     def global_init(
-        self, dataset: DataFrame, context: GlobalInitContext
+        self, df: DataFrame, context: GlobalInitContext
     ) -> GlobalInitArtifacts:
 
         rng = np.random.default_rng(context.seed)
 
         cat_attrs, num_attrs = split_cat_num(context.schema)
-        prefix_columns(dataset, cat_attrs)
+        prefix_columns(df, cat_attrs)
 
         num_scaler: QuantileTransformer | None = None
         if num_attrs:
             num_scaler = QuantileTransformer(
-                n_quantiles=len(dataset),
+                n_quantiles=len(df),
                 output_distribution="normal",
                 random_state=int(rng.integers(2**31)),
             )
-            num_scaler.fit(dataset[num_attrs].values)
+            num_scaler.fit(df[num_attrs].values)
 
         label_encoder: LabelEncoder | None
         if cat_attrs:
-            vocab_classes = sorted(np.unique(dataset[cat_attrs]))
+            vocab_classes = sorted(np.unique(df[cat_attrs]))
             label_encoder = LabelEncoder().fit(vocab_classes)
-            cat_scaled = dataset[cat_attrs].apply(label_encoder.transform)
+            cat_scaled = df[cat_attrs].apply(label_encoder.transform)
             vocab_per_attr = {attr: set(cat_scaled[attr]) for attr in cat_attrs}
             n_cat_tokens = len(vocab_classes)
         else:
@@ -224,9 +224,7 @@ class FedTabDiff(Synthesizer):
             synthesizer=artifacts.encode(),
         )
 
-    def train(
-        self, request: Payload, data: DataFrame, context: TrainContext
-    ) -> Payload:
+    def train(self, request: Payload, df: DataFrame, context: TrainContext) -> Payload:
 
         state = GlobalState.decode(request).state
         if context.global_init_artifacts is None:
@@ -235,23 +233,21 @@ class FedTabDiff(Synthesizer):
         artifacts = _FedTabDiffArtifacts.decode(context.global_init_artifacts)
 
         if artifacts.cat_attrs:
-            prefix_columns(data, artifacts.cat_attrs)
+            prefix_columns(df, artifacts.cat_attrs)
             assert isinstance(artifacts.label_encoder, LabelEncoder)
-            cat_scaled = data[artifacts.cat_attrs].apply(
+            cat_scaled = df[artifacts.cat_attrs].apply(
                 artifacts.label_encoder.transform
             )
             cat_tensor = torch.tensor(cat_scaled.values, dtype=torch.long)
         else:
-            cat_tensor = torch.zeros((len(data), 0), dtype=torch.long)
+            cat_tensor = torch.zeros((len(df), 0), dtype=torch.long)
 
         if artifacts.num_attrs:
             assert isinstance(artifacts.num_scaler, QuantileTransformer)
-            num_scaled = artifacts.num_scaler.transform(
-                data[artifacts.num_attrs].values
-            )
+            num_scaled = artifacts.num_scaler.transform(df[artifacts.num_attrs].values)
             num_tensor = torch.tensor(num_scaled, dtype=torch.float)
         else:
-            num_tensor = torch.zeros((len(data), 0), dtype=torch.float)
+            num_tensor = torch.zeros((len(df), 0), dtype=torch.float)
 
         tensor_dataset = TensorDataset(cat_tensor, num_tensor)
 

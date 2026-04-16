@@ -1,3 +1,13 @@
+"""Defines the Synthesizer ABC.
+
+Classes
+-------
+Synthesizer
+    Abstract base class for synthesizer implementations.
+GlobalInitArtifacts
+    Simple container for preprocessing artifacts.
+"""
+
 import functools
 from abc import abstractmethod
 from dataclasses import dataclass
@@ -16,12 +26,32 @@ from fedbench.core.payload import ArraysTarget, Payload
 
 @dataclass(frozen=True)
 class GlobalInitArtifacts:
+    """A simple container for preprocessing output.
+
+    Attributes
+    ----------
+    coordinator : Payload | None
+        The content of this field, if any, is injected into the coordinator's
+        attach_global_init_artifacts.
+    synthesizer : Payload | None
+        The content of this field, if any, is stored by the framework,
+        and always attached to the context passed to a Synthesizer's
+        train and sample methods.
+    """
+
     coordinator: Payload | None = None
     synthesizer: Payload | None = None
 
 
 class Synthesizer(Component):
-    """The framework view of the model to train and sample from."""
+    """The framework view of the model to train and sample from.
+
+    Attributes
+    ----------
+    SUPPORTED_COORDINATORS : set[str]
+        Names of supported coordinators. Looked up at class level. If not overridden,
+        it is an empty set.
+    """
 
     SUPPORTED_COORDINATORS: ClassVar[set[str]] = set()
 
@@ -70,23 +100,70 @@ class Synthesizer(Component):
     @property
     @abstractmethod
     def arrays_target(self) -> ArraysTarget:
+        """Array deserialization target.
+
+        Decides the runtime type of the arrays field of
+        `fedbench.core.payload.Payload` instances.
+
+        Returns
+        -------
+        `fedbench.core.payload.ArraysTarget`
+            numpy | torch
+        """
+
         pass
 
     @abstractmethod
     def global_init(
         self,
-        dataset: DataFrame,
+        df: DataFrame,
         context: GlobalInitContext,
     ) -> GlobalInitArtifacts:
+        """Preprocessing hook.
+
+        Called before initiating a federated simulation.
+
+        Parameters
+        ----------
+        df : `pandas.DataFrame`
+            The union of all train partitions.
+        context : `fedbench.core.algorithm.context.GlobalInitContext`
+            A context object holding relevant information like the table schema and the
+            derived seed to use for stochastic operations during initialization.
+
+        Returns
+        -------
+        `fedbench.core.algorithm.context.GlobalInitArtifacts`
+            The resulting preprocessing artifacts.
+        """
+
         pass
 
     @abstractmethod
     def train(
         self,
         request: Payload,
-        data: DataFrame,
+        df: DataFrame,
         context: TrainContext,
     ) -> Payload:
+        """Respond to a coordinator train request.
+
+        Parameters
+        ----------
+        request : `fedbench.core.payload.Payload`
+            Incoming request from the active coordinator.
+        df : `pandas.DataFrame`
+            The local train partition.
+        context : `fedbench.core.algorithm.context.TrainContext`
+            A context object holding relevant information like preprocessing artifacts.
+            Includes a client local read/write storage.
+
+        Returns
+        -------
+        `fedbench.core.payload.Payload`
+            Response content.
+        """
+
         pass
 
     @abstractmethod
@@ -95,4 +172,20 @@ class Synthesizer(Component):
         request: Payload,
         context: SampleContext,
     ) -> DataFrame:
+        """Sample synthetic data.
+
+        Parameters
+        ----------
+        request : `fedbench.core.payload.Payload`
+            Most recent global train artifacts published by the active coordinator.
+        context : `fedbench.core.algorithm.context.SampleContext`
+            A context object holding relevant information like preprocessing artifacts.
+            Includes a client local read/write storage.
+
+        Returns
+        -------
+        `pandas.DataFrame`
+            The sampled synthetic data.
+        """
+
         pass
