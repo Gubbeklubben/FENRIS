@@ -2,24 +2,25 @@ C4Component
     UpdateLayoutConfig($c4ShapeInRow="2", $c4BoundaryInRow="2")
     Person(user, "User", "")
     Container_Boundary(framework, "Application", "") {
-        Component(cli, "CLI")
+        Component(cli, "CLI", "package")
         Component(run, "Runner", "module", "Executes a sequence<br/> of commands.")
-        Component(ep, "EntryPoint", "importlib.metadata.EntryPoint", "Plugin
-            discovery.")
+        Component(ep, "EntryPoint", "importlib.metadata.EntryPoint", "Discover
+            available<br/>components.")
         Component(pipeline, "Pipeline", "module", "Defines a sequence<br/> of
         commands.")
-        Component(reg, "Registry", "module", "Loads and provides<br/> registered
-            objects.")
+        Component(reg, "Registry", "module", "Load selected component<br/> factories.")
         Component(comp, "Component", "object", "Synthesizer |
             Coordinator<br/>| Partitioner | Evaluator")
         Component(factory, "Factory", "module", "Creates component<br/>
             instances.")
     }
     Container_Boundary(flwr, "flwr", "") {
-        Component(server_app, "flwr ServerApp")
         Component(server, "Server", "thread")
-        Component(client_app, "flwr ClientApp")
+        Component(server_app, "flwr ServerApp", "object", "Framework defined
+            server<br/>side logic.")
         Component(client, "Client", "process")
+        Component(client_app, "flwr ClientApp", "object", "Framework defined
+            client<br/>side logic")
     }
     Rel(user, cli, "Invokes")
     Rel(cli, run, "Invokes")
@@ -27,6 +28,7 @@ C4Component
     Rel(factory, reg, "Uses")
     Rel(factory, comp, "Creates")
     Rel(client_app, comp, "Uses")
+    Rel(client_app, factory, "Uses")
     Rel(server_app, comp, "Uses")
     Rel(pipeline, comp, "Uses")
     Rel(pipeline, factory, "Uses")
