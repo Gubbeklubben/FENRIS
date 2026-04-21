@@ -1,0 +1,51 @@
+---
+config:
+  theme: default
+
+  themeCSS: |
+    .messageText, .loopText tspan {
+        stroke: white;
+        stroke-width: 0.45em;
+        paint-order: stroke;
+        fill: black;
+    }
+    [marker-end*="crosshead"]{
+        display:none
+    }
+---
+sequenceDiagram
+    autonumber
+    participant Runner
+    participant Server
+    participant Client as Client × N
+
+
+    Runner->>+Server: flwr.Strategy.run()
+
+    Server->>+Client: configure <br>(Config + GlobalInitArtifacts.synthesizer)
+    Note over Client: Store in flwr state
+    Client-->>-Server: ack
+
+    loop for round in 1..num_rounds
+        Server->>+Client: train (coordinator payload)
+        Note over Client: Train the server-supplied synthesizer <br> on each client's local data partition, <br> and return the resulting model state
+        Client->>Client: synthesizer.train()
+        Client-->>-Server: train reply (train artifacts)
+        Note over Server: Coordinator aggregates replies <br> and updates central model state
+        opt if early stop logic should run
+            note over Server: Once `stop_min_rounds` rounds have passed: <br> Every `stop_eval_every` rounds, <br> compute `stop_metric` using the global holdout
+            Server->>Server: eval_suite.global_evaluate_single(stop_metric)
+
+            break if early stop triggered
+                Note over Server: Break loop when `stop_metric` has converged <br> (`stop_patience` consecutive rounds have passed <br> without `stop_metric` improving by at least `stop_epsilon`)
+            end
+        end
+    end
+
+    Server->>+Client: evaluate (final aggregated model state)
+    Note over Client: Evaluate final model against <br>each client's local data partition, <br> and return per-client metrics
+    Client->>Client: synthesizer.sample()
+    Client->>Client: eval_suite.local_evaluate()
+
+    Client-->>-Server: evaluate reply (per-client metrics)
+    Server-->>-Runner: train_artifacts + per_client_metrics <br> collected from all clients
