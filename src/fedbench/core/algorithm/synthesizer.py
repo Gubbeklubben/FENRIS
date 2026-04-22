@@ -111,8 +111,6 @@ class Synthesizer(Component):
             numpy | torch
         """
 
-        pass
-
     @abstractmethod
     def global_init(
         self,
@@ -136,8 +134,6 @@ class Synthesizer(Component):
         `fedbench.core.algorithm.context.GlobalInitArtifacts`
             The resulting preprocessing artifacts.
         """
-
-        pass
 
     @abstractmethod
     def train(
@@ -164,8 +160,6 @@ class Synthesizer(Component):
             Response content.
         """
 
-        pass
-
     @abstractmethod
     def sample(
         self,
@@ -187,5 +181,3 @@ class Synthesizer(Component):
         `pandas.DataFrame`
             The sampled synthetic data.
         """
-
-        pass

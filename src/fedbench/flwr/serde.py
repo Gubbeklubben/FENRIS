@@ -35,7 +35,6 @@ class ObjectSerde(ABC):
     @abstractmethod
     def stype(self) -> str:
         """String indicating the serialization mechanism."""
-        pass
 
     @abstractmethod
     def serialize(self, obj: Any) -> bytes:
