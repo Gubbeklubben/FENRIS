@@ -126,6 +126,6 @@ def evaluate(message: Message, flwr_context: Context) -> Message:
                 f"Could not encode metric {key} with value {value}."
             ) from e
 
-    update = Payload(extras={"metrics": metrics})
-    rdict = ctx.serde.to_flwr(update)
+    payload = Payload(extras={"metrics": metrics})
+    rdict = ctx.serde.to_flwr(payload)
     return Message(content=rdict, reply_to=message)

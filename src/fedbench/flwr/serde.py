@@ -29,7 +29,7 @@ def count_rdict_bytes(rdict: RecordDict) -> int:
 
 
 class ObjectSerde(ABC):
-    """Serialize/deserialize the contents of an Update's objects attribute."""
+    """Serialize/deserialize the contents of a payload's objects attribute."""
 
     @property
     @abstractmethod
