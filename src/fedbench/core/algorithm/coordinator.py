@@ -24,7 +24,7 @@ class Coordinator(Component):
     consisting of a batch of requests, and associated replies.
 
     When one or more rounds of training has been completed, the framework expects
-    to be able to call ~Coordinator.publish_train_artifacts and receive a
+    to be able to call Coordinator.publish_train_artifacts and receive a
     `fedbench.core.payload.Payload`. This payload is used as input when
     sampling from the current synthesizer, expecting the end result to be
     a `pandas DataFrame` sampled with the current central model state.
@@ -104,7 +104,7 @@ class Coordinator(Component):
 
 
 class SingleStepCoordinator(Coordinator):
-    """Static adapter for common configure -> exec -> aggregate logic."""
+    """Convenience adapter for common configure -> exec -> aggregate logic."""
 
     @abstractmethod
     def configure_train(
