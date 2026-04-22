@@ -8,4 +8,3 @@ class Component(ABC):
     @abstractmethod
     def name(self) -> str:
         """String identifying this component."""
-        pass
