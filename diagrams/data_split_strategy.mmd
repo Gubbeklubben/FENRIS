@@ -1,0 +1,37 @@
+flowchart TD
+
+    Full --> Server & Client
+    Client --> ClientTrain & ClientTest
+
+    Full["
+    <b>Full dataset (100%)</b>
+    Loaded once at benchmark startup
+    "]
+
+    Server["
+    <b>Global holdout (20%)</b>
+    Server-side evaluation
+    "]
+
+    Client["
+    <b>Client pool (80%)</b>
+    Partitioned across N clients
+    "]
+
+    ClientTrain["
+    <b>Client train (64%)</b>
+    Synthesizer training and client-side evaluation
+    "]
+
+    ClientTest["
+    <b>Client test (16%)</b>
+    Client-side evaluation
+    "]
+
+    classDef full fill:#B5D4F4,stroke:#185FA5,color:#0C447C
+    classDef server fill:#9FE1CB,stroke:#0F6E56,color:#085041
+    classDef client fill:#FAC775,stroke:#BA7517,color:#633806
+
+    class Full full
+    class Server server
+    class Client,ClientTrain,ClientTest client
