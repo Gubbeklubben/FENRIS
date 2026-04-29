@@ -17,7 +17,7 @@ sequenceDiagram
     autonumber
     participant Runner
     participant Server
-    participant Client as Client × N
+    participant Client as for each Client
 
 
     Runner->>+Server: execute
@@ -31,6 +31,7 @@ sequenceDiagram
         Note over Client: Train on local partition.
         Client->>Client: synthesizer.train()
         Client-->>-Server: train reply
+        Server->>Server: aggregate train replies
         opt if early stop logic should run
             Server->>Server: eval_suite.global_evaluate_single(stop_metric)
 
