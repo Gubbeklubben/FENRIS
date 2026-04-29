@@ -20,7 +20,7 @@ from fedbench.core.algorithm import (
 )
 from fedbench.core.data.schemas import load_or_infer_schema
 from fedbench.core.eval import CentralizedEvalContext, Evaluator
-from fedbench.core.logger import log_info
+from fedbench.core.logger import log_info, log_warning
 from fedbench.core.payload import ArraysTarget
 
 
@@ -63,6 +63,13 @@ def _validate_evaluators(evaluators: Iterable[Evaluator]) -> None:
 
 def load_dataset(ctx: RunContext) -> None:
     df = ctx.df_loader()
+    num_dropped = len(df) - len(df.dropna())
+    if num_dropped > 0:
+        log_warning(
+            __name__,
+            f"Dropped {num_dropped} rows containing missing values before "
+            f"partitioning ({len(df)} -> {len(df) - num_dropped} rows).",
+        )
     schema = load_or_infer_schema(Path(ctx.config.data.schema), df)
     ctx.dataset = PartitionedDataset(
         df, schema, ctx.partitioner, ctx.config.test_size, ctx.config.seed.partitioning
