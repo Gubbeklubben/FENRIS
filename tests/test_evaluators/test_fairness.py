@@ -30,7 +30,7 @@ import math
 import numpy as np
 import pandas as pd
 
-from fedbench.builtins.evaluators.fairness import FairnessEvaluator
+from fenris.builtins.evaluators.fairness import FairnessEvaluator
 
 from .conftest import assert_dicts_nan_safe, make_ctx
 

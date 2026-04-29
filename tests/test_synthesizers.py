@@ -16,9 +16,9 @@ Run a single synthesizer (e.g. fedtabdiff):
 import pandas as pd
 import pytest
 
-from fedbench.app.registry import Group
-from fedbench.core.algorithm import GlobalInitContext, TrainContext
-from fedbench.core.data.schemas import ColumnSchema, TableSchema
+from fenris.app.registry import Group
+from fenris.core.algorithm import GlobalInitContext, TrainContext
+from fenris.core.data.schemas import ColumnSchema, TableSchema
 
 # Kwargs that reduce compute so the tests stay fast. Synthesizers not listed
 # here are instantiated with their defaults (e.g. fed_hello needs no tuning).

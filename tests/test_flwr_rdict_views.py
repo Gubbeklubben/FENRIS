@@ -4,7 +4,7 @@ import pytest
 from flwr.app import ConfigRecord, MetricRecord, RecordDict
 
 # noinspection PyProtectedMember
-from fedbench.flwr.rdict import RDictNamespaceView, _NamespaceView
+from fenris.flwr.rdict import RDictNamespaceView, _NamespaceView
 
 
 def full_key(namespace: str, sub: str, sep: str) -> str:

@@ -5,8 +5,8 @@ from queue import Queue
 
 import pytest
 
-from fedbench.app.run.eventbus import BusState, EventBus
-from fedbench.core.events import Event
+from fenris.app.run.eventbus import BusState, EventBus
+from fenris.core.events import Event
 
 
 class SomeEvent(Event):

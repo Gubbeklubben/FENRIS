@@ -1,4 +1,4 @@
-# FedBench
+# FENRIS
 
 An Extensible Benchmarking Framework for Federated Synthetic Tabular Data Generators
 
@@ -43,21 +43,21 @@ Invoke-Expression (poetry env activate)
 ```
 
 If you have not activated the Poetry virtual environment for whatever reason,
-all Fedbench commands must be prefixed with `poetry run` to execute correctly.
+all FENRIS commands must be prefixed with `poetry run` to execute correctly.
 
 ### Listing available components
 To list all available components:
 
 ```bash
-fedbench show
+fenris show
 ```
 
 To list only certain types of components, specify the type(s) as an argument:
 
 ```bash
-fedbench show evaluators
-fedbench show partitioners
-fedbench show synthesizers coordinators
+fenris show evaluators
+fenris show partitioners
+fenris show synthesizers coordinators
 ```
 
 ### Running a benchmarking pipeline
@@ -65,14 +65,14 @@ fedbench show synthesizers coordinators
 Minimal example pipeline run:
 
 ```bash
-fedbench run \
+fenris run \
   fed_hello fedavg iid_partitioner datasets/breast_cancer.csv
 ```
 
 Example pipeline run with FedTabDiff:
 
 ```bash
-fedbench run \
+fenris run \
   fedtabdiff fedavg iid_partitioner datasets/breast_cancer.csv \
   --synthesizer-kwargs "\
     batch_size=128, \

@@ -26,7 +26,7 @@ To bypass the hooks in an emergency: `git commit --no-verify`
 ## Type checking
 
 ```bash
-poetry run mypy -p fedbench
+poetry run mypy -p fenris
 ```
 
 ## Run tests

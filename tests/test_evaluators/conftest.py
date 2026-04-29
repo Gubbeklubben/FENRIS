@@ -22,13 +22,13 @@ import math
 import numpy as np
 import pandas as pd
 
-import fedbench.core.data.schemas
-from fedbench.builtins.evaluators.fidelity import (
+import fenris.core.data.schemas
+from fenris.builtins.evaluators.fidelity import (
     DistributionSimilarityMetricsEvaluator,
     MomentReductionMetricsEvaluator,
 )
-from fedbench.core.data.schemas import ColumnSchema, TableSchema, infer_schema
-from fedbench.core.eval.evalcontext import (
+from fenris.core.data.schemas import ColumnSchema, TableSchema, infer_schema
+from fenris.core.eval.evalcontext import (
     CentralizedEvalContext,
     GlobalEvalContext,
     LocalEvalContext,
@@ -178,7 +178,7 @@ MIXED_DF = pd.concat([NUMERIC_DF, CATEGORICAL_DF], axis=1)
 # ---------------------------------------------------------------------------
 
 
-def make_schema(*col_defs: tuple[str, fedbench.core.data.schemas.Kind]) -> TableSchema:
+def make_schema(*col_defs: tuple[str, fenris.core.data.schemas.Kind]) -> TableSchema:
     """Shorthand: make_schema(("age", "continuous"), ("sex", "binary"))."""
     return TableSchema(columns=tuple(ColumnSchema(n, k) for n, k in col_defs))
 

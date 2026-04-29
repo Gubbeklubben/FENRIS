@@ -5,9 +5,9 @@ import numpy as np
 import pytest
 from flwr.app import ArrayRecord, ConfigRecord, MetricRecord, RecordDict
 
-from fedbench.core.payload import Payload
-from fedbench.flwr.rdict import RDictNamespaceView
-from fedbench.flwr.serde import FlwrSerde, Pickle
+from fenris.core.payload import Payload
+from fenris.flwr.rdict import RDictNamespaceView
+from fenris.flwr.serde import FlwrSerde, Pickle
 
 _RNG = np.random.default_rng(42)
 

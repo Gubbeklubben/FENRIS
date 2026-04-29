@@ -1,10 +1,10 @@
 import pandas as pd
 import pytest
 
-from fedbench.app.run.partitioned_dataset import PartitionedDataset
-from fedbench.builtins.partitioners.flwr_delegates import FlwrDelegatePartitioner
-from fedbench.core.data import load_csv
-from fedbench.core.data.schemas import infer_schema
+from fenris.app.run.partitioned_dataset import PartitionedDataset
+from fenris.builtins.partitioners.flwr_delegates import FlwrDelegatePartitioner
+from fenris.core.data import load_csv
+from fenris.core.data.schemas import infer_schema
 from tests.fake_components import FakePartitionerRegistry
 
 

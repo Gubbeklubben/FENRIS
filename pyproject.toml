@@ -1,5 +1,5 @@
 [project]
-name = "fedbench"
+name = "fenris"
 version = "0.1.0"
 description = "An Extensible Benchmarking Framework for Federated Synthetic Tabular Data Generators"
 authors = [
@@ -40,42 +40,42 @@ builtins = [
 ]
 
 [project.scripts]
-fedbench = "fedbench.cli.main:app"
+fenris = "fenris.cli.main:app"
 
-[project.entry-points."fedbench.synthesizers"]
-fed_hello     = "fedbench.builtins.synthesizers.fed_hello:FedHello"
-fed_naughty   = "fedbench.builtins.synthesizers.fed_naughty:FedNaughty"
-fedtabdiff    = "fedbench.builtins.synthesizers.fedtabdiff:FedTabDiff"
-fed_tgan      = "fedbench.builtins.synthesizers.fed_tgan:FedTGAN"
-fed_simplegan = "fedbench.builtins.synthesizers.fed_simplegan:FedSimpleGAN"
+[project.entry-points."fenris.synthesizers"]
+fed_hello     = "fenris.builtins.synthesizers.fed_hello:FedHello"
+fed_naughty   = "fenris.builtins.synthesizers.fed_naughty:FedNaughty"
+fedtabdiff    = "fenris.builtins.synthesizers.fedtabdiff:FedTabDiff"
+fed_tgan      = "fenris.builtins.synthesizers.fed_tgan:FedTGAN"
+fed_simplegan = "fenris.builtins.synthesizers.fed_simplegan:FedSimpleGAN"
 
-[project.entry-points."fedbench.coordinators"]
-fedavg = "fedbench.builtins.coordinators.fedavg:FedAvg"
-fed_tgan = "fedbench.builtins.coordinators.fed_tgan:FedTGAN"
+[project.entry-points."fenris.coordinators"]
+fedavg = "fenris.builtins.coordinators.fedavg:FedAvg"
+fed_tgan = "fenris.builtins.coordinators.fed_tgan:FedTGAN"
 
-[project.entry-points."fedbench.evaluators"]
-moment_reduction_metrics        = "fedbench.builtins.evaluators.fidelity:MomentReductionMetricsEvaluator"
-distribution_similarity_metrics = "fedbench.builtins.evaluators.fidelity:DistributionSimilarityMetricsEvaluator"
-categorical_tv_mean             = "fedbench.builtins.evaluators.fidelity:CategoricalTvMeanEvaluator"
-corr_fro_diff                   = "fedbench.builtins.evaluators.fidelity:CorrFroDiffEvaluator"
+[project.entry-points."fenris.evaluators"]
+moment_reduction_metrics        = "fenris.builtins.evaluators.fidelity:MomentReductionMetricsEvaluator"
+distribution_similarity_metrics = "fenris.builtins.evaluators.fidelity:DistributionSimilarityMetricsEvaluator"
+categorical_tv_mean             = "fenris.builtins.evaluators.fidelity:CategoricalTvMeanEvaluator"
+corr_fro_diff                   = "fenris.builtins.evaluators.fidelity:CorrFroDiffEvaluator"
 
-tstr                        = "fedbench.builtins.evaluators.utility:TSTREvaluator"
-direct_overlap_diagnostic   = "fedbench.builtins.evaluators.privacy:DirectOverlapDiagnosticEvaluator"
-mia_nearest_neighbor_attack = "fedbench.builtins.evaluators.privacy:MIANearestNeighborAttackEvaluator"
-aia_supervised_attack       = "fedbench.builtins.evaluators.privacy:AIASupervisedAttackEvaluator"
+tstr                        = "fenris.builtins.evaluators.utility:TSTREvaluator"
+direct_overlap_diagnostic   = "fenris.builtins.evaluators.privacy:DirectOverlapDiagnosticEvaluator"
+mia_nearest_neighbor_attack = "fenris.builtins.evaluators.privacy:MIANearestNeighborAttackEvaluator"
+aia_supervised_attack       = "fenris.builtins.evaluators.privacy:AIASupervisedAttackEvaluator"
 
-fairness    = "fedbench.builtins.evaluators.fairness:FairnessEvaluator"
-scalability = "fedbench.builtins.evaluators.scalability:ScalabilityEvaluator"
+fairness    = "fenris.builtins.evaluators.fairness:FairnessEvaluator"
+scalability = "fenris.builtins.evaluators.scalability:ScalabilityEvaluator"
 
-[project.entry-points."fedbench.partitioners"]
-iid_partitioner          = "fedbench.builtins.partitioners.flwr_delegates:FlwrDelegatePartitioner.with_iid_partitioner"
-linear_partitioner       = "fedbench.builtins.partitioners.flwr_delegates:FlwrDelegatePartitioner.with_linear_partitioner"
-square_partitioner       = "fedbench.builtins.partitioners.flwr_delegates:FlwrDelegatePartitioner.with_square_partitioner"
-exponential_partitioner  = "fedbench.builtins.partitioners.flwr_delegates:FlwrDelegatePartitioner.with_exponential_partitioner"
-dirichlet_partitioner    = "fedbench.builtins.partitioners.flwr_delegates:FlwrDelegatePartitioner.with_dirichlet_partitioner"
-pathological_partitioner = "fedbench.builtins.partitioners.flwr_delegates:FlwrDelegatePartitioner.with_pathological_partitioner"
-shard_partitioner        = "fedbench.builtins.partitioners.flwr_delegates:FlwrDelegatePartitioner.with_shard_partitioner"
-continuous_partitioner   = "fedbench.builtins.partitioners.flwr_delegates:FlwrDelegatePartitioner.with_continuous_partitioner"
+[project.entry-points."fenris.partitioners"]
+iid_partitioner          = "fenris.builtins.partitioners.flwr_delegates:FlwrDelegatePartitioner.with_iid_partitioner"
+linear_partitioner       = "fenris.builtins.partitioners.flwr_delegates:FlwrDelegatePartitioner.with_linear_partitioner"
+square_partitioner       = "fenris.builtins.partitioners.flwr_delegates:FlwrDelegatePartitioner.with_square_partitioner"
+exponential_partitioner  = "fenris.builtins.partitioners.flwr_delegates:FlwrDelegatePartitioner.with_exponential_partitioner"
+dirichlet_partitioner    = "fenris.builtins.partitioners.flwr_delegates:FlwrDelegatePartitioner.with_dirichlet_partitioner"
+pathological_partitioner = "fenris.builtins.partitioners.flwr_delegates:FlwrDelegatePartitioner.with_pathological_partitioner"
+shard_partitioner        = "fenris.builtins.partitioners.flwr_delegates:FlwrDelegatePartitioner.with_shard_partitioner"
+continuous_partitioner   = "fenris.builtins.partitioners.flwr_delegates:FlwrDelegatePartitioner.with_continuous_partitioner"
 
 
 [build-system]
@@ -84,7 +84,7 @@ build-backend = "poetry.core.masonry.api"
 
 
 [tool.poetry]
-packages = [{include = "fedbench", from = "src"}]
+packages = [{include = "fenris", from = "src"}]
 
 # --- PYTEST CONFIG ---
 

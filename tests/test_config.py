@@ -3,9 +3,9 @@ from typing import Any, Optional, Union
 
 import pytest
 
-from fedbench.config.builder import build_config, parse_kwargs_for_function
-from fedbench.config.parsing import coerce, is_optional
-from fedbench.core.eval import Category
+from fenris.config.builder import build_config, parse_kwargs_for_function
+from fenris.config.parsing import coerce, is_optional
+from fenris.core.eval import Category
 
 from .fake_components import (
     FakeCoordinatorRegistry,

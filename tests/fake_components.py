@@ -2,8 +2,8 @@ from typing import Generator, Iterable, Literal
 
 from pandas import DataFrame
 
-from fedbench.app.registry import Registry
-from fedbench.core.algorithm import (
+from fenris.app.registry import Registry
+from fenris.core.algorithm import (
     Coordinator,
     GlobalInitArtifacts,
     GlobalInitContext,
@@ -11,8 +11,8 @@ from fedbench.core.algorithm import (
     Synthesizer,
     TrainContext,
 )
-from fedbench.core.data import Partitioner
-from fedbench.core.payload import ArraysTarget, Payload
+from fenris.core.data import Partitioner
+from fenris.core.payload import ArraysTarget, Payload
 
 
 class FakeSynthesizer(Synthesizer):
