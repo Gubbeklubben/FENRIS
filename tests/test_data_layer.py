@@ -78,3 +78,31 @@ def test_mutation_does_not_affect_source(partitioned_dataset, load_fn, kwargs):
     original_values = load().copy()
     result.iloc[0, 0] = -9999
     assert load().equals(original_values)
+
+
+def test_partitioned_dataset_drops_rows_with_nan(sample_df) -> None:
+    df_with_nan = sample_df.copy()
+    df_with_nan.loc[1, "age"] = pd.NA
+    df_with_nan.loc[4, "cat"] = pd.NA
+
+    schema = infer_schema(df_with_nan)
+    partitioner = FlwrDelegatePartitioner.with_iid_partitioner(num_partitions=2)
+    dataset = PartitionedDataset(
+        df_with_nan,
+        schema,
+        partitioner,
+        test_size=0.25,
+        seed=42,
+    )
+
+    total_rows = len(dataset.load_global_holdout())
+    for partition_id in range(dataset.num_partitions):
+        total_rows += len(dataset.load_train_partition(partition_id))
+        total_rows += len(dataset.load_test_partition(partition_id))
+
+    assert dataset.num_dropped == 2
+    assert total_rows == 10
+    assert not dataset.load_all_train_data().isna().any().any()
+    assert not dataset.load_global_holdout().isna().any().any()
+    assert not dataset.load_train_partition(0).isna().any().any()
+    assert not dataset.load_test_partition(0).isna().any().any()

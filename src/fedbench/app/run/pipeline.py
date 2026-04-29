@@ -20,7 +20,7 @@ from fedbench.core.algorithm import (
 )
 from fedbench.core.data.schemas import load_or_infer_schema
 from fedbench.core.eval import CentralizedEvalContext, Evaluator
-from fedbench.core.logger import log_info
+from fedbench.core.logger import log_info, log_warning
 from fedbench.core.payload import ArraysTarget
 
 
@@ -67,6 +67,12 @@ def load_dataset(ctx: RunContext) -> None:
     ctx.dataset = PartitionedDataset(
         df, schema, ctx.partitioner, ctx.config.test_size, ctx.config.seed.partitioning
     )
+    if ctx.dataset.num_dropped > 0:
+        log_warning(
+            __name__,
+            f"Dropped {ctx.dataset.num_dropped} rows containing missing values before "
+            f"partitioning ({len(df)} -> {len(df) - ctx.dataset.num_dropped} rows).",
+        )
 
 
 def global_init(ctx: RunContext) -> None:
