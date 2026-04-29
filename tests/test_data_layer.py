@@ -100,6 +100,7 @@ def test_partitioned_dataset_drops_rows_with_nan(sample_df) -> None:
         total_rows += len(dataset.load_train_partition(partition_id))
         total_rows += len(dataset.load_test_partition(partition_id))
 
+    assert dataset.num_dropped == 2
     assert total_rows == 10
     assert not dataset.load_all_train_data().isna().any().any()
     assert not dataset.load_global_holdout().isna().any().any()

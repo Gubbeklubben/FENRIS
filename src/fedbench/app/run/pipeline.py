@@ -63,17 +63,16 @@ def _validate_evaluators(evaluators: Iterable[Evaluator]) -> None:
 
 def load_dataset(ctx: RunContext) -> None:
     df = ctx.df_loader()
-    num_dropped = len(df) - len(df.dropna())
-    if num_dropped > 0:
-        log_warning(
-            __name__,
-            f"Dropped {num_dropped} rows containing missing values before "
-            f"partitioning ({len(df)} -> {len(df) - num_dropped} rows).",
-        )
     schema = load_or_infer_schema(Path(ctx.config.data.schema), df)
     ctx.dataset = PartitionedDataset(
         df, schema, ctx.partitioner, ctx.config.test_size, ctx.config.seed.partitioning
     )
+    if ctx.dataset.num_dropped > 0:
+        log_warning(
+            __name__,
+            f"Dropped {ctx.dataset.num_dropped} rows containing missing values before "
+            f"partitioning ({len(df)} -> {len(df) - ctx.dataset.num_dropped} rows).",
+        )
 
 
 def global_init(ctx: RunContext) -> None:
