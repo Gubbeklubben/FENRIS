@@ -18,6 +18,8 @@ class PartitionedDataset:
         self._schema = schema
         self._partitioner = partitioner
 
+        df = df.dropna().reset_index(drop=True)
+
         client_pool, holdout = train_test_split(
             df,
             test_size=test_size,
