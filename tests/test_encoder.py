@@ -1,4 +1,4 @@
-"""Tests for FedbenchEncoder / FedbenchEncoder.decode.
+"""Tests for FenrisEncoder / FenrisEncoder.decode.
 
 Covers:
 - Round-trip for flat and nested dataclasses
@@ -15,15 +15,15 @@ from dataclasses import dataclass, field
 
 import pytest
 
-from fedbench.core.encoder import FedbenchEncoder
+from fenris.core.encoder import FenrisEncoder
 
 
 def dumps(obj) -> str:
-    return json.dumps(obj, cls=FedbenchEncoder)
+    return json.dumps(obj, cls=FenrisEncoder)
 
 
 def loads(raw: str):
-    return json.loads(raw, object_hook=FedbenchEncoder.decode)
+    return json.loads(raw, object_hook=FenrisEncoder.decode)
 
 
 def roundtrip(obj):

@@ -66,7 +66,7 @@ jobs:
         run: poetry install --no-interaction --without builtins
 
       - name: Run mypy
-        run: poetry run mypy -p fedbench
+        run: poetry run mypy -p fenris
 
   test:
     name: Pytest

@@ -6,10 +6,10 @@ from types import SimpleNamespace
 
 import pandas as pd
 
-from fedbench.app.run.pipeline import write_artifacts
-from fedbench.config import SeedConfig
-from fedbench.config.config import Config, DataConfig
-from fedbench.core.data import TableSchema
+from fenris.app.run.pipeline import write_artifacts
+from fenris.config import SeedConfig
+from fenris.config.config import Config, DataConfig
+from fenris.core.data import TableSchema
 
 
 def _make_config(tmp_path: Path) -> Config:

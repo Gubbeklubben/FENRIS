@@ -18,7 +18,7 @@ import numpy as np
 import pandas as pd
 import pytest
 
-from fedbench.builtins.evaluators.privacy import (
+from fenris.builtins.evaluators.privacy import (
     AIASupervisedAttackEvaluator,
     DirectOverlapDiagnosticEvaluator,
     MIANearestNeighborAttackEvaluator,

@@ -20,7 +20,7 @@ import numpy as np
 import pandas as pd
 import pytest
 
-from fedbench.builtins.evaluators.fidelity import (
+from fenris.builtins.evaluators.fidelity import (
     CategoricalTvMeanEvaluator,
     CorrFroDiffEvaluator,
 )

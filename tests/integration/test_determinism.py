@@ -14,10 +14,10 @@ from pathlib import Path
 import pandas as pd
 import pytest
 
-import fedbench.app.run.runner as runner
-from fedbench.app.registry import Group
-from fedbench.app.run.pipeline import pipeline
-from fedbench.config.builder import build_config
+import fenris.app.run.runner as runner
+from fenris.app.registry import Group
+from fenris.app.run.pipeline import pipeline
+from fenris.config.builder import build_config
 
 _DATASET = Path(__file__).parent.parent.parent / "datasets" / "breast_cancer.csv"
 

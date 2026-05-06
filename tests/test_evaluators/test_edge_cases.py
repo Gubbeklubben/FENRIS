@@ -23,17 +23,17 @@ import numpy as np
 import pandas as pd
 import pytest
 
-from fedbench.builtins.evaluators.fairness import FairnessEvaluator
-from fedbench.builtins.evaluators.fidelity import (
+from fenris.builtins.evaluators.fairness import FairnessEvaluator
+from fenris.builtins.evaluators.fidelity import (
     CategoricalTvMeanEvaluator,
     CorrFroDiffEvaluator,
 )
-from fedbench.builtins.evaluators.privacy import (
+from fenris.builtins.evaluators.privacy import (
     AIASupervisedAttackEvaluator,
     DirectOverlapDiagnosticEvaluator,
     MIANearestNeighborAttackEvaluator,
 )
-from fedbench.builtins.evaluators.utility import TSTREvaluator
+from fenris.builtins.evaluators.utility import TSTREvaluator
 
 from .conftest import (
     NUMERIC_DF,
