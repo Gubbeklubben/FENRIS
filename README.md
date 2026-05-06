@@ -1,6 +1,5 @@
-# FENRIS
-
-An Extensible Benchmarking Framework for Federated Synthetic Tabular Data Generators
+# FENRIS: Federated Extensible Norwegian Research Interface for Synthetic data.
+Fenris is an extensible benchmarking framework for federated synthetic tabular data generators.
 
 ## Quickstart (WIP)
 
