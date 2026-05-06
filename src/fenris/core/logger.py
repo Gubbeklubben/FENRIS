@@ -10,7 +10,7 @@ from typing import Any, ParamSpec, TypeVar
 TEE = "\u251c\u2500\u2500"
 ELBOW = "\u2514\u2500\u2500"
 
-# Stolen from flwr.common.logger
+# Adapted from flwr.common.logger
 LOG_COLORS = {
     "DEBUG": "\033[94m",  # Blue
     "INFO": "\033[92m",  # Green
@@ -53,7 +53,20 @@ def log(
     level: int = logging.INFO,
     **kwargs: Any,
 ) -> None:
+    """Emit a log record prefixed with *source*.
 
+    Parameters
+    ----------
+    source : str
+        Label prepended to the message (e.g. a component name). Pass an
+        empty string to omit the prefix.
+    message : str
+        The log message.
+    level : int, optional
+        Logging level. Defaults to ``logging.INFO``.
+    **kwargs : Any
+        Extra keyword arguments forwarded to :func:`logging.Logger.log`.
+    """
     msg = f"{source}: {message}" if source else message
     logger.log(level, msg, **kwargs)
 
@@ -71,6 +84,19 @@ R = TypeVar("R")
 
 
 def debug_calls(modulename: str) -> Callable[[Callable[P, R]], Callable[P, R]]:
+    """Decorator that logs call arguments and return values at DEBUG level.
+
+    Parameters
+    ----------
+    modulename : str
+        Label used as the *source* in log output.
+
+    Returns
+    -------
+    Callable
+        A decorator that wraps the target function with argument/return logging.
+    """
+
     def decorator(func: Callable[P, R]) -> Callable[P, R]:
         @functools.wraps(func)
         def wrapper(*args: P.args, **kwargs: P.kwargs) -> R:
