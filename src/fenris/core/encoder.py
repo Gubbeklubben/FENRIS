@@ -17,6 +17,20 @@ class FenrisEncoder(json.JSONEncoder):
     """
 
     def default(self, obj: Any) -> Any:
+        """Serialize *obj* when the standard encoder cannot handle it.
+
+        Parameters
+        ----------
+        obj : Any
+            The object to serialize.
+
+        Returns
+        -------
+        dict or Any
+            A plain dict with ``__dataclass__`` and ``__module__`` tags if
+            *obj* is a dataclass instance; otherwise delegates to the standard
+            JSON encoder.
+        """
         if dataclasses.is_dataclass(obj) and not isinstance(obj, type):
             return {
                 "__dataclass__": type(obj).__qualname__,
@@ -27,12 +41,22 @@ class FenrisEncoder(json.JSONEncoder):
 
     @staticmethod
     def decode(obj: dict[str, Any]) -> Any:
-        """``object_hook`` for ``json.loads`` — reconstructs dataclasses by
-        dynamic import.
+        """Reconstruct a dataclass from a tagged dict; for use as ``object_hook``.
 
         Called bottom-up on every dict in the JSON tree, so nested dataclasses
-        are reconstructed before the dicts that contain them.  Dicts without
-        both tags, or whose class cannot be found, are returned unchanged.
+        are reconstructed before the dicts that contain them.
+
+        Parameters
+        ----------
+        obj : dict[str, Any]
+            A dict parsed from JSON. Must contain both ``__dataclass__`` and
+            ``__module__`` keys to trigger reconstruction.
+
+        Returns
+        -------
+        Any
+            The reconstructed dataclass instance if both tags are present and
+            the class can be imported; otherwise *obj* is returned unchanged.
         """
         if "__dataclass__" in obj and "__module__" in obj:
             module = importlib.import_module(obj["__module__"])

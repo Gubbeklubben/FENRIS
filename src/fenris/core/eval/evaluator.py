@@ -10,10 +10,24 @@ from fenris.core.eval.evalcontext import GlobalEvalContext, LocalEvalContext
 
 
 def normalize_key(text: str) -> str:
+    """Convert *text* to a lowercase, underscore-separated metric key.
+
+    Non-alphanumeric character runs are replaced with a single underscore.
+
+    Parameters
+    ----------
+    text : str
+
+    Returns
+    -------
+    str
+    """
     return re.sub(r"[^a-z_]+", "_", text.lower())
 
 
 class Category(StrEnum):
+    """Evaluation category labels used to prefix fully qualified metric keys."""
+
     FIDELITY = "fidelity"
     UTILITY = "utility"
     PRIVACY = "privacy"
@@ -22,6 +36,8 @@ class Category(StrEnum):
 
 
 class EvaluationMode(Flag):
+    """Flag indicating whether an evaluator supports centralized or federated mode."""
+
     CENTRALIZED = auto()
     FEDERATED = auto()
     # noinspection PyTypeChecker
@@ -30,6 +46,21 @@ class EvaluationMode(Flag):
 
 @dataclass(frozen=True)
 class MetricDescriptor:
+    """Metadata for a single metric emitted by an `Evaluator`.
+
+    Attributes
+    ----------
+    key : str
+        Metric key used as the suffix after the category prefix.
+    default_stop_mode : {"min", "max"} or None
+        Default optimization direction for early stopping; ``None`` if no sensible
+        default exists
+    suffix_type : {"sensitive", "target", None}
+        Whether the metric is expanded once per sensitive column
+        (``"sensitive"``), once for the target column (``"target"``), or
+        emitted as-is (``None``).
+    """
+
     key: str
     default_stop_mode: Literal["min", "max"] | None = "min"
     suffix_type: Literal["sensitive", "target", None] = None
@@ -37,21 +68,57 @@ class MetricDescriptor:
 
 @dataclass(frozen=True)
 class EvaluatorDescriptor:
+    """Metadata for an `Evaluator`.
+
+    Attributes
+    ----------
+    category : Category
+        Evaluation category this evaluator belongs to.
+    eval_mode : EvaluationMode
+        Whether the evaluator supports centralized, federated, or both modes.
+    metrics : list[MetricDescriptor]
+        Descriptors for each metric the evaluator emits.
+    """
+
     category: Category
     eval_mode: EvaluationMode
     metrics: list[MetricDescriptor]
 
 
 class Evaluator(Component):
+    """Abstract base class for evaluators.
+
+    Evaluators compute quality metrics for synthetic data, supporting both
+    centralized evaluation (via `global_evaluate`) and federated evaluation
+    (via `local_evaluate` on clients followed by `aggregate` on the server).
+    """
+
     @property
     @abstractmethod
-    def metadata(self) -> EvaluatorDescriptor: ...
+    def metadata(self) -> EvaluatorDescriptor:
+        """Descriptor declaring the evaluator's category, mode, and metrics."""
 
     def get_metric_descriptor_dict(
         self,
         target_column: str | None = None,
         sensitive_columns: tuple[str, ...] | None = None,
     ) -> dict[str, MetricDescriptor]:
+        """Build a mapping from fully qualified metric key to `MetricDescriptor`.
+
+        Sensitive- and target-suffixed metrics are expanded from their template
+        descriptors using the provided column names.
+
+        Parameters
+        ----------
+        target_column : str or None, optional
+            Target column name.
+        sensitive_columns : tuple[str, ...] or None, optional
+            Sensitive column names.
+
+        Returns
+        -------
+        dict[str, MetricDescriptor]
+        """
         descriptors: dict[str, MetricDescriptor] = {}
         for metric in self.metadata.metrics:
             if sensitive_columns and metric.suffix_type == "sensitive":
@@ -68,19 +135,71 @@ class Evaluator(Component):
         target_column: str | None = None,
         sensitive_columns: tuple[str, ...] | None = None,
     ) -> Iterable[str]:
+        """Return all fully qualified metric keys for this evaluator.
+
+        Parameters
+        ----------
+        target_column : str or None, optional
+            Target column name for expanding target-suffixed metrics.
+        sensitive_columns : tuple[str, ...] or None, optional
+            Sensitive column names for expanding sensitive-suffixed metrics.
+
+        Returns
+        -------
+        Iterable[str]
+        """
         return self.get_metric_descriptor_dict(target_column, sensitive_columns).keys()
 
     def _nan_result(self) -> dict[str, float]:
+        """Return a dict of NaN values keyed by this evaluator's metric keys."""
         return {key: math.nan for key in self.get_metric_keys()}
 
-    # Centralized mode
     @abstractmethod
-    def global_evaluate(self, ctx: GlobalEvalContext) -> dict[str, float]: ...
+    def global_evaluate(self, ctx: GlobalEvalContext) -> dict[str, float]:
+        """Centralized evaluation using the full synthetic and holdout sets.
 
-    # Federated mode, client side
-    @abstractmethod
-    def local_evaluate(self, ctx: LocalEvalContext) -> Any: ...
+        Parameters
+        ----------
+        ctx : GlobalEvalContext
+            Evaluation context containing the synthetic data and holdout set.
 
-    # Federated mode, server side
+        Returns
+        -------
+        dict[str, float]
+            Metric key to value mapping. Keys must match those declared in
+            `metadata`.
+        """
+
     @abstractmethod
-    def aggregate(self, stats: Iterable[Any]) -> dict[str, float]: ...
+    def local_evaluate(self, ctx: LocalEvalContext) -> Any:
+        """Federated evaluation on one client's local data.
+
+        Called on each client during federated evaluation. The return value
+        is opaque to the framework and passed verbatim to `aggregate`.
+
+        Parameters
+        ----------
+        ctx : LocalEvalContext
+            Evaluation context containing the client's local partitions.
+
+        Returns
+        -------
+        Any
+            Intermediate statistics to be aggregated server-side.
+        """
+
+    @abstractmethod
+    def aggregate(self, stats: Iterable[Any]) -> dict[str, float]:
+        """Aggregate per-client local evaluation results on the server.
+
+        Parameters
+        ----------
+        stats : Iterable[Any]
+            Collection of values returned by `local_evaluate` across all clients.
+
+        Returns
+        -------
+        dict[str, float]
+            Aggregated metric key to value mapping. Keys must match those
+            declared in `metadata`.
+        """
