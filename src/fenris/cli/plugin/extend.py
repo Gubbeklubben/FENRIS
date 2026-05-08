@@ -11,6 +11,7 @@ from tomlkit import TOMLDocument
 from tomlkit.items import Table
 
 from fenris.app.registry import Group
+from fenris.app.scaffold import create_component_scaffold
 from fenris.cli.plugin._util import validate_identifier
 from fenris.core.component import Component
 
@@ -97,7 +98,8 @@ def extend(
             continue
 
         with path.open("w") as f:
-            f.write(codegen(cls, _to_cap_words(name)))
+            code = create_component_scaffold(cls, name, _to_cap_words(name))
+            f.write(code)
 
         qualifier = f"{'.'.join((*packages, name))}:{_to_cap_words(name)}"
         entry_point[name] = qualifier
@@ -201,11 +203,3 @@ def _get_class(group: Group, base: str | None) -> type[Component]:
 
 def _to_cap_words(identifier: str) -> str:
     return "".join(w.capitalize() for w in identifier.split("_"))
-
-
-def codegen(base: type[Component], name: str) -> str:
-    from fenris.app.scaffold import AbstractMethodCollector, Builder
-
-    collector = AbstractMethodCollector(base)
-    builder = Builder(collector)
-    return builder.with_name(name).build().code

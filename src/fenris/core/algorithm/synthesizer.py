@@ -53,6 +53,7 @@ class Synthesizer(Component):
         it is an empty set.
     """
 
+    # [scaffold] required_cls_var
     SUPPORTED_COORDINATORS: ClassVar[set[str]] = set()
 
     def __init_subclass__(cls, **kwargs: Any) -> None:

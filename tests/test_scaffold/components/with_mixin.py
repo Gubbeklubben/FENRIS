@@ -1,6 +1,6 @@
 from abc import ABC, abstractmethod
 
-from tests.test_subclass_builder.components.base import Base
+from tests.test_scaffold.components.base import Base
 
 
 class Mixin(ABC):

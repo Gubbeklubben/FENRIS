@@ -1,10 +1,12 @@
 import threading
-from abc import ABC, abstractmethod
+from abc import abstractmethod
 from collections.abc import Callable
 from typing import Any
 
 import numpy as np
 from pandas import DataFrame
+
+from fenris.core.component import Component
 
 SOME_CONSTANT = 0
 
@@ -21,7 +23,7 @@ def some_decorator(func: Callable[..., Any]) -> Callable[..., Any]:
     return func
 
 
-class Base(ABC):
+class Base(Component):
     @property
     @abstractmethod
     def keep_decorator(self) -> str:
