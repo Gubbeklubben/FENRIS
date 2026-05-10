@@ -12,6 +12,10 @@ from tests.test_scaffold.components.override_abstract_with_abstract import (
 from tests.test_scaffold.components.override_abstract_with_concrete import (
     OverrideAbstractWithConcrete,
 )
+from tests.test_scaffold.components.override_cls_var import (
+    OverrideRequiredWithNotRequired,
+    OverrideRequiredWithRequired,
+)
 from tests.test_scaffold.components.with_mixin import WithMixin
 
 NAME = "fed_up"
@@ -62,6 +66,24 @@ def test_component_name(generated_code_for_base):
         return \"{NAME}\"
     """
     assert_in_class_body(generated_code_for_base, fn_def, Base)
+
+
+def test_cls_vars(generated_code_for_base):
+    assert_in_class_body(generated_code_for_base, "REQUIRED: int =", Base)
+    assert "NOT_REQUIRED: int =" not in generated_code_for_base
+    assert "NOT_ANNOTATED =" not in generated_code_for_base
+
+
+def test_override_cls_vars():
+    code = generate_code(OverrideRequiredWithRequired)
+    assert_in_class_body(code, "REQUIRED: int =", OverrideRequiredWithRequired)
+    code = generate_code(OverrideRequiredWithNotRequired)
+    assert "REQUIRED: int =" not in code
+
+
+def test_imports_cls_var_accesses(generated_code_for_base):
+    assert_in_class_body(generated_code_for_base, "REMEMBER_ACCESSES: ClassVar[", Base)
+    assert_in_imports(generated_code_for_base, "ClassVar", Base)
 
 
 def test_keep_decorator(generated_code_for_base):

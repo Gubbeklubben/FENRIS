@@ -1,7 +1,7 @@
 import threading
 from abc import abstractmethod
 from collections.abc import Callable
-from typing import Any
+from typing import Any, ClassVar
 
 import numpy as np
 from pandas import DataFrame
@@ -24,6 +24,14 @@ def some_decorator(func: Callable[..., Any]) -> Callable[..., Any]:
 
 
 class Base(Component):
+    # [scaffold] required_cls_var
+    REQUIRED: int = 1
+    NOT_REQUIRED: int = 0
+    # [scaffold] required_cls_var
+    NOT_ANNOTATED = -1  # ...and thus ignored
+    # [scaffold] required_cls_var
+    REMEMBER_ACCESSES: ClassVar[bool] = True
+
     @property
     @abstractmethod
     def keep_decorator(self) -> str:

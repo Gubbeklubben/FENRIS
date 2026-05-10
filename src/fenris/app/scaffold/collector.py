@@ -22,6 +22,8 @@ from fenris.app.scaffold.tags import REQUIRED_CLS_VAR
 class _NodeWrapper[T]:
     node: T = field(repr=False)
     module: str
+    mro_index: int
+    index: int
     accesses: list[Access] = field(init=False, repr=False, default_factory=list)
 
 
@@ -34,8 +36,6 @@ class ClsVar(_NodeWrapper[cst.AnnAssign]):
 class FunctionDef(_NodeWrapper[cst.FunctionDef]):
     is_property: bool
     is_abstract: bool
-    mro_index: int
-    method_index: int
 
 
 class Collector(cst.CSTVisitor):
@@ -52,7 +52,6 @@ class Collector(cst.CSTVisitor):
         self._cls_vars: dict[str, list[ClsVar | None]] = defaultdict(
             lambda: [None for _ in self._mro]
         )
-        self._collected = False
         self._curr_modulename: str = ""
         self._cls_stack: list[str] = []
         self._wrapper_stack: list[
@@ -72,19 +71,16 @@ class Collector(cst.CSTVisitor):
         return self._mro[0].__module__
 
     @property
-    def fn_defs(self) -> Iterable[FunctionDef]:
-        for value in self._fn_defs.values():
-            yield next(fn for fn in value if fn is not None)
-
-    @property
     def cls_vars(self) -> Iterable[ClsVar]:
         for value in self._cls_vars.values():
             yield next(c for c in value if c is not None)
 
-    def maybe_collect(self) -> None:
-        if self._collected:
-            return
+    @property
+    def fn_defs(self) -> Iterable[FunctionDef]:
+        for value in self._fn_defs.values():
+            yield next(fn for fn in value if fn is not None)
 
+    def collect(self) -> None:
         processed = set()
         for cls in self._mro:
             src_file = inspect.getsourcefile(cls)
@@ -102,9 +98,7 @@ class Collector(cst.CSTVisitor):
             wrapper = MetadataWrapper(cst.parse_module(code))
             wrapper.visit(self)
             processed.add(src_file)
-
         self._curr_modulename = ""
-        self._collected = True
 
     @property
     def _curr_mro_index(self) -> int:
@@ -140,6 +134,8 @@ class Collector(cst.CSTVisitor):
         cls_var = ClsVar(
             cst.ensure_type(node.body[0], cst.AnnAssign),
             self._curr_modulename,
+            self._curr_mro_index,
+            len(self._cls_vars),
             is_required,
         )
         name = cst.ensure_type(cls_var.node.target, cst.Name).value
@@ -180,10 +176,10 @@ class Collector(cst.CSTVisitor):
         fn_def = FunctionDef(
             node,
             self._curr_modulename,
-            is_property,
-            is_abstract,
             self._curr_mro_index,
             len(self._fn_defs),
+            is_property,
+            is_abstract,
         )
         self._fn_defs[node.name.value][self._curr_mro_index] = fn_def
         self._wrapper_stack.append(fn_def)
