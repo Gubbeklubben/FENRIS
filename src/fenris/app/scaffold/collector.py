@@ -38,6 +38,23 @@ class FunctionDef(_NodeWrapper[cst.FunctionDef]):
     is_abstract: bool
 
 
+@dataclass
+class TargetData:
+    cls: type
+    name: str
+    module: str
+    cls_vars: tuple[ClsVar, ...]
+    fn_defs: tuple[FunctionDef, ...]
+
+    @property
+    def required_cls_vars(self) -> Iterable[ClsVar]:
+        return filter(lambda n: n.is_required, self.cls_vars)
+
+    @property
+    def abstract_fn_defs(self) -> Iterable[FunctionDef]:
+        return filter(lambda n: n.is_abstract, self.fn_defs)
+
+
 class Collector(cst.CSTVisitor):
     """Collect abstract methods and tagged cls vars from a target class mro."""
 
@@ -58,29 +75,7 @@ class Collector(cst.CSTVisitor):
             _NodeWrapper[cst.AnnAssign] | _NodeWrapper[cst.FunctionDef]
         ] = []
 
-    @property
-    def target_cls(self) -> type:
-        return self._mro[0]
-
-    @property
-    def target_name(self) -> str:
-        return self._mro[0].__name__
-
-    @property
-    def target_module(self) -> str:
-        return self._mro[0].__module__
-
-    @property
-    def cls_vars(self) -> Iterable[ClsVar]:
-        for value in self._cls_vars.values():
-            yield next(c for c in value if c is not None)
-
-    @property
-    def fn_defs(self) -> Iterable[FunctionDef]:
-        for value in self._fn_defs.values():
-            yield next(fn for fn in value if fn is not None)
-
-    def collect(self) -> None:
+    def collect(self) -> TargetData:
         processed = set()
         for cls in self._mro:
             src_file = inspect.getsourcefile(cls)
@@ -99,6 +94,20 @@ class Collector(cst.CSTVisitor):
             wrapper.visit(self)
             processed.add(src_file)
         self._curr_modulename = ""
+
+        return TargetData(
+            self._mro[0],
+            self._mro[0].__name__,
+            self._mro[0].__module__,
+            tuple(
+                next(n for n in value if n is not None)
+                for value in self._cls_vars.values()
+            ),
+            tuple(
+                next(n for n in value if n is not None)
+                for value in self._fn_defs.values()
+            ),
+        )
 
     @property
     def _curr_mro_index(self) -> int:

@@ -12,24 +12,24 @@ from libcst.metadata import (
     ScopeProvider,
 )
 
-from fenris.app.scaffold.collector import Collector
+from fenris.app.scaffold.collector import ClsVar, FunctionDef, TargetData
 
 
-def resolve(collector: Collector) -> cst.Module:
+def resolve(target: TargetData) -> cst.Module:
     return cst.Module(
         body=[
-            *_resolve_imports(collector),
+            *_resolve_imports(target),
             cst.ClassDef(
-                name=cst.Name(value=f"MyAwesome{collector.target_name}"),
-                bases=[cst.Arg(value=cst.Name(value=collector.target_name))],
-                body=cst.IndentedBlock(body=[*_resolve_class_body(collector)]),
+                name=cst.Name(value=f"MyAwesome{target.name}"),
+                bases=[cst.Arg(value=cst.Name(value=target.name))],
+                body=cst.IndentedBlock(body=[*_resolve_class_body(target)]),
                 leading_lines=[cst.EmptyLine(), cst.EmptyLine()],
             ),
         ]
     )
 
 
-def _resolve_imports(collector: Collector) -> Iterable[cst.SimpleStatementLine]:
+def _resolve_imports(target: TargetData) -> Iterable[cst.SimpleStatementLine]:
     assignments: list[tuple[Assignment, str | None]] = []
     # Create an assignment and use the same code path as for any other
     # assignment. Not necessarily elegant, but convenient.
@@ -37,22 +37,25 @@ def _resolve_imports(collector: Collector) -> Iterable[cst.SimpleStatementLine]:
         cst.Module(
             body=[
                 cst.ensure_type(
-                    cst.parse_statement(
-                        f"from {collector.target_module} import {collector.target_name}"
-                    ),
+                    cst.parse_statement(f"from {target.module} import {target.name}"),
                     cst.SimpleStatementLine,
                 )
             ]
         )
     )
     scope = next(iter(set(wrapper.resolve(ScopeProvider).values())))
-    for assignment in scope.assignments:
-        assignments.append((assignment, None))
+    if scope is not None:
+        # I do love static analysis tools, but they can be annoying,
+        # scope will never be None...
+        for assignment in scope.assignments:
+            # Definitely not a BuiltinAssignment
+            assignments.append((cast(Assignment, assignment), None))
 
-    for node in (
-        *filter(lambda w: w.is_required, collector.cls_vars),
-        *filter(lambda w: w.is_abstract, collector.fn_defs),
-    ):
+    nodes: Iterable[ClsVar | FunctionDef] = (
+        *target.required_cls_vars,
+        *target.abstract_fn_defs,
+    )
+    for node in nodes:
         for access in node.accesses:
             if isinstance(access.node, cst.BaseString):
                 continue
@@ -66,27 +69,27 @@ def _resolve_imports(collector: Collector) -> Iterable[cst.SimpleStatementLine]:
             assignment = next(iter(access.referents))
             if isinstance(assignment, BuiltinAssignment):
                 continue
-
-            if isinstance(assignment, Assignment):
-                assignments.append((assignment, node.module))
+            assignments.append((cast(Assignment, assignment), node.module))
 
     return _resolve_assignments(assignments)
 
 
 def _resolve_class_body(
-    collector: Collector,
+    target: TargetData,
 ) -> Iterable[cst.SimpleStatementLine | cst.FunctionDef]:
-    required_cls_vars = filter(lambda w: w.is_required, collector.cls_vars)
+
     cls_vars = tuple(
         cst.SimpleStatementLine(body=[cls_var.node])
-        for cls_var in sorted(required_cls_vars, key=lambda c: (-c.mro_index, c.index))
+        for cls_var in sorted(
+            target.required_cls_vars,
+            key=lambda c: (-c.mro_index, c.index),
+        )
     )
     yield from cls_vars
 
-    abstract_fn_defs = filter(lambda w: w.is_abstract, collector.fn_defs)
     for idx, fn_def in enumerate(
         sorted(
-            abstract_fn_defs,
+            target.abstract_fn_defs,
             key=lambda w: (int(not w.is_property), -w.mro_index, w.index),
         )
     ):

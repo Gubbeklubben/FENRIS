@@ -8,8 +8,6 @@ from fenris.core.component import Component
 __all__ = [
     "create_component_scaffold",
 ]
-
-
 _modules: dict[type[Component], cst.Module] = {}
 
 
@@ -22,9 +20,8 @@ def create_component_scaffold(
     try:
         module = _modules[target_cls]
     except KeyError:
-        clt = Collector(target_cls)
-        clt.collect()
-        module = resolver.resolve(clt)
+        target = Collector(target_cls).collect()
+        module = resolver.resolve(target)
         _modules[target_cls] = module
 
     return module.visit(ComponentTransformer(name, cls_name)).code
