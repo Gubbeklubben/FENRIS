@@ -43,9 +43,10 @@ def train(message: Message, flwr_context: Context) -> Message:
 
     with ctx.serde.use_deserialized(ctx.synthesizer_storage) as storage:
         train_ctx = TrainContext(
+            coordinator=ctx.config.coordinator,
+            seed=ctx.config.seed.training,
             global_init_artifacts=artifacts,
             client_storage=storage,
-            seed=ctx.config.seed.training,
         )
         start_time = time.perf_counter_ns()
         reply = ctx.synthesizer.train(request, train_df, train_ctx)
@@ -90,10 +91,11 @@ def evaluate(message: Message, flwr_context: Context) -> Message:
 
     with ctx.serde.use_deserialized(ctx.synthesizer_storage) as storage:
         sample_ctx = SampleContext(
+            coordinator=ctx.config.coordinator,
+            seed=ctx.config.seed.sampling,
             global_init_artifacts=artifacts,
             client_storage=storage,
             schema=ctx.dataset.schema,
-            seed=ctx.config.seed.sampling,
             num_rows=ctx.config.num_synthetic_rows or ctx.dataset.global_holdout_size,
         )
         synthetic_df = ctx.synthesizer.sample(request, sample_ctx)

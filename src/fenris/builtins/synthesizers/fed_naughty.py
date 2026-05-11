@@ -18,10 +18,11 @@ from numpy.typing import NDArray
 from pandas import DataFrame
 
 from fenris.builtins.coordinators.fedavg import ClientUpdate, GlobalState
-from fenris.core.algorithm import GlobalInitArtifacts, Synthesizer
-from fenris.core.algorithm.context import (
+from fenris.core.algorithm import (
+    GlobalInitArtifacts,
     GlobalInitContext,
     SampleContext,
+    Synthesizer,
     TrainContext,
 )
 from fenris.core.logger import log_info

@@ -78,8 +78,9 @@ def load_dataset(ctx: RunContext) -> None:
 def global_init(ctx: RunContext) -> None:
     df = ctx.dataset.load_all_train_data()
     init_ctx = GlobalInitContext(
-        schema=ctx.dataset.schema,
+        coordinator=ctx.coordinator.name,
         seed=ctx.config.seed.init,
+        schema=ctx.dataset.schema,
     )
     artifacts: GlobalInitArtifacts = ctx.synthesizer.global_init(df, init_ctx)
     ctx.global_init_artifacts = artifacts
@@ -137,10 +138,11 @@ def aggregate_federated_metrics(ctx: RunContext) -> None:
 
 def global_sample(ctx: RunContext) -> None:
     sample_ctx = SampleContext(
+        coordinator=ctx.coordinator.name,
+        seed=ctx.config.seed.sampling,
         global_init_artifacts=ctx.global_init_artifacts.synthesizer,
         client_storage=None,
         schema=ctx.dataset.schema,
-        seed=ctx.config.seed.sampling,
         num_rows=ctx.config.num_synthetic_rows or ctx.dataset.global_holdout_size,
     )
     ctx.synthetic_df = ctx.synthesizer.sample(ctx.train_artifacts, sample_ctx)

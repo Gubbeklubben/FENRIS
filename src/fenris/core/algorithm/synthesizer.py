@@ -6,6 +6,12 @@ Synthesizer
     Abstract base class for synthesizer implementations.
 GlobalInitArtifacts
     Simple container for preprocessing artifacts.
+GlobalInitContext
+    Context passed to `Synthesizer.global_init`.
+TrainContext
+    Context passed to `Synthesizer.train`.
+SampleContext
+    Context passed to `Synthesizer.sample`.
 """
 
 import functools
@@ -15,12 +21,8 @@ from typing import Any, ClassVar
 
 from pandas import DataFrame
 
-from fenris.core.algorithm.context import (
-    GlobalInitContext,
-    SampleContext,
-    TrainContext,
-)
 from fenris.core.component import Component
+from fenris.core.data import TableSchema
 from fenris.core.payload import ArraysTarget, Payload
 
 
@@ -41,6 +43,77 @@ class GlobalInitArtifacts:
 
     coordinator: Payload | None = None
     synthesizer: Payload | None = None
+
+
+@dataclass(frozen=True)
+class _Context:
+    """Base context.
+
+    Attributes
+    ----------
+    coordinator : str
+        Name of the active coordinator.
+    seed : int
+        Seed to use for stochastic operations.
+    """
+
+    coordinator: str
+    seed: int
+
+
+@dataclass(frozen=True)
+class GlobalInitContext(_Context):
+    """Context passed to `Synthesizer.global_init`.
+
+    Attributes
+    ----------
+    schema : TableSchema
+        Schema classifying the dataset that will be used for the run.
+    """
+
+    schema: TableSchema
+
+
+@dataclass(frozen=True)
+class TrainContext(_Context):
+    """Context passed to `Synthesizer.train`.
+
+    Attributes
+    ----------
+    global_init_artifacts : Payload or None
+        Synthesizer-side artifacts produced by `Synthesizer.global_init`, or
+        ``None`` if global initialization produced no synthesizer artifacts.
+    client_storage : Payload or None
+        Persistent per-client key/value store. The synthesizer may read from
+        and write to this across training rounds. ``None`` on the first round.
+    """
+
+    global_init_artifacts: Payload | None
+    client_storage: Payload | None
+
+
+@dataclass(frozen=True)
+class SampleContext(_Context):
+    """Context passed to `Synthesizer.sample`.
+
+    Attributes
+    ----------
+    global_init_artifacts : Payload or None
+        Synthesizer-side artifacts produced by `Synthesizer.global_init`, or
+        ``None`` if global initialization produced no synthesizer artifacts.
+    client_storage : Payload or None
+        Persistent per-client store accumulated during training, or ``None``
+        if the synthesizer wrote nothing to storage.
+    schema : TableSchema
+        Schema of the table to synthesize.
+    num_rows : int
+        Number of synthetic rows to generate.
+    """
+
+    global_init_artifacts: Payload | None
+    client_storage: Payload | None
+    schema: TableSchema
+    num_rows: int
 
 
 class Synthesizer(Component):
@@ -126,7 +199,7 @@ class Synthesizer(Component):
         ----------
         df : `pandas.DataFrame`
             The union of all train partitions.
-        context : `fenris.core.algorithm.context.GlobalInitContext`
+        context : `fenris.core.algorithm.GlobalInitContext`
             A context object holding relevant information like the table schema and the
             derived seed to use for stochastic operations during initialization.
 
@@ -151,7 +224,7 @@ class Synthesizer(Component):
             Incoming request from the active coordinator.
         df : `pandas.DataFrame`
             The local train partition.
-        context : `fenris.core.algorithm.context.TrainContext`
+        context : `fenris.core.algorithm.TrainContext`
             A context object holding relevant information like preprocessing artifacts.
             Includes a client local read/write storage.
 
@@ -173,7 +246,7 @@ class Synthesizer(Component):
         ----------
         request : `fenris.core.payload.Payload`
             Most recent global train artifacts published by the active coordinator.
-        context : `fenris.core.algorithm.context.SampleContext`
+        context : `fenris.core.algorithm.SampleContext`
             A context object holding relevant information like preprocessing artifacts.
             Includes a client local read/write storage.
 
