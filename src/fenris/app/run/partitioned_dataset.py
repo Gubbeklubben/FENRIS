@@ -1,5 +1,4 @@
 import pandas as pd
-from sklearn.model_selection import train_test_split
 
 from fenris.core.data.partitioner import Partitioner
 from fenris.core.data.schemas import TableSchema
@@ -21,6 +20,8 @@ class PartitionedDataset:
         df_clean = df.dropna().reset_index(drop=True)
         self.num_dropped = len(df) - len(df_clean)
         df = df_clean
+
+        from sklearn.model_selection import train_test_split
 
         client_pool, holdout = train_test_split(
             df,

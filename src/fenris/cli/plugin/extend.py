@@ -11,7 +11,6 @@ from tomlkit import TOMLDocument
 from tomlkit.items import Table
 
 from fenris.app.registry import Group
-from fenris.app.scaffold import AbstractMethodCollector, Builder
 from fenris.cli.plugin._util import validate_identifier
 from fenris.core.component import Component
 
@@ -205,6 +204,8 @@ def _to_cap_words(identifier: str) -> str:
 
 
 def codegen(base: type[Component], name: str) -> str:
+    from fenris.app.scaffold import AbstractMethodCollector, Builder
+
     collector = AbstractMethodCollector(base)
     builder = Builder(collector)
     return builder.with_name(name).build().code
