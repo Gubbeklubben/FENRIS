@@ -11,7 +11,6 @@ from tomlkit import TOMLDocument
 from tomlkit.items import Table
 
 from fenris.app.registry import Group
-from fenris.app.scaffold import create_component_scaffold
 from fenris.cli.plugin._util import validate_identifier
 from fenris.core.component import Component
 
@@ -89,6 +88,10 @@ def extend(
     except TypeError as exc:
         print(f"Error in {py_proj}: {str(exc)}", file=sys.stderr)
         raise typer.Abort()
+
+    # Triggers some relatively heavy libcst imports. Importing here
+    # makes the cli a little more responsive.
+    from fenris.app.scaffold import create_component_scaffold
 
     for name in names:
         path = _descend_and_create_as_needed(root_pkg, packages[1:])
