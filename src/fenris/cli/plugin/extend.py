@@ -89,6 +89,10 @@ def extend(
         print(f"Error in {py_proj}: {str(exc)}", file=sys.stderr)
         raise typer.Abort()
 
+    # Triggers some relatively heavy libcst imports. Importing here
+    # makes the cli a little more responsive.
+    from fenris.app.scaffold import create_component_scaffold
+
     for name in names:
         path = _descend_and_create_as_needed(root_pkg, packages[1:])
         path = path.joinpath(name.lower()).with_suffix(".py")
@@ -97,7 +101,8 @@ def extend(
             continue
 
         with path.open("w") as f:
-            f.write(codegen(cls, _to_cap_words(name)))
+            code = create_component_scaffold(cls, name, _to_cap_words(name))
+            f.write(code)
 
         qualifier = f"{'.'.join((*packages, name))}:{_to_cap_words(name)}"
         entry_point[name] = qualifier
@@ -201,11 +206,3 @@ def _get_class(group: Group, base: str | None) -> type[Component]:
 
 def _to_cap_words(identifier: str) -> str:
     return "".join(w.capitalize() for w in identifier.split("_"))
-
-
-def codegen(base: type[Component], name: str) -> str:
-    from fenris.app.scaffold import AbstractMethodCollector, Builder
-
-    collector = AbstractMethodCollector(base)
-    builder = Builder(collector)
-    return builder.with_name(name).build().code
