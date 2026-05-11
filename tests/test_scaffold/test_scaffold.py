@@ -60,6 +60,16 @@ def test_syntax_valid(generated_code_for_base):
     ast.parse(generated_code_for_base)
 
 
+def test_can_scaffold_relevant():
+    # If scaffolding were to crash for some component ABC,
+    # this test should reveal it.
+    from fenris.app.registry import Group
+
+    for group in Group:
+        for base in group.bases:
+            create_component_scaffold(base, "test", "Test")
+
+
 def test_component_name(generated_code_for_base):
     fn_def = f"""
     def name(self) -> str:
