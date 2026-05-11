@@ -1,3 +1,14 @@
+"""Resolve a minimal new cst.Module from collected target data.
+
+Resolves required imports from the accesses associated with required
+class variables and abstract methods. Organizes a default implementation
+without overriding method bodies or assign targets.
+
+Functions
+---------
+resolve
+"""
+
 import heapq
 import sys
 from collections import defaultdict

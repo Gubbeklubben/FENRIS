@@ -1,3 +1,13 @@
+"""Add the final transformations to a resolved scaffold (cst.Module).
+
+Classes
+-------
+ComponentTransformer
+    A libcst.CSTTransformer that modifies class name, implements Component.name,
+    and replaces the bodies of other methods with a statement raising
+    NotImplementedError.
+"""
+
 import libcst as cst
 
 

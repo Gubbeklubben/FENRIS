@@ -1,3 +1,18 @@
+"""Collect data relevant for scaffolding some target ABC.
+
+Classes
+-------
+Collector
+    Given some target ABC, locates source files, parses with libcst
+    and collects relevant data from the resulting syntax tree.
+TargetData
+    Collector output.
+ClsVar
+    A collected class variable assignment. Wraps a libcst.AnnAssign node.
+FunctionDef
+    A collected function definition. Wraps a libcst.FunctionDef node.
+"""
+
 import inspect
 from abc import ABC
 from collections import defaultdict
@@ -56,8 +71,6 @@ class TargetData:
 
 
 class Collector(cst.CSTVisitor):
-    """Collect abstract methods and tagged cls vars from a target class mro."""
-
     METADATA_DEPENDENCIES = (ScopeProvider, ExpressionContextProvider)
 
     def __init__(self, target_cls: type) -> None:
