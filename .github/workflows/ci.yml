@@ -5,6 +5,7 @@ on:
   push:
     branches:
       - main
+  workflow_dispatch:
 
 jobs:
   lint-and-format:
@@ -31,7 +32,7 @@ jobs:
           key: venv-${{ runner.os }}-${{ hashFiles('poetry.lock') }}
 
       - name: Install dependencies
-        run: poetry install --no-interaction --without builtins
+        run: poetry install --no-interaction
 
       - name: Check formatting
         run: poetry run ruff format src tests --check
@@ -63,7 +64,7 @@ jobs:
           key: venv-${{ runner.os }}-${{ hashFiles('poetry.lock') }}
 
       - name: Install dependencies
-        run: poetry install --no-interaction --without builtins
+        run: poetry install --no-interaction
 
       - name: Run mypy
         run: poetry run mypy -p fenris
@@ -92,7 +93,7 @@ jobs:
           key: venv-${{ runner.os }}-${{ hashFiles('poetry.lock') }}
 
       - name: Install dependencies
-        run: poetry install --no-interaction --without builtins
+        run: poetry install --no-interaction
 
       - name: Run tests
         run: poetry run pytest tests
