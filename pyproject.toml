@@ -2,6 +2,7 @@
 name = "fenris"
 version = "0.1.0"
 description = "An Extensible Benchmarking Framework for Federated Synthetic Tabular Data Generators"
+readme = "README.md"
 authors = [
     {name = "Trond Thorsteinsson", email = "trondthorsteinsson@gmail.com"},
     {name = "Ken Solbakken Remen", email = "kenremen@gmail.com"},
