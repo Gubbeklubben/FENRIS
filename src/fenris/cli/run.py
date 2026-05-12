@@ -10,7 +10,7 @@ from fenris.config.parsing import parse_args, parse_kwargs
 app = typer.Typer()
 
 
-@app.command(help="Execute a federated benchmarking pipeline.")
+@app.command()
 def run(
     synthesizer: Annotated[str, typer.Argument(help="Synthesizer name.")],
     coordinator: Annotated[str, typer.Argument(help="Coordinator name.")],
@@ -129,6 +129,7 @@ def run(
         ),
     ] = None,
 ) -> None:
+    """Execute a federated benchmarking pipeline."""
 
     cli_input = {
         key: value  # nofmt

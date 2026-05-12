@@ -10,7 +10,7 @@ from fenris.app.registry import Group, Metadata
 app = typer.Typer()
 
 
-@app.command(help="List available components.")
+@app.command()
 def show(
     groups: Annotated[
         list[Group] | None,
