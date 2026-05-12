@@ -36,7 +36,7 @@ def new(
 
     root = parent.joinpath(name)
     if root.exists():
-        print(f"{root} already exists.", file=sys.stderr)
+        typer.echo(f"{root} already exists.", file=sys.stderr)
         raise typer.Abort()
 
     root.mkdir(parents=True)
