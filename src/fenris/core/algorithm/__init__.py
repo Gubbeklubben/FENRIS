@@ -1,10 +1,11 @@
-from fenris.core.algorithm.context import (
+from fenris.core.algorithm.coordinator import Coordinator, SingleStepCoordinator
+from fenris.core.algorithm.synthesizer import (
+    GlobalInitArtifacts,
     GlobalInitContext,
     SampleContext,
+    Synthesizer,
     TrainContext,
 )
-from fenris.core.algorithm.coordinator import Coordinator, SingleStepCoordinator
-from fenris.core.algorithm.synthesizer import GlobalInitArtifacts, Synthesizer
 
 __all__ = [
     "Coordinator",
