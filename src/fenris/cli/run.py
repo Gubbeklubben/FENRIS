@@ -129,6 +129,7 @@ def run(
         ),
     ] = None,
 ) -> None:
+    """Execute a federated benchmarking pipeline."""
 
     cli_input = {
         key: value  # nofmt
