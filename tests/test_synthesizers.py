@@ -39,13 +39,15 @@ def _make_instance(name: str):
 
 
 def _run_global_init_and_train(synth, df: pd.DataFrame, schema: TableSchema) -> None:
-    init_ctx = GlobalInitContext(schema=schema, seed=0)
+    init_ctx = GlobalInitContext(coordinator="fake_coordinator", seed=0, schema=schema)
     artifacts = synth.global_init(df.copy(), init_ctx)
 
     train_ctx = TrainContext(
+        coordinator="fake_coordinator",
+        seed=1,
+        schema=schema,
         global_init_artifacts=artifacts.synthesizer,
         client_storage=None,
-        seed=1,
     )
     synth.train(artifacts.coordinator, df.copy(), train_ctx)
 

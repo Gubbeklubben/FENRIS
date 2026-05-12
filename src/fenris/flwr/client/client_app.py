@@ -45,6 +45,7 @@ def train(message: Message, flwr_context: Context) -> Message:
         train_ctx = TrainContext(
             coordinator=ctx.config.coordinator,
             seed=ctx.config.seed.training,
+            schema=ctx.dataset.schema,
             global_init_artifacts=artifacts,
             client_storage=storage,
         )
@@ -93,9 +94,9 @@ def evaluate(message: Message, flwr_context: Context) -> Message:
         sample_ctx = SampleContext(
             coordinator=ctx.config.coordinator,
             seed=ctx.config.seed.sampling,
+            schema=ctx.dataset.schema,
             global_init_artifacts=artifacts,
             client_storage=storage,
-            schema=ctx.dataset.schema,
             num_rows=ctx.config.num_synthetic_rows or ctx.dataset.global_holdout_size,
         )
         synthetic_df = ctx.synthesizer.sample(request, sample_ctx)

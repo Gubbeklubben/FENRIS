@@ -140,9 +140,9 @@ def global_sample(ctx: RunContext) -> None:
     sample_ctx = SampleContext(
         coordinator=ctx.coordinator.name,
         seed=ctx.config.seed.sampling,
+        schema=ctx.dataset.schema,
         global_init_artifacts=ctx.global_init_artifacts.synthesizer,
         client_storage=None,
-        schema=ctx.dataset.schema,
         num_rows=ctx.config.num_synthetic_rows or ctx.dataset.global_holdout_size,
     )
     ctx.synthetic_df = ctx.synthesizer.sample(ctx.train_artifacts, sample_ctx)

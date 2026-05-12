@@ -55,23 +55,18 @@ class _Context:
         Name of the active coordinator.
     seed : int
         Seed to use for stochastic operations.
-    """
-
-    coordinator: str
-    seed: int
-
-
-@dataclass(frozen=True)
-class GlobalInitContext(_Context):
-    """Context passed to `Synthesizer.global_init`.
-
-    Attributes
-    ----------
     schema : TableSchema
         Schema classifying the dataset that will be used for the run.
     """
 
+    coordinator: str
+    seed: int
     schema: TableSchema
+
+
+@dataclass(frozen=True)
+class GlobalInitContext(_Context):
+    """Context passed to `Synthesizer.global_init`."""
 
 
 @dataclass(frozen=True)
@@ -104,15 +99,12 @@ class SampleContext(_Context):
     client_storage : Payload or None
         Persistent per-client store accumulated during training, or ``None``
         if the synthesizer wrote nothing to storage.
-    schema : TableSchema
-        Schema of the table to synthesize.
     num_rows : int
         Number of synthetic rows to generate.
     """
 
     global_init_artifacts: Payload | None
     client_storage: Payload | None
-    schema: TableSchema
     num_rows: int
 
 
