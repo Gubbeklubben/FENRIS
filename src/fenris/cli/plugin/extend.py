@@ -86,7 +86,7 @@ def extend(
     try:
         entry_point = _ensure_entry_point(group, toml)
     except TypeError as exc:
-        print(f"Error in {py_proj}: {str(exc)}", file=sys.stderr)
+        typer.echo(f"Error in {py_proj}: {str(exc)}", file=sys.stderr)
         raise typer.Abort()
 
     # Triggers some relatively heavy libcst imports. Importing here
@@ -97,7 +97,7 @@ def extend(
         path = _descend_and_create_as_needed(root_pkg, packages[1:])
         path = path.joinpath(name.lower()).with_suffix(".py")
         if path.exists():
-            print(f"File {path} already exists.")
+            typer.echo(f"File {path} already exists.")
             continue
 
         with path.open("w") as f:
@@ -182,7 +182,7 @@ def _descend_and_create_as_needed(path: Path, packages: Sequence[str]) -> Path:
 
     curr = path.joinpath(packages[0])
     if curr.exists() and not curr.is_dir():
-        print(f"{curr} exists, but is not a directory.", file=sys.stderr)
+        typer.echo(f"{curr} exists, but is not a directory.", file=sys.stderr)
         raise typer.Abort()
 
     curr.mkdir(exist_ok=True)

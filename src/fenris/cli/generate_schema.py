@@ -50,4 +50,4 @@ def generate_schema(
     with schema_path.open("w") as f:
         json.dump(asdict(schema), f, indent=4)
 
-    print(f"Inferred schema for `{dataset_file}` written to `{schema_path}`.")
+    typer.echo(f"Inferred schema for `{dataset_file}` written to `{schema_path}`.")

@@ -61,42 +61,44 @@ def show(
         for category, entries in evaluators_by_category.items():
             # Category title
             title = f"{category.capitalize()} evaluators"
-            print()
-            print(f"{'':<2}{title}")
-            print(f"{'':<2}{'\u2500' * len(title)}")
+            typer.echo()
+            typer.echo(f"{'':<2}{title}")
+            typer.echo(f"{'':<2}{'\u2500' * len(title)}")
 
             for metadata, evaluator_metadata in entries:
                 # Evaluator title
-                print(f"{'':<4}{metadata.name}")
+                typer.echo(f"{'':<4}{metadata.name}")
 
                 if show_metadata:
                     _show_metadata(metadata, indent=6)
 
                     if not evaluator_metadata:
-                        print(f"{'':<6}Error: Metadata missing for this evaluator.")
+                        typer.echo(
+                            f"{'':<6}Error: Metadata missing for this evaluator."
+                        )
                         continue
 
                     eval_mode = evaluator_metadata.eval_mode.name or ""
-                    print(f"{'':<6}Evaluation mode: {eval_mode.lower()}")
+                    typer.echo(f"{'':<6}Evaluation mode: {eval_mode.lower()}")
 
-                    print(f"{'':<6}Metrics:")
+                    typer.echo(f"{'':<6}Metrics:")
                     for metric in evaluator_metadata.metrics:
-                        print(f"{'':<8}{metric.key}", end="")
-                        print(
+                        typer.echo(f"{'':<8}{metric.key}", end="")
+                        typer.echo(
                             f".<{metric.suffix_type}_column>"
                             if metric.suffix_type
                             else ""
                         )
-                    print()
+                    typer.echo()
 
     def maybe_show(group: Group) -> None:
         if group not in selected:
             return
 
         # Component type heading
-        print()
-        print(group.name)
-        print("\u2500" * len(group.name))
+        typer.echo()
+        typer.echo(group.name)
+        typer.echo("\u2500" * len(group.name))
 
         if group == Group.EVALUATORS:
             show_evaluators()
@@ -105,7 +107,7 @@ def show(
         registry = group.get_registry()
         for metadata in registry.metadata():
             # Component name
-            print(f"{'':<2}{metadata.name}")
+            typer.echo(f"{'':<2}{metadata.name}")
 
             if show_metadata:
                 _show_metadata(metadata, indent=4)
@@ -113,22 +115,22 @@ def show(
             if keywords:
                 component_factory = registry.load(metadata.name)
                 if params := inspect.signature(component_factory).parameters.values():
-                    print(f"{'':<4}Parameters:")
+                    typer.echo(f"{'':<4}Parameters:")
                     for param in params:
-                        print(f"{'':<6}{param}")
-                    print()
+                        typer.echo(f"{'':<6}{param}")
+                    typer.echo()
 
     maybe_show(Group.SYNTHESIZERS)
     maybe_show(Group.COORDINATORS)
     maybe_show(Group.PARTITIONERS)
     maybe_show(Group.EVALUATORS)
 
-    print()
+    typer.echo()
 
 
 def _show_metadata(metadata: Metadata, indent: int) -> None:
     for f in fields(metadata):
         if f.name in ("value", "group"):
             continue
-        print(f"{'':<{indent}}{f.name}: {getattr(metadata, f.name)}")
-    print()
+        typer.echo(f"{'':<{indent}}{f.name}: {getattr(metadata, f.name)}")
+    typer.echo()
