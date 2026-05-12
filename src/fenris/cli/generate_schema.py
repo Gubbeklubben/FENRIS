@@ -11,7 +11,7 @@ from fenris.core.data.schemas import infer_schema
 app = typer.Typer()
 
 
-@app.command(help="Infer a fixed schema from the input dataset and write it to file.")
+@app.command(help="Infer a fixed schema from a dataset and write it to file.")
 def generate_schema(
     dataset_file: Annotated[
         Path,

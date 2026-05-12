@@ -14,7 +14,7 @@ from fenris.cli.plugin._util import validate_identifier
 app = typer.Typer()
 
 
-@app.command()
+@app.command(help="Scaffold a new plugin project.")
 def new(
     name: Annotated[
         str,

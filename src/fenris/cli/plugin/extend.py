@@ -17,7 +17,7 @@ from fenris.core.component import Component
 app = typer.Typer()
 
 
-@app.command()
+@app.command(help="Add new component stubs to an existing plugin project.")
 def extend(
     plugin: Annotated[
         Path,
