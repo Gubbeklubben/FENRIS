@@ -83,7 +83,7 @@ def show(
 
                     typer.echo(f"{'':<6}Metrics:")
                     for metric in evaluator_metadata.metrics:
-                        typer.echo(f"{'':<8}{metric.key}", end="")
+                        typer.echo(f"{'':<8}{metric.key}", nl=False)
                         typer.echo(
                             f".<{metric.suffix_type}_column>"
                             if metric.suffix_type
