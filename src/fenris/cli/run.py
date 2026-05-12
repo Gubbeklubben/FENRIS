@@ -135,5 +135,9 @@ def run(
         for key, value in locals().items()
         if value is not None
     }
-    config = build_config(cli_input)
+    try:
+        config = build_config(cli_input)
+    except (TypeError, ValueError, OSError) as exc:
+        raise typer.BadParameter(str(exc))
+
     runner.run(config, pipeline())
