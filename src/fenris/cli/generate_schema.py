@@ -11,7 +11,7 @@ from fenris.core.data.schemas import infer_schema
 app = typer.Typer()
 
 
-@app.command(help="Infer a fixed schema from a dataset and write it to file.")
+@app.command()
 def generate_schema(
     dataset_file: Annotated[
         Path,
@@ -36,6 +36,8 @@ def generate_schema(
         typer.Option("--force", help="Overwrite the schema file if it already exists."),
     ] = False,
 ) -> None:
+    """Infer a fixed schema from a dataset and write it to file."""
+
     schema_path = schema_file or dataset_file.with_suffix(".schema.json")
 
     if not force and schema_path.exists():
