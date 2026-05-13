@@ -18,6 +18,7 @@ dependencies = [
     "typer~=0.20.1",
     "numpy~=2.4.2",
     "pandas~=3.0.0",
+    "datasets~=4.5.0",
     "flwr-datasets~=0.6.0",
     "scipy~=1.17.0",
     "scikit-learn~=1.8.0",
