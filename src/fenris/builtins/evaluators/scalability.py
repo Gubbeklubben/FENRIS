@@ -30,8 +30,8 @@ from fenris.core.eval.evalcontext import GlobalEvalContext, LocalEvalContext
 from fenris.core.eval.evaluator import (
     EvaluationMode,
     Evaluator,
-    EvaluatorDescriptor,
-    MetricDescriptor,
+    EvaluatorSpec,
+    MetricSpec,
 )
 
 
@@ -48,16 +48,16 @@ class ScalabilityEvaluator(Evaluator):
         return "scalability"
 
     @property
-    def metadata(self) -> EvaluatorDescriptor:
-        return EvaluatorDescriptor(
+    def evaluator_spec(self) -> EvaluatorSpec:
+        return EvaluatorSpec(
             category=Category.SCALABILITY,
             eval_mode=EvaluationMode.FEDERATED,
             metrics=[
-                MetricDescriptor("wall_clock_seconds", default_stop_mode=None),
-                MetricDescriptor("bytes_sent", default_stop_mode=None),
-                MetricDescriptor("bytes_received", default_stop_mode=None),
-                MetricDescriptor("rounds_to_converge", default_stop_mode=None),
-                MetricDescriptor("local_train_seconds_mean", default_stop_mode=None),
+                MetricSpec("wall_clock_seconds", default_stop_mode=None),
+                MetricSpec("bytes_sent", default_stop_mode=None),
+                MetricSpec("bytes_received", default_stop_mode=None),
+                MetricSpec("rounds_to_converge", default_stop_mode=None),
+                MetricSpec("local_train_seconds_mean", default_stop_mode=None),
             ],
         )
 

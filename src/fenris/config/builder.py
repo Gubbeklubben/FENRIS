@@ -160,7 +160,7 @@ def validate_stop_metrics(
             f"is not emitted by any evaluator in the current evaluation suite."
         ) from e
 
-    if EvaluationMode.CENTRALIZED not in evaluator.metadata.eval_mode:
+    if EvaluationMode.CENTRALIZED not in evaluator.evaluator_spec.eval_mode:
         raise ValueError(
             f"Metric `{metrics_cfg['stop_metric']}` does not support "
             f"centralized evaluation and cannot be used as a stop metric"

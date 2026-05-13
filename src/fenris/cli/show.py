@@ -5,7 +5,8 @@ from typing import Annotated
 
 import typer
 
-from fenris.app.registry import Group, Metadata
+from fenris.app.registry import Group
+from fenris.core.component import Metadata
 
 app = typer.Typer()
 
@@ -51,7 +52,7 @@ def show(
         for evaluator in Group.EVALUATORS.get_registry().metadata():
             evaluator_factory = Group.EVALUATORS.get_registry().load(evaluator.name)
             try:
-                metadata = evaluator_factory().metadata
+                metadata = evaluator_factory().evaluator_spec
                 category = metadata.category
             except NotImplementedError:
                 metadata = None

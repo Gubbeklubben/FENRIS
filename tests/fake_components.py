@@ -1,5 +1,7 @@
+from types import SimpleNamespace
 from typing import Generator, Iterable, Literal
 
+import pytest
 from pandas import DataFrame
 
 from fenris.app.registry import Registry
@@ -19,10 +21,6 @@ class FakeSynthesizer(Synthesizer):
     SUPPORTED_COORDINATORS = {"fake_coordinator"}
 
     @property
-    def name(self) -> str:
-        return "fake_synthesizer"
-
-    @property
     def arrays_target(self) -> ArraysTarget:
         return ArraysTarget.NUMPY
 
@@ -39,10 +37,6 @@ class FakeSynthesizer(Synthesizer):
 
 
 class FakeCoordinator(Coordinator):
-    @property
-    def name(self) -> str:
-        return "fake_coordinator"
-
     @property
     def arrays_target(self) -> ArraysTarget:
         return ArraysTarget.NUMPY
@@ -61,10 +55,6 @@ class FakeCoordinator(Coordinator):
 
 
 class FakePartitioner(Partitioner):
-    @property
-    def name(self) -> str:
-        return "fake_partitioner"
-
     # noinspection PyUnusedLocal
     def __init__(self, num_partitions: int):
         pass
@@ -86,48 +76,56 @@ class FakePartitioner(Partitioner):
         return NotImplemented
 
 
-class FakeEntryPoint:
-    def __init__(self, name, value, group, product):
-        self.name = name
-        self.value = value
-        self.group = group
-        self.product = product
-
-    def load(self):
-        return self.product
-
-
-class FakeSynthRegistry(Registry):
-    KEY = "fake_synthesizer"
-
-    def __init__(self):
-        super().__init__(f"{__package__}.fake_synthesizers")
-        self._entry_points = {
-            self.KEY: FakeEntryPoint(
-                self.KEY, "", f"{__package__}.fake_synthesizers", FakeSynthesizer
+def _mock_entry_points(group: str) -> list[SimpleNamespace]:
+    match group:
+        case "fenris.synthesizers":
+            ep = SimpleNamespace(
+                name="fake_synthesizer",
+                group="fenris.synthesizers",
+                value="fake:FakeSynth",
+                module="fake",
+                attr="FakeSynth",
+                dist=SimpleNamespace(name="", version=""),
+                load=lambda: FakeSynthesizer,
             )
-        }
-
-
-class FakeCoordinatorRegistry(Registry):
-    KEY = "fake_coordinator"
-
-    def __init__(self):
-        super().__init__(f"{__package__}.fake_coordinators")
-        self._entry_points = {
-            self.KEY: FakeEntryPoint(
-                self.KEY, "", f"{__package__}.fake_coordinators", FakeCoordinator
+        case "fenris.coordinators":
+            ep = SimpleNamespace(
+                name="fake_coordinator",
+                group="fenris.coordinators",
+                value="fake:FakeCoord",
+                module="fake",
+                attr="FakeCoord",
+                dist=SimpleNamespace(name="", version=""),
+                load=lambda: FakeCoordinator,
             )
-        }
-
-
-class FakePartitionerRegistry(Registry):
-    KEY = "fake_partitioner"
-
-    def __init__(self):
-        super().__init__(f"{__package__}.fake_partitioners")
-        self._entry_points = {
-            self.KEY: FakeEntryPoint(
-                self.KEY, "", f"{__package__}.fake_partitioners", FakePartitioner
+        case "fenris.partitioners":
+            ep = SimpleNamespace(
+                name="fake_partitioner",
+                group="fenris.partitioner",
+                value="fake:FakePartitioner",
+                module="fake",
+                attr="FakePartitioner",
+                dist=SimpleNamespace(name="", version=""),
+                load=lambda: FakePartitioner,
             )
-        }
+        case _:
+            raise ValueError(group)
+    return [ep]
+
+
+@pytest.fixture
+def synthesizers(monkeypatch):
+    monkeypatch.setattr("fenris.app.registry.entry_points", _mock_entry_points)
+    return Registry(group="fenris.synthesizers")
+
+
+@pytest.fixture
+def coordinators(monkeypatch):
+    monkeypatch.setattr("fenris.app.registry.entry_points", _mock_entry_points)
+    return Registry(group="fenris.coordinators")
+
+
+@pytest.fixture
+def partitioners(monkeypatch):
+    monkeypatch.setattr("fenris.app.registry.entry_points", _mock_entry_points)
+    return Registry(group="fenris.partitioners")

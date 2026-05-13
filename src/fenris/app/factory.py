@@ -58,7 +58,7 @@ def create_evaluators(
     # noinspection PyTypeChecker
     for name in registry:
         evaluator = create_evaluator(name, registry)
-        evaluators[evaluator.metadata.category].append(evaluator)
+        evaluators[evaluator.evaluator_spec.category].append(evaluator)
     for category in categories:
         for evaluator in evaluators[category]:
             yield evaluator

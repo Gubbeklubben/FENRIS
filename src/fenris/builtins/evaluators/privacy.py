@@ -56,8 +56,8 @@ from fenris.core.eval import Category, Evaluator, LocalEvalContext
 from fenris.core.eval.evalcontext import CentralizedEvalContext, GlobalEvalContext
 from fenris.core.eval.evaluator import (
     EvaluationMode,
-    EvaluatorDescriptor,
-    MetricDescriptor,
+    EvaluatorSpec,
+    MetricSpec,
     normalize_key,
 )
 from fenris.core.logger import log_debug
@@ -104,17 +104,17 @@ class DirectOverlapDiagnosticEvaluator(Evaluator):
         return "direct_overlap_diagnostic"
 
     @property
-    def metadata(self) -> EvaluatorDescriptor:
-        return EvaluatorDescriptor(
+    def evaluator_spec(self) -> EvaluatorSpec:
+        return EvaluatorSpec(
             category=Category.PRIVACY,
             eval_mode=EvaluationMode.FEDERATED,
             metrics=[
-                MetricDescriptor("exact_row_match_rate_train"),
-                MetricDescriptor("exact_row_match_any"),
-                MetricDescriptor("partial_match_rate_top1"),
-                MetricDescriptor("partial_match_rate_top2"),
-                MetricDescriptor("partial_match_rate_top3"),
-                MetricDescriptor("partial_match_any"),
+                MetricSpec("exact_row_match_rate_train"),
+                MetricSpec("exact_row_match_any"),
+                MetricSpec("partial_match_rate_top1"),
+                MetricSpec("partial_match_rate_top2"),
+                MetricSpec("partial_match_rate_top3"),
+                MetricSpec("partial_match_any"),
             ],
         )
 
@@ -270,14 +270,14 @@ class MIANearestNeighborAttackEvaluator(Evaluator):
         return "mia_nearest_neighbor_attack"
 
     @property
-    def metadata(self) -> EvaluatorDescriptor:
-        return EvaluatorDescriptor(
+    def evaluator_spec(self) -> EvaluatorSpec:
+        return EvaluatorSpec(
             category=Category.PRIVACY,
             eval_mode=EvaluationMode.BOTH,
             metrics=[
-                MetricDescriptor("mia_auc"),
-                MetricDescriptor("mia_accuracy"),
-                MetricDescriptor("mia_advantage"),
+                MetricSpec("mia_auc"),
+                MetricSpec("mia_accuracy"),
+                MetricSpec("mia_advantage"),
             ],
         )
 
@@ -445,14 +445,14 @@ class AIASupervisedAttackEvaluator(Evaluator):
         return "aia_supervised_attack"
 
     @property
-    def metadata(self) -> EvaluatorDescriptor:
-        return EvaluatorDescriptor(
+    def evaluator_spec(self) -> EvaluatorSpec:
+        return EvaluatorSpec(
             category=Category.PRIVACY,
             eval_mode=EvaluationMode.BOTH,
             metrics=[
-                MetricDescriptor("aia_auc", suffix_type="sensitive"),
-                MetricDescriptor("aia_accuracy", suffix_type="sensitive"),
-                MetricDescriptor("aia_rmse", suffix_type="sensitive"),
+                MetricSpec("aia_auc", suffix_type="sensitive"),
+                MetricSpec("aia_accuracy", suffix_type="sensitive"),
+                MetricSpec("aia_rmse", suffix_type="sensitive"),
             ],
         )
 

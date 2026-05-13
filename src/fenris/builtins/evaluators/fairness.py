@@ -23,8 +23,8 @@ from fenris.core.eval import Category, Evaluator, LocalEvalContext
 from fenris.core.eval.evalcontext import GlobalEvalContext
 from fenris.core.eval.evaluator import (
     EvaluationMode,
-    EvaluatorDescriptor,
-    MetricDescriptor,
+    EvaluatorSpec,
+    MetricSpec,
     normalize_key,
 )
 from fenris.core.logger import log_debug
@@ -71,14 +71,14 @@ class FairnessEvaluator(Evaluator):
         return "fairness"
 
     @property
-    def metadata(self) -> EvaluatorDescriptor:
-        return EvaluatorDescriptor(
+    def evaluator_spec(self) -> EvaluatorSpec:
+        return EvaluatorSpec(
             category=Category.FAIRNESS,
             eval_mode=EvaluationMode.BOTH,
             metrics=[
-                MetricDescriptor("demographic_parity_diff", suffix_type="sensitive"),
-                MetricDescriptor("equalized_odds_diff", suffix_type="sensitive"),
-                MetricDescriptor("equal_opportunity_diff", suffix_type="sensitive"),
+                MetricSpec("demographic_parity_diff", suffix_type="sensitive"),
+                MetricSpec("equalized_odds_diff", suffix_type="sensitive"),
+                MetricSpec("equal_opportunity_diff", suffix_type="sensitive"),
             ],
         )
 

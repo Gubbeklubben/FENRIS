@@ -20,8 +20,8 @@ from fenris.core.eval import Category, Evaluator, LocalEvalContext
 from fenris.core.eval.evalcontext import GlobalEvalContext
 from fenris.core.eval.evaluator import (
     EvaluationMode,
-    EvaluatorDescriptor,
-    MetricDescriptor,
+    EvaluatorSpec,
+    MetricSpec,
 )
 
 
@@ -31,14 +31,14 @@ class TSTREvaluator(Evaluator):
         return "tstr"
 
     @property
-    def metadata(self) -> EvaluatorDescriptor:
-        return EvaluatorDescriptor(
+    def evaluator_spec(self) -> EvaluatorSpec:
+        return EvaluatorSpec(
             category=Category.UTILITY,
             eval_mode=EvaluationMode.BOTH,
             metrics=[
-                MetricDescriptor("tstr_auc", default_stop_mode="max"),
-                MetricDescriptor("tstr_accuracy", default_stop_mode="max"),
-                MetricDescriptor("tstr_rmse"),
+                MetricSpec("tstr_auc", default_stop_mode="max"),
+                MetricSpec("tstr_accuracy", default_stop_mode="max"),
+                MetricSpec("tstr_rmse"),
             ],
         )
 

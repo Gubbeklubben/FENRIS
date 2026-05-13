@@ -2,7 +2,7 @@ from collections.abc import Iterable, Iterator, Mapping
 from typing import Any
 
 from fenris.core.eval.evalcontext import GlobalEvalContext, LocalEvalContext
-from fenris.core.eval.evaluator import Evaluator, MetricDescriptor
+from fenris.core.eval.evaluator import Evaluator, MetricSpec
 
 
 class EvaluationSuite:
@@ -17,13 +17,13 @@ class EvaluationSuite:
         metric_key: str,
         target_column: str | None,
         sensitive_columns: tuple[str, ...] | None,
-    ) -> tuple[Evaluator, MetricDescriptor]:
+    ) -> tuple[Evaluator, MetricSpec]:
 
         for ev in self._evaluators:
-            for key, metric in ev.get_metric_descriptor_dict(
+            for key, metric in ev.get_metric_spec_dict(
                 target_column, sensitive_columns
             ).items():
-                if f"{ev.metadata.category}.{key}" == metric_key:
+                if f"{ev.evaluator_spec.category}.{key}" == metric_key:
                     return ev, metric
         raise KeyError(
             f"Specified metric key {metric_key} is not emitted "
@@ -46,7 +46,7 @@ class EvaluationSuite:
                 f"\nDeclared: {declared_keys}\nActual: {actual_keys}"
             )
         return {
-            f"{evaluator.metadata.category}.{key}": value
+            f"{evaluator.evaluator_spec.category}.{key}": value
             for key, value in raw_metrics.items()
         }
 

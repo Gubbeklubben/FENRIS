@@ -4,13 +4,13 @@ from fenris.core.eval.evalcontext import (
     LocalEvalContext,
 )
 from fenris.core.eval.evalsuite import EvaluationSuite
-from fenris.core.eval.evaluator import Category, Evaluator, EvaluatorDescriptor
+from fenris.core.eval.evaluator import Category, Evaluator, EvaluatorSpec
 
 __all__ = [
     "Category",
     "Evaluator",
     "EvaluationSuite",
-    "EvaluatorDescriptor",
+    "EvaluatorSpec",
     "LocalEvalContext",
     "GlobalEvalContext",
     "CentralizedEvalContext",

@@ -70,14 +70,6 @@ def test_can_scaffold_relevant():
             create_component_scaffold(base, "test", "Test")
 
 
-def test_component_name(generated_code_for_base):
-    fn_def = f"""
-    def name(self) -> str:
-        return \"{NAME}\"
-    """
-    assert_in_class_body(generated_code_for_base, fn_def, Base)
-
-
 def test_cls_vars(generated_code_for_base):
     assert_in_class_body(generated_code_for_base, "REQUIRED: int =", Base)
     assert "NOT_REQUIRED: int =" not in generated_code_for_base

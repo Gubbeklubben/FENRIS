@@ -7,28 +7,6 @@ from fenris.config.builder import build_config, parse_kwargs_for_function
 from fenris.config.parsing import coerce, is_optional
 from fenris.core.eval import Category
 
-from .fake_components import (
-    FakeCoordinatorRegistry,
-    FakePartitionerRegistry,
-    FakeSynthRegistry,
-)
-
-
-@pytest.fixture
-def synthesizers():
-    return FakeSynthRegistry()
-
-
-@pytest.fixture
-def coordinators():
-    return FakeCoordinatorRegistry()
-
-
-@pytest.fixture
-def partitioners():
-    return FakePartitionerRegistry()
-
-
 # --- helpers ---------------------------------------------------------------
 
 
@@ -38,9 +16,9 @@ def minimal_valid_cfg(tmp_path: Path, **overrides):
 
     base = {
         "dataset": str(dataset),
-        "synthesizer": FakeSynthRegistry.KEY,
-        "coordinator": FakeCoordinatorRegistry.KEY,
-        "partitioner": FakePartitionerRegistry.KEY,
+        "synthesizer": "fake_synthesizer",
+        "coordinator": "fake_coordinator",
+        "partitioner": "fake_partitioner",
     }
     base.update(overrides)
     return base

@@ -5,12 +5,6 @@ from fenris.app.run.partitioned_dataset import PartitionedDataset
 from fenris.builtins.partitioners.flwr_delegates import FlwrDelegatePartitioner
 from fenris.core.data import load_csv
 from fenris.core.data.schemas import infer_schema
-from tests.fake_components import FakePartitionerRegistry
-
-
-@pytest.fixture
-def partitioners():
-    return FakePartitionerRegistry()
 
 
 @pytest.fixture

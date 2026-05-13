@@ -1,28 +1,16 @@
 from __future__ import annotations
 
 import importlib.metadata
-from dataclasses import dataclass
 from enum import Enum
 from importlib.metadata import entry_points
 from typing import Any, Iterator, Self
 
 from fenris.core.algorithm import Coordinator, SingleStepCoordinator, Synthesizer
-from fenris.core.component import Component
+from fenris.core.component import Component, Metadata
 from fenris.core.data import Partitioner
 from fenris.core.eval import Evaluator
 
 _ROOT_PKG = __name__.split(".")[0]
-
-
-@dataclass(frozen=True)
-class Metadata:
-    name: str
-    group: str
-    value: str
-    module: str
-    attr: str
-    dist_name: str
-    dist_version: str
 
 
 # PyCharm static analysis is most pleased if using Enum not StrEnum,
@@ -112,7 +100,9 @@ class Registry:
         )
 
     def load(self, name: str) -> Any:
-        return self._get_entry_point(name).load()
+        factory = self._get_entry_point(name).load()
+        factory.metadata = self.get_metadata(name)
+        return factory
 
     def _get_entry_point(self, name: str) -> importlib.metadata.EntryPoint:
         try:

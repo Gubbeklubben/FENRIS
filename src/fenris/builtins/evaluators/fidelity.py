@@ -50,8 +50,8 @@ from fenris.core.eval import Category, Evaluator, LocalEvalContext
 from fenris.core.eval.evalcontext import GlobalEvalContext
 from fenris.core.eval.evaluator import (
     EvaluationMode,
-    EvaluatorDescriptor,
-    MetricDescriptor,
+    EvaluatorSpec,
+    MetricSpec,
 )
 from fenris.core.logger import log_debug
 
@@ -102,13 +102,13 @@ class MomentReductionMetricsEvaluator(Evaluator):
         return "moment_reduction_metrics"
 
     @property
-    def metadata(self) -> EvaluatorDescriptor:
-        return EvaluatorDescriptor(
+    def evaluator_spec(self) -> EvaluatorSpec:
+        return EvaluatorSpec(
             category=Category.FIDELITY,
             eval_mode=EvaluationMode.BOTH,
             metrics=[
-                MetricDescriptor("mean_abs_diff"),
-                MetricDescriptor("std_abs_diff"),
+                MetricSpec("mean_abs_diff"),
+                MetricSpec("std_abs_diff"),
             ],
         )
 
@@ -242,14 +242,14 @@ class DistributionSimilarityMetricsEvaluator(Evaluator):
         return "distribution_similarity_metrics"
 
     @property
-    def metadata(self) -> EvaluatorDescriptor:
-        return EvaluatorDescriptor(
+    def evaluator_spec(self) -> EvaluatorSpec:
+        return EvaluatorSpec(
             category=Category.FIDELITY,
             eval_mode=EvaluationMode.BOTH,
             metrics=[
-                MetricDescriptor("ks_mean"),
-                MetricDescriptor("wasserstein_mean"),
-                MetricDescriptor("t_stat_mean_abs"),
+                MetricSpec("ks_mean"),
+                MetricSpec("wasserstein_mean"),
+                MetricSpec("t_stat_mean_abs"),
             ],
         )
 
@@ -339,12 +339,12 @@ class CategoricalTvMeanEvaluator(Evaluator):
         return "categorical_tv_mean"
 
     @property
-    def metadata(self) -> EvaluatorDescriptor:
-        return EvaluatorDescriptor(
+    def evaluator_spec(self) -> EvaluatorSpec:
+        return EvaluatorSpec(
             category=Category.FIDELITY,
             eval_mode=EvaluationMode.BOTH,
             metrics=[
-                MetricDescriptor("categorical_tv_mean"),
+                MetricSpec("categorical_tv_mean"),
             ],
         )
 
@@ -433,12 +433,12 @@ class CorrFroDiffEvaluator(Evaluator):
         return "corr_fro_diff"
 
     @property
-    def metadata(self) -> EvaluatorDescriptor:
-        return EvaluatorDescriptor(
+    def evaluator_spec(self) -> EvaluatorSpec:
+        return EvaluatorSpec(
             category=Category.FIDELITY,
             eval_mode=EvaluationMode.CENTRALIZED,
             metrics=[
-                MetricDescriptor("corr_fro_diff"),
+                MetricSpec("corr_fro_diff"),
             ],
         )
 
