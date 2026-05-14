@@ -1,8 +1,6 @@
-from __future__ import annotations
-
 from abc import ABC
 from dataclasses import dataclass
-from typing import Any
+from typing import Any, final
 
 
 @dataclass(frozen=True)
@@ -23,13 +21,18 @@ class Component(ABC):
 
     def __init_subclass__(cls, **kwargs: Any) -> None:
         super().__init_subclass__(**kwargs)
-        attr = "metadata"
-        if attr in cls.__dict__:
+        if "metadata" in cls.__dict__:
             raise TypeError(
-                f"The '{attr}' attr is reserved, and set dynamically by the relevant "
-                f"registry."
+                "The 'metadata' attr is reserved, and set dynamically by the relevant "
+                "registry."
+            )
+        if "name" in cls.__dict__:
+            raise TypeError(
+                "The 'name' property is implemented in the base class and should "
+                "not not be overridden."
             )
 
+    @final
     @property
     def name(self) -> str:
         return self.__class__.metadata.name
