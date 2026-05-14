@@ -235,6 +235,8 @@ def _calc_gradient_penalty(
         Fake data (with conditional vectors concatenated), shape (batch, dim)
     device : torch.device
         Computation device
+    generator : torch.Generator
+        RNG used to sample interpolation coefficients
     pac : int
         PacGAN pack size (must match discriminator.pack)
     lambda_ : float

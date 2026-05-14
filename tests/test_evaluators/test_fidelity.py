@@ -182,6 +182,9 @@ class TestCategoricalTvMean:
 
     def test_half_overlap(self):
         """
+        Synthetic data covers only one of two equally likely categories,
+        giving TV = 0.5.
+
         real = [A, A, B, B]  → P(A)=0.5, P(B)=0.5
         syn  = [A, A, A, A]  → P(A)=1.0, P(B)=0.0
         TV = 0.5 * (|0.5-1.0| + |0.5-0.0|) = 0.5
@@ -240,6 +243,9 @@ class TestCorrFroDiff:
 
     def test_perfect_positive_vs_negative_correlation(self):
         """
+        Frobenius norm of correlation diff between perfectly positive and negative
+        correlations.
+
         real: b = a  → corr = [[1, 1], [1, 1]]
         syn:  b = -a → corr = [[1, -1], [-1, 1]]
         diff = [[0, 2], [2, 0]]

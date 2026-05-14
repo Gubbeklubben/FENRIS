@@ -26,8 +26,17 @@ logger.setLevel(logging.DEBUG)
 
 
 class ColoredStreamHandler(logging.StreamHandler):  # type: ignore[type-arg]
+    """StreamHandler that prepends ANSI color codes based on log level."""
+
     # Adapted from flwr.common.logger
     def format(self, record: logging.LogRecord) -> str:
+        """Format *record* with an ANSI-colored level prefix.
+
+        Returns
+        -------
+        str
+            The formatted log string with ANSI color codes applied.
+        """
         seperator = " " * (8 - len(record.levelname))
         log_fmt = (
             f"{LOG_COLORS[record.levelname]}"

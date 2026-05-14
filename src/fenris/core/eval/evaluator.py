@@ -17,6 +17,7 @@ def normalize_key(text: str) -> str:
     Parameters
     ----------
     text : str
+        Raw metric name to normalize
 
     Returns
     -------
@@ -97,6 +98,13 @@ class Evaluator(Component):
     EVALUATOR_SPEC: ClassVar[EvaluatorSpec]
 
     def __init_subclass__(cls, **kwargs: Any) -> None:
+        """Enforce that every Evaluator subclass declares ``EVALUATOR_SPEC``.
+
+        Raises
+        ------
+        TypeError
+            If ``EVALUATOR_SPEC`` is not declared on the subclass.
+        """
         super().__init_subclass__(**kwargs)
         if "EVALUATOR_SPEC" not in cls.__dict__:
             raise TypeError(
@@ -156,7 +164,13 @@ class Evaluator(Component):
         return self.get_metric_spec_dict(target_column, sensitive_columns).keys()
 
     def _nan_result(self) -> dict[str, float]:
-        """Return a dict of NaN values keyed by this evaluator's metric keys."""
+        """Return a dict of NaN values keyed by this evaluator's metric keys.
+
+        Returns
+        -------
+        dict[str, float]
+            Every metric key mapped to ``float("nan")``.
+        """
         return {key: math.nan for key in self.get_metric_keys()}
 
     @abstractmethod
