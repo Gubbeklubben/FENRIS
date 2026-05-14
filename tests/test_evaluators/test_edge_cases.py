@@ -4,8 +4,8 @@ Parameterized to ensure every evaluator handles degenerate inputs gracefully.
 Every new evaluator added to ``ALL_EVALUATORS`` is automatically covered by
 all three checks without writing any additional test code.
 
-Note on the NaN contract (Code Structure Guide §7.1.2)
-------------------------------------------------------
+Note on the NaN contract
+------------------------
 Evaluators emit ``float("nan")`` when a metric is not applicable, rather
 than omitting the key.  Tests in this module accept both ``nan`` and finite
 values; only ``±inf`` is forbidden.
@@ -101,9 +101,9 @@ class TestEdgeCases:
     def test_result_values_are_finite_or_nan(self, evaluator):
         """No evaluator should return ±infinity for normal inputs.
 
-        Per the NaN contract (§7.1.2), a missing metric should be
-        ``float("nan")`` rather than a missing key.  Both ``nan`` and finite
-        values are therefore accepted; only ``±inf`` is forbidden.
+        A missing metric should be ``float("nan")`` rather than a missing key.
+        Both ``nan`` and finite values are therefore accepted; only ``±inf`` is
+        forbidden.
         """
         ctx = _make_eval_ctx(evaluator, NUMERIC_DF, NUMERIC_DF * 1.01)
         result = evaluator.global_evaluate(ctx)

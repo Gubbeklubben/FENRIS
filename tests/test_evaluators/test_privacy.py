@@ -6,8 +6,8 @@ Each evaluator is tested by constructing datasets where the expected
 outcome is obvious from first principles (e.g. copying training data
 produces 100 % overlap; fully disjoint data produces 0 %).
 
-Note on the NaN contract (Code Structure Guide §7.1.2)
-------------------------------------------------------
+Note on the NaN contract
+------------------------
 Evaluators emit ``float("nan")`` for inapplicable metrics rather than
 omitting the key.  Tests assert the full key set is present and values are nan.
 """
@@ -41,7 +41,7 @@ class TestDirectOverlap:
     """Tests for exact-match and partial-match memorization diagnostics.
 
     ``global_evaluate`` intentionally returns NaN for this evaluator —
-    overlap against a server holdout is a structural false negative (§16.5).
+    overlap against a server holdout is a structural false negative.
     All meaningful tests use ``local_evaluate`` + ``aggregate``, which is the
     only correct mode for overlap detection.
     """
@@ -221,7 +221,7 @@ class TestAIA:
     GENERIC_NAN_KEYS = {"aia_accuracy", "aia_auc", "aia_rmse"}
 
     def test_no_sensitive_columns_returns_nan_keys(self):
-        """No sensitive_columns → generic nan result emitted (NaN contract §7.1.2)."""
+        """No sensitive_columns → generic nan result emitted."""
         df = pd.DataFrame({"x": [1.0, 2.0, 3.0], "y": [0, 1, 0]})
         ctx = make_ctx(df, df.copy(), sensitive_columns=None)
         result = self.evaluator.global_evaluate(ctx)

@@ -71,7 +71,7 @@ class MetricsConfig:
 
 @dataclass(frozen=True)
 class SeedConfig:
-    """Derived seeds per §23.2 of the technical reference.
+    """Bundle of master seed and all derived seeds.
 
     Each randomness source gets a distinct offset so that changing the
     master seed produces a genuinely different experiment.

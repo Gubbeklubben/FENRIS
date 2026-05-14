@@ -7,8 +7,8 @@ obvious, so no deep statistical expertise is required to verify correctness.
 Where the formula allows an exact analytic result (e.g. Wasserstein shift of
 1, TV = 0.5, Frobenius = 2√2) the expected value is derived in the docstring.
 
-Note on the NaN contract (Code Structure Guide §7.1.2)
-------------------------------------------------------
+Note on the NaN contract
+------------------------
 Evaluators emit ``float("nan")`` for inapplicable metrics rather than
 omitting the key.  Tests assert that inapplicable metrics are ``nan`` and
 that the full expected key set is always present.
@@ -79,7 +79,7 @@ class TestMomentReduction:
         assert result["std_abs_diff"] == pytest.approx(0.0, abs=1e-9)
 
     def test_no_numeric_columns_emits_nan_keys(self):
-        """No numeric columns → both keys present but nan (NaN contract §7.1.2)."""
+        """No numeric columns → both keys present but nan."""
         ctx = make_ctx(CATEGORICAL_DF, CATEGORICAL_DF.copy())
         result = self.evaluator.global_evaluate(ctx)
 
@@ -134,7 +134,7 @@ class TestDistributionSimilarity:
         assert result["ks_mean"] > 0.99
 
     def test_no_numeric_columns_emits_nan_keys(self):
-        """No numeric columns → all keys present but nan (NaN contract §7.1.2)."""
+        """No numeric columns → all keys present but nan."""
         ctx = make_ctx(CATEGORICAL_DF, CATEGORICAL_DF.copy())
         result = self.evaluator.global_evaluate(ctx)
 
@@ -198,7 +198,7 @@ class TestCategoricalTvMean:
         assert result["categorical_tv_mean"] == pytest.approx(0.5, abs=1e-9)
 
     def test_no_categorical_columns_emits_nan_key(self):
-        """No categorical columns → key present but nan (NaN contract §7.1.2)."""
+        """No categorical columns → key present but nan."""
         ctx = make_ctx(NUMERIC_DF, NUMERIC_DF.copy())
         result = self.evaluator.global_evaluate(ctx)
 
@@ -233,7 +233,7 @@ class TestCorrFroDiff:
         assert result["corr_fro_diff"] == pytest.approx(0.0, abs=1e-9)
 
     def test_fewer_than_two_columns_emits_nan_key(self):
-        """Single numeric column → key present but nan (NaN contract §7.1.2)."""
+        """Single numeric column → key present but nan."""
         real = pd.DataFrame({"x": [1.0, 2.0, 3.0]})
         syn = pd.DataFrame({"x": [4.0, 5.0, 6.0]})
         ctx = make_ctx(real, syn)
@@ -261,7 +261,7 @@ class TestCorrFroDiff:
         assert result["corr_fro_diff"] == pytest.approx(expected, abs=1e-6)
 
     def test_only_categorical_emits_nan_key(self):
-        """No numeric columns → key present but nan (NaN contract §7.1.2)."""
+        """No numeric columns → key present but nan."""
         ctx = make_ctx(CATEGORICAL_DF, CATEGORICAL_DF.copy())
         result = self.evaluator.global_evaluate(ctx)
 

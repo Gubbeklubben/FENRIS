@@ -1,5 +1,5 @@
 """
-Scalability evaluators (metric family 5, spec §9).
+Scalability evaluators.
 
 Most scalability metrics are *measurements*, not computations: wall-clock time,
 byte counts, and round count are accumulated by ScalabilityCollector via the
@@ -8,11 +8,11 @@ through this evaluator at all.
 
 This evaluator handles only ``local_train_seconds_mean``, which is self-reported
 by each client via LocalEvalContext and aggregated here as a row-count-weighted
-mean.  global_evaluate returns NaN for all keys (scalability has no centralized
-analogue, spec §15.5 table 5).
+mean.  global_evaluate returns NaN for all keys — scalability has no centralized
+analogue.
 
-Registered metric keys (spec §9)
----------------------------------
+Registered metric keys
+----------------------
   scalability.wall_clock_seconds        — set by ScalabilityCollector
   scalability.bytes_sent                — set by ScalabilityCollector
   scalability.bytes_received            — set by ScalabilityCollector
@@ -60,9 +60,7 @@ class ScalabilityEvaluator(Evaluator):
     # ------------------------------------------------------------------
 
     def global_evaluate(self, ctx: GlobalEvalContext) -> dict[str, float]:
-        """Return NaN for all keys
-        — scalability has no centralized analogue (spec §15.5).
-        """
+        """Return NaN for all keys — scalability has no centralized analogue."""
         return self._nan_result()
 
     # ------------------------------------------------------------------

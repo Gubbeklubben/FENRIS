@@ -26,8 +26,7 @@ Federated aggregation notes
 
 * CorrFroDiffEvaluator — **centralized-only**. Computing the global
   correlation matrix federally requires sending cross-product matrices that
-  reveal joint distribution information. Federated mode is intentionally
-  unsupported; see reference guide §3.3.1 / §15.1.
+  reveal joint distribution information.
 """
 
 from __future__ import annotations
@@ -406,8 +405,7 @@ class CorrFroDiffEvaluator(Evaluator):
     Computing the global Pearson correlation matrix federally requires each
     client to send O(d²) cross-product sums, which reveals the joint
     distribution of column pairs — a meaningful privacy leakage.  This
-    evaluator must therefore be used in centralized mode only; see reference
-    guide §3.3.1 and §15.1.
+    evaluator must therefore be used in centralized mode only.
     """
 
     EVALUATOR_SPEC: ClassVar[EvaluatorSpec] = EvaluatorSpec(
