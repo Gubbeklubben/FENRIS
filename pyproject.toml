@@ -113,14 +113,56 @@ line-length = 88
 src = ["src", "tests"]
 
 [tool.ruff.lint]
-# E, W: pycodestyle (standard errors and warnings)
-# F: pyflakes (unused variables/imports)
-# I: isort (automatic import sorting)
+preview = true  # required for pydoclint to work
 
-# TODO: add along the way to enforce docstrings
-# DOC: pydoclint (checks that docstrings match function signatures)
-# D: pydocstyle (checks docstring formatting)
-select = ["E", "W", "F", "I"]
+select = [
+    "E", # E: pycodestyle errors
+    "W", # W: pycodestyle warnings
+    "F", # F: pyflakes (unused variables/imports)
+    "I", # I: isort (automatic import sorting)
+
+    "D", # D: pydocstyle (checks docstring formatting)
+    "DOC", # DOC: pydoclint (checks that docstrings match function signatures)
+
+    "D212", # Multi-line docstring summary should start at the first line.
+    "D415", # First line should end with a period, question mark, or exclamation point.
+    "D417", # All parameters in signature should be documented.
+]
+
+ignore = [
+    "D100", # Missing docstring in public module # TODO
+    "D104", # Missing docstring in public package # TODO
+    "D205", # Blank line required between summary and description
+                                        # (Due to line-length restrictions, this rule also forces
+                                        # summaries to fit on one line, which is not always possible)
+
+    "D401", # First line must be in imperative mood
+    "D403", # First word must be capitalized - not desirable for the more mathematical docstrings
+]
+
+
+[tool.ruff.lint.per-file-ignores]
+# TODO: Eventually, the whole codebase should be kept to the same standard as core
+# For now, we are more lenient with anything outside of core
+"!src/fenris/core/**" = [
+    "D101", # Missing docstring in public class
+    "D102", # Missing docstring in public method
+    "D103", # Missing docstring in public function
+    "D105", # Missing docstring in magic method
+    "DOC501", # Raised exception missing from docstring
+    "DOC201", # `return` not documented in docstring
+]
+
+# TODO: evalsuite does not belong in core and does not need to be kept to current core standards
+# (This should match the ignore list above)
+"src/fenris/core/eval/evalsuite.py" = [
+    "D101", # Missing docstring in public class
+    "D102", # Missing docstring in public method
+    "D103", # Missing docstring in public function
+    "D105", # Missing docstring in magic method
+    "DOC501", # Raised exception missing from docstring
+    "DOC201", # `return` is not documented in docstring
+]
 
 [tool.ruff.lint.pydocstyle]
 convention = "numpy"
