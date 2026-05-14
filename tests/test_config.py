@@ -3,11 +3,29 @@ from typing import Any, Optional, Union
 
 import pytest
 
+from fenris.app.registry import Registry
 from fenris.config.builder import build_config, parse_kwargs_for_function
 from fenris.config.parsing import coerce, is_optional
 from fenris.core.eval import Category
+from tests.fake_components import mock_entry_points
 
-# --- helpers ---------------------------------------------------------------
+
+@pytest.fixture
+def synthesizers(monkeypatch):
+    monkeypatch.setattr("fenris.app.registry.entry_points", mock_entry_points)
+    return Registry(group="fenris.synthesizers")
+
+
+@pytest.fixture
+def coordinators(monkeypatch):
+    monkeypatch.setattr("fenris.app.registry.entry_points", mock_entry_points)
+    return Registry(group="fenris.coordinators")
+
+
+@pytest.fixture
+def partitioners(monkeypatch):
+    monkeypatch.setattr("fenris.app.registry.entry_points", mock_entry_points)
+    return Registry(group="fenris.partitioners")
 
 
 def minimal_valid_cfg(tmp_path: Path, **overrides):

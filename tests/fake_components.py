@@ -1,10 +1,8 @@
 from types import SimpleNamespace
 from typing import Generator, Iterable, Literal
 
-import pytest
 from pandas import DataFrame
 
-from fenris.app.registry import Registry
 from fenris.core.algorithm import (
     Coordinator,
     GlobalInitArtifacts,
@@ -76,7 +74,7 @@ class FakePartitioner(Partitioner):
         return NotImplemented
 
 
-def _mock_entry_points(group: str) -> list[SimpleNamespace]:
+def mock_entry_points(group: str) -> list[SimpleNamespace]:
     match group:
         case "fenris.synthesizers":
             ep = SimpleNamespace(
@@ -111,21 +109,3 @@ def _mock_entry_points(group: str) -> list[SimpleNamespace]:
         case _:
             raise ValueError(group)
     return [ep]
-
-
-@pytest.fixture
-def synthesizers(monkeypatch):
-    monkeypatch.setattr("fenris.app.registry.entry_points", _mock_entry_points)
-    return Registry(group="fenris.synthesizers")
-
-
-@pytest.fixture
-def coordinators(monkeypatch):
-    monkeypatch.setattr("fenris.app.registry.entry_points", _mock_entry_points)
-    return Registry(group="fenris.coordinators")
-
-
-@pytest.fixture
-def partitioners(monkeypatch):
-    monkeypatch.setattr("fenris.app.registry.entry_points", _mock_entry_points)
-    return Registry(group="fenris.partitioners")

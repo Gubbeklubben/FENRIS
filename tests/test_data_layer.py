@@ -2,7 +2,7 @@ import pandas as pd
 import pytest
 
 from fenris.app.run.partitioned_dataset import PartitionedDataset
-from fenris.builtins.partitioners.flwr_delegates import FlwrDelegatePartitioner
+from fenris.builtins.partitioners.flwr_delegates import IidPartitioner
 from fenris.core.data import load_csv
 from fenris.core.data.schemas import infer_schema
 
@@ -52,7 +52,7 @@ def test_load_csv_and_schema(sample_df, tmp_path):
 @pytest.fixture
 def partitioned_dataset(sample_df):
     schema = infer_schema(sample_df)
-    partitioner = FlwrDelegatePartitioner.with_iid_partitioner(num_partitions=2)
+    partitioner = IidPartitioner(num_partitions=2)
     return PartitionedDataset(sample_df, schema, partitioner, test_size=0.25, seed=42)
 
 
@@ -80,7 +80,7 @@ def test_partitioned_dataset_drops_rows_with_nan(sample_df) -> None:
     df_with_nan.loc[4, "cat"] = pd.NA
 
     schema = infer_schema(df_with_nan)
-    partitioner = FlwrDelegatePartitioner.with_iid_partitioner(num_partitions=2)
+    partitioner = IidPartitioner(num_partitions=2)
     dataset = PartitionedDataset(
         df_with_nan,
         schema,

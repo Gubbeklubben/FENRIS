@@ -67,14 +67,14 @@ fairness    = "fenris.builtins.evaluators.fairness:FairnessEvaluator"
 scalability = "fenris.builtins.evaluators.scalability:ScalabilityEvaluator"
 
 [project.entry-points."fenris.partitioners"]
-iid_partitioner          = "fenris.builtins.partitioners.flwr_delegates:FlwrDelegatePartitioner.with_iid_partitioner"
-linear_partitioner       = "fenris.builtins.partitioners.flwr_delegates:FlwrDelegatePartitioner.with_linear_partitioner"
-square_partitioner       = "fenris.builtins.partitioners.flwr_delegates:FlwrDelegatePartitioner.with_square_partitioner"
-exponential_partitioner  = "fenris.builtins.partitioners.flwr_delegates:FlwrDelegatePartitioner.with_exponential_partitioner"
-dirichlet_partitioner    = "fenris.builtins.partitioners.flwr_delegates:FlwrDelegatePartitioner.with_dirichlet_partitioner"
-pathological_partitioner = "fenris.builtins.partitioners.flwr_delegates:FlwrDelegatePartitioner.with_pathological_partitioner"
-shard_partitioner        = "fenris.builtins.partitioners.flwr_delegates:FlwrDelegatePartitioner.with_shard_partitioner"
-continuous_partitioner   = "fenris.builtins.partitioners.flwr_delegates:FlwrDelegatePartitioner.with_continuous_partitioner"
+iid_partitioner          = "fenris.builtins.partitioners.flwr_delegates:IidPartitioner"
+linear_partitioner       = "fenris.builtins.partitioners.flwr_delegates:LinearPartitioner"
+square_partitioner       = "fenris.builtins.partitioners.flwr_delegates:SquarePartitioner"
+exponential_partitioner  = "fenris.builtins.partitioners.flwr_delegates:ExponentialPartitioner"
+dirichlet_partitioner    = "fenris.builtins.partitioners.flwr_delegates:DirichletPartitioner"
+pathological_partitioner = "fenris.builtins.partitioners.flwr_delegates:PathologicalPartitioner"
+shard_partitioner        = "fenris.builtins.partitioners.flwr_delegates:ShardPartitioner"
+continuous_partitioner   = "fenris.builtins.partitioners.flwr_delegates:ContinuousPartitioner"
 
 
 [build-system]
