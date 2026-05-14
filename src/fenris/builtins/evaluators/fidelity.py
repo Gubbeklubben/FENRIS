@@ -98,10 +98,6 @@ class MomentReductionMetricsEvaluator(Evaluator):
     """
 
     @property
-    def name(self) -> str:
-        return "moment_reduction_metrics"
-
-    @property
     def evaluator_spec(self) -> EvaluatorSpec:
         return EvaluatorSpec(
             category=Category.FIDELITY,
@@ -238,10 +234,6 @@ class DistributionSimilarityMetricsEvaluator(Evaluator):
     """
 
     @property
-    def name(self) -> str:
-        return "distribution_similarity_metrics"
-
-    @property
     def evaluator_spec(self) -> EvaluatorSpec:
         return EvaluatorSpec(
             category=Category.FIDELITY,
@@ -335,10 +327,6 @@ class CategoricalTvMeanEvaluator(Evaluator):
     """
 
     @property
-    def name(self) -> str:
-        return "categorical_tv_mean"
-
-    @property
     def evaluator_spec(self) -> EvaluatorSpec:
         return EvaluatorSpec(
             category=Category.FIDELITY,
@@ -427,10 +415,6 @@ class CorrFroDiffEvaluator(Evaluator):
     evaluator must therefore be used in centralized mode only; see reference
     guide §3.3.1 and §15.1.
     """
-
-    @property
-    def name(self) -> str:
-        return "corr_fro_diff"
 
     @property
     def evaluator_spec(self) -> EvaluatorSpec:

@@ -163,10 +163,6 @@ class FedTabDiff(Synthesizer):
         )
 
     @property
-    def name(self) -> str:
-        return "fedtabdiff"
-
-    @property
     def arrays_target(self) -> ArraysTarget:
         return ArraysTarget.TORCH
 

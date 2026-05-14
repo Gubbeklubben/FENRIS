@@ -67,10 +67,6 @@ class FairnessEvaluator(Evaluator):
     """
 
     @property
-    def name(self) -> str:
-        return "fairness"
-
-    @property
     def evaluator_spec(self) -> EvaluatorSpec:
         return EvaluatorSpec(
             category=Category.FAIRNESS,

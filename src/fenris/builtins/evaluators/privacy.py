@@ -100,10 +100,6 @@ class DirectOverlapDiagnosticEvaluator(Evaluator):
     """
 
     @property
-    def name(self) -> str:
-        return "direct_overlap_diagnostic"
-
-    @property
     def evaluator_spec(self) -> EvaluatorSpec:
         return EvaluatorSpec(
             category=Category.PRIVACY,
@@ -264,10 +260,6 @@ class MIANearestNeighborAttackEvaluator(Evaluator):
     The server aggregates via a weighted mean AUC (approximate; see
     reference guide §15.3.2).
     """
-
-    @property
-    def name(self) -> str:
-        return "mia_nearest_neighbor_attack"
 
     @property
     def evaluator_spec(self) -> EvaluatorSpec:
@@ -439,10 +431,6 @@ class AIASupervisedAttackEvaluator(Evaluator):
     ------------------
     Weighted mean per metric key, weighted by ``n_test``.
     """
-
-    @property
-    def name(self) -> str:
-        return "aia_supervised_attack"
 
     @property
     def evaluator_spec(self) -> EvaluatorSpec:

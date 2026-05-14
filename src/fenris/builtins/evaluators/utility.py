@@ -27,10 +27,6 @@ from fenris.core.eval.evaluator import (
 
 class TSTREvaluator(Evaluator):
     @property
-    def name(self) -> str:
-        return "tstr"
-
-    @property
     def evaluator_spec(self) -> EvaluatorSpec:
         return EvaluatorSpec(
             category=Category.UTILITY,

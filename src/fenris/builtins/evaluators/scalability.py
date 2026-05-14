@@ -44,10 +44,6 @@ class ScalabilityEvaluator(Evaluator):
     """
 
     @property
-    def name(self) -> str:
-        return "scalability"
-
-    @property
     def evaluator_spec(self) -> EvaluatorSpec:
         return EvaluatorSpec(
             category=Category.SCALABILITY,
