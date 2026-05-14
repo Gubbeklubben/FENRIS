@@ -46,18 +46,11 @@ class ObjectSerde(ABC):
 
 
 class Pickle(ObjectSerde):
-    def __init__(self, disabled: bool = False) -> None:
-        self._disabled = disabled
-
     @property
     def stype(self) -> str:
         return "pickle"
 
     def serialize(self, obj: Any) -> bytes:
-        if self._disabled:
-            raise TypeError(
-                f"Pickle disabled, can not serialize object of type {type(obj)}."
-            )
         return pickle.dumps(obj)
 
     def deserialize(self, data: bytes) -> Any:

@@ -227,7 +227,6 @@ def test_static_defaults(tmp_path, synthesizers, coordinators, partitioners):
     assert config.seed.sampling == 46
     assert config.seed.evaluation == 47
     assert config.num_synthetic_rows is None
-    assert config.disable_pickle is False
 
 
 # --- column name validation ------------------------------------------------

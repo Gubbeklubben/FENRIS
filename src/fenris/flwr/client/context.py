@@ -40,7 +40,7 @@ def build_client_context(flwr_storage: RecordDict) -> ClientContext:
     )
     eval_suite = factory.create_evaluation_suite(set(config.metrics.run_categories))
     serde = FlwrSerde(
-        object_serde=Pickle(disabled=config.disable_pickle),
+        object_serde=Pickle(),
         default_arrays_target=synthesizer.arrays_target,
     )
     return ClientContext(

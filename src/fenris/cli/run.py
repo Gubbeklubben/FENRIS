@@ -116,9 +116,6 @@ def run(
             "rather than in parallel."
         ),
     ] = None,
-    disable_pickle: Annotated[
-        bool | None, typer.Option(help="Disable pickle based serialization.")
-    ] = None,
     schema: Annotated[
         str | None,
         typer.Option(
