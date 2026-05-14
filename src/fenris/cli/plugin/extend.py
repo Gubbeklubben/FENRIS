@@ -101,7 +101,7 @@ def extend(
             continue
 
         with path.open("w") as f:
-            code = create_component_scaffold(cls, name, _to_cap_words(name))
+            code = create_component_scaffold(cls, _to_cap_words(name))
             f.write(code)
 
         qualifier = f"{'.'.join((*packages, name))}:{_to_cap_words(name)}"

@@ -3,18 +3,16 @@
 Classes
 -------
 ComponentTransformer
-    A libcst.CSTTransformer that modifies class name, implements Component.name,
-    and replaces the bodies of other methods with a statement raising
-    NotImplementedError.
+    A libcst.CSTTransformer that modifies class name, and replaces
+    method bodies with a statement raising NotImplementedError.
 """
 
 import libcst as cst
 
 
 class ComponentTransformer(cst.CSTTransformer):
-    def __init__(self, name: str, cls_name: str) -> None:
+    def __init__(self, cls_name: str) -> None:
         super().__init__()
-        self._name = name
         self._cls_name = cls_name
 
     def leave_ClassDef(
@@ -30,17 +28,16 @@ class ComponentTransformer(cst.CSTTransformer):
         self, original_node: cst.FunctionDef, updated_node: cst.FunctionDef
     ) -> cst.FunctionDef:
 
-        body = (
-            cst.SimpleStatementLine(
+        return updated_node.with_changes(
+            body=cst.IndentedBlock(
                 body=[
-                    # Deliberate violation of quoting convention
-                    # to get doubles in output.
-                    cst.Return(value=cst.SimpleString(f'"{self._name}"'))
+                    cst.SimpleStatementLine(
+                        body=[
+                            cst.Raise(
+                                exc=cst.Call(func=cst.Name("NotImplementedError"))
+                            )
+                        ]
+                    )
                 ]
             )
-            if original_node.name.value == "name"
-            else cst.SimpleStatementLine(
-                body=[cst.Raise(exc=cst.Call(func=cst.Name("NotImplementedError")))]
-            )
         )
-        return updated_node.with_changes(body=cst.IndentedBlock(body=[body]))
