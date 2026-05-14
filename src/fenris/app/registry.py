@@ -29,13 +29,6 @@ class Group(Enum):
     def __init__(self, _: str, bases: tuple[type[Component]]) -> None:
         self._bases = bases
 
-    @classmethod
-    def from_type(cls, type_: type[Component]) -> Group:
-        for group in cls:
-            if issubclass(type_, group.bases[0]):
-                return group
-        raise TypeError(f"{type_} is not a valid component type")
-
     @property
     def bases(self) -> tuple[type[Component]]:
         return self._bases

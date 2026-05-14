@@ -8,7 +8,6 @@ from dataclasses import asdict
 from pathlib import Path
 
 import fenris.app.factory as factory
-from fenris.app.registry import Group
 from fenris.app.run.command import Command
 from fenris.app.run.partitioned_dataset import PartitionedDataset
 from fenris.app.run.platform_info import collect_platform_info
@@ -179,8 +178,7 @@ def write_artifacts(ctx: RunContext) -> None:
 
     component_meta = {}
     for comp in ctx.components:
-        reg = Group.from_type(type(comp)).get_registry()
-        component_meta[comp.name] = asdict(reg.get_metadata(comp.name))
+        component_meta[comp.name] = asdict(comp.metadata)
 
     with outputdir.joinpath("components.json").open("w") as f:
         json.dump(component_meta, f, indent=4)
