@@ -23,7 +23,7 @@ class EvaluationSuite:
             for key, metric in ev.get_metric_spec_dict(
                 target_column, sensitive_columns
             ).items():
-                if f"{ev.evaluator_spec.category}.{key}" == metric_key:
+                if f"{ev.EVALUATOR_SPEC.category}.{key}" == metric_key:
                     return ev, metric
         raise KeyError(
             f"Specified metric key {metric_key} is not emitted "
@@ -46,7 +46,7 @@ class EvaluationSuite:
                 f"\nDeclared: {declared_keys}\nActual: {actual_keys}"
             )
         return {
-            f"{evaluator.evaluator_spec.category}.{key}": value
+            f"{evaluator.EVALUATOR_SPEC.category}.{key}": value
             for key, value in raw_metrics.items()
         }
 

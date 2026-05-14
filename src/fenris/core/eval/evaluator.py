@@ -3,7 +3,7 @@ import re
 from abc import abstractmethod
 from dataclasses import dataclass
 from enum import Flag, StrEnum, auto
-from typing import Any, Iterable, Literal
+from typing import Any, ClassVar, Iterable, Literal
 
 from fenris.core.component import Component
 from fenris.core.eval.evalcontext import GlobalEvalContext, LocalEvalContext
@@ -68,7 +68,7 @@ class MetricSpec:
 
 @dataclass(frozen=True)
 class EvaluatorSpec:
-    """Metadata for an `Evaluator`.
+    """Metadata declaring an evaluator's category, mode, and metrics.
 
     Attributes
     ----------
@@ -93,10 +93,15 @@ class Evaluator(Component):
     (via `local_evaluate` on clients followed by `aggregate` on the server).
     """
 
-    @property
-    @abstractmethod
-    def evaluator_spec(self) -> EvaluatorSpec:
-        """Metadata declaring the evaluator's category, mode, and metrics."""
+    # [scaffold] required_cls_var
+    EVALUATOR_SPEC: ClassVar[EvaluatorSpec]
+
+    def __init_subclass__(cls, **kwargs: Any) -> None:
+        super().__init_subclass__(**kwargs)
+        if "EVALUATOR_SPEC" not in cls.__dict__:
+            raise TypeError(
+                f"{cls}: Evaluator subclass must declare class variable EVALUATOR_SPEC."
+            )
 
     def get_metric_spec_dict(
         self,
@@ -120,7 +125,7 @@ class Evaluator(Component):
         dict[str, MetricSpec]
         """
         specs: dict[str, MetricSpec] = {}
-        for metric in self.evaluator_spec.metrics:
+        for metric in self.EVALUATOR_SPEC.metrics:
             if sensitive_columns and metric.suffix_type == "sensitive":
                 for suffix in sensitive_columns:
                     specs[f"{metric.key}.{normalize_key(suffix)}"] = metric

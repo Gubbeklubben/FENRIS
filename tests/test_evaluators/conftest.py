@@ -23,10 +23,6 @@ import numpy as np
 import pandas as pd
 
 import fenris.core.data.schemas
-from fenris.builtins.evaluators.fidelity import (
-    DistributionSimilarityMetricsEvaluator,
-    MomentReductionMetricsEvaluator,
-)
 from fenris.core.data.schemas import ColumnSchema, TableSchema, infer_schema
 from fenris.core.eval.evalcontext import (
     CentralizedEvalContext,
@@ -191,11 +187,3 @@ def make_schema(*col_defs: tuple[str, fenris.core.data.schemas.Kind]) -> TableSc
 # subclasses satisfy the abstract interface without adding any logic of
 # their own — they exist purely so pytest can construct evaluator instances.
 # ---------------------------------------------------------------------------
-
-
-class _MomentReduction(MomentReductionMetricsEvaluator):
-    """Concrete stub — no overrides; exists only to satisfy the ABC."""
-
-
-class _DistSimilarity(DistributionSimilarityMetricsEvaluator):
-    """Concrete stub — no overrides; exists only to satisfy the ABC."""

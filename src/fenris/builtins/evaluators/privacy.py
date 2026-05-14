@@ -41,7 +41,7 @@ AIASupervisedAttackEvaluator — **exact** federated aggregation (per
 import hashlib
 import math
 from dataclasses import dataclass
-from typing import Any, Iterable, Mapping
+from typing import Any, ClassVar, Iterable, Mapping
 
 import numpy as np
 import pandas as pd
@@ -99,20 +99,18 @@ class DirectOverlapDiagnosticEvaluator(Evaluator):
     (same synthetic DF broadcast to all), so any client's value is used.
     """
 
-    @property
-    def evaluator_spec(self) -> EvaluatorSpec:
-        return EvaluatorSpec(
-            category=Category.PRIVACY,
-            eval_mode=EvaluationMode.FEDERATED,
-            metrics=[
-                MetricSpec("exact_row_match_rate_train"),
-                MetricSpec("exact_row_match_any"),
-                MetricSpec("partial_match_rate_top1"),
-                MetricSpec("partial_match_rate_top2"),
-                MetricSpec("partial_match_rate_top3"),
-                MetricSpec("partial_match_any"),
-            ],
-        )
+    EVALUATOR_SPEC: ClassVar[EvaluatorSpec] = EvaluatorSpec(
+        category=Category.PRIVACY,
+        eval_mode=EvaluationMode.FEDERATED,
+        metrics=[
+            MetricSpec("exact_row_match_rate_train"),
+            MetricSpec("exact_row_match_any"),
+            MetricSpec("partial_match_rate_top1"),
+            MetricSpec("partial_match_rate_top2"),
+            MetricSpec("partial_match_rate_top3"),
+            MetricSpec("partial_match_any"),
+        ],
+    )
 
     # noinspection PyMethodMayBeStatic
     def _canonical_value(self, val: Any) -> str:
@@ -261,17 +259,15 @@ class MIANearestNeighborAttackEvaluator(Evaluator):
     reference guide §15.3.2).
     """
 
-    @property
-    def evaluator_spec(self) -> EvaluatorSpec:
-        return EvaluatorSpec(
-            category=Category.PRIVACY,
-            eval_mode=EvaluationMode.BOTH,
-            metrics=[
-                MetricSpec("mia_auc"),
-                MetricSpec("mia_accuracy"),
-                MetricSpec("mia_advantage"),
-            ],
-        )
+    EVALUATOR_SPEC: ClassVar[EvaluatorSpec] = EvaluatorSpec(
+        category=Category.PRIVACY,
+        eval_mode=EvaluationMode.BOTH,
+        metrics=[
+            MetricSpec("mia_auc"),
+            MetricSpec("mia_accuracy"),
+            MetricSpec("mia_advantage"),
+        ],
+    )
 
     DEFAULT_MIA_K = 1000
 
@@ -432,17 +428,15 @@ class AIASupervisedAttackEvaluator(Evaluator):
     Weighted mean per metric key, weighted by ``n_test``.
     """
 
-    @property
-    def evaluator_spec(self) -> EvaluatorSpec:
-        return EvaluatorSpec(
-            category=Category.PRIVACY,
-            eval_mode=EvaluationMode.BOTH,
-            metrics=[
-                MetricSpec("aia_auc", suffix_type="sensitive"),
-                MetricSpec("aia_accuracy", suffix_type="sensitive"),
-                MetricSpec("aia_rmse", suffix_type="sensitive"),
-            ],
-        )
+    EVALUATOR_SPEC: ClassVar[EvaluatorSpec] = EvaluatorSpec(
+        category=Category.PRIVACY,
+        eval_mode=EvaluationMode.BOTH,
+        metrics=[
+            MetricSpec("aia_auc", suffix_type="sensitive"),
+            MetricSpec("aia_accuracy", suffix_type="sensitive"),
+            MetricSpec("aia_rmse", suffix_type="sensitive"),
+        ],
+    )
 
     # noinspection PyMethodMayBeStatic
     def _compute_column(

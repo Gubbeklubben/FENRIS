@@ -6,7 +6,7 @@ using a Train-on-Synthetic / Test-on-Real (TSTR) approach with
 logistic regression (classification) or ridge regression (regression).
 """
 
-from typing import Iterable, Mapping
+from typing import ClassVar, Iterable, Mapping
 
 import numpy as np
 import pandas as pd
@@ -26,17 +26,15 @@ from fenris.core.eval.evaluator import (
 
 
 class TSTREvaluator(Evaluator):
-    @property
-    def evaluator_spec(self) -> EvaluatorSpec:
-        return EvaluatorSpec(
-            category=Category.UTILITY,
-            eval_mode=EvaluationMode.BOTH,
-            metrics=[
-                MetricSpec("tstr_auc", default_stop_mode="max"),
-                MetricSpec("tstr_accuracy", default_stop_mode="max"),
-                MetricSpec("tstr_rmse"),
-            ],
-        )
+    EVALUATOR_SPEC: ClassVar[EvaluatorSpec] = EvaluatorSpec(
+        category=Category.UTILITY,
+        eval_mode=EvaluationMode.BOTH,
+        metrics=[
+            MetricSpec("tstr_auc", default_stop_mode="max"),
+            MetricSpec("tstr_accuracy", default_stop_mode="max"),
+            MetricSpec("tstr_rmse"),
+        ],
+    )
 
     # noinspection PyMethodMayBeStatic
     def _compute(
