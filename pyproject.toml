@@ -109,6 +109,7 @@ follow_imports_for_stubs = true
 # --- RUFF CONFIG ---
 
 [tool.ruff]
+preview = true  # Mainly to get the hug_parens_with_braces_and_square_brackets rule
 line-length = 88
 src = ["src", "tests"]
 
