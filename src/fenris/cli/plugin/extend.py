@@ -101,7 +101,7 @@ def extend(
             continue
 
         with path.open("w") as f:
-            code = create_component_scaffold(cls, name, _to_cap_words(name))
+            code = create_component_scaffold(cls, _to_cap_words(name))
             f.write(code)
 
         qualifier = f"{'.'.join((*packages, name))}:{_to_cap_words(name)}"
@@ -194,14 +194,16 @@ def _descend_and_create_as_needed(path: Path, packages: Sequence[str]) -> Path:
 
 def _get_class(group: Group, base: str | None) -> type[Component]:
     if base is None:
-        return group.bases[0]
-    try:
-        return next(cls for cls in group.bases if cls.__name__ == base)
-    except StopIteration:
-        raise RuntimeError(
-            f"Invalid base {base} for group {group.value}. Please validate base"
-            f"arg before calling _get_class."
-        ) from None
+        return group.base
+
+    for cls in group.bases:
+        if cls.__name__ == base:
+            return cls
+
+    raise RuntimeError(
+        f"Invalid base {base} for group {group.value}. Please validate base"
+        f"arg before calling _get_class."
+    ) from None
 
 
 def _to_cap_words(identifier: str) -> str:

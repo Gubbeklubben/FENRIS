@@ -171,10 +171,6 @@ class FedNaughty(Synthesizer):
         )
 
     @property
-    def name(self) -> str:
-        return "fed_naughty"
-
-    @property
     def arrays_target(self) -> ArraysTarget:
         return ArraysTarget.TORCH
 

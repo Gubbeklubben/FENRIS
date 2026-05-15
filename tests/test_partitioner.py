@@ -1,7 +1,15 @@
 import pandas as pd
 from pandas import DataFrame
 
-from fenris.builtins.partitioners.flwr_delegates import FlwrDelegatePartitioner
+from fenris.builtins.partitioners.flwr_delegates import (
+    ContinuousPartitioner,
+    DirichletPartitioner,
+    ExponentialPartitioner,
+    LinearPartitioner,
+    PathologicalPartitioner,
+    ShardPartitioner,
+    SquarePartitioner,
+)
 from fenris.core.data import Partitioner
 
 
@@ -18,7 +26,7 @@ def assert_valid_partition(p: Partitioner, num_partitions: int) -> None:
 
 
 def test_linear_partitioner():
-    p = FlwrDelegatePartitioner.with_linear_partitioner(num_partitions=5)
+    p = LinearPartitioner(num_partitions=5)
     p.set_dataset(make_dummy_dataset())
     assert_valid_partition(p, 5)
 
@@ -31,7 +39,7 @@ def test_linear_partitioner():
 
 
 def test_square_partitioner():
-    p = FlwrDelegatePartitioner.with_square_partitioner(num_partitions=5)
+    p = SquarePartitioner(num_partitions=5)
     p.set_dataset(make_dummy_dataset(n=1000))
     assert_valid_partition(p, 5)
 
@@ -43,7 +51,7 @@ def test_square_partitioner():
 
 
 def test_exponential_partitioner():
-    p = FlwrDelegatePartitioner.with_exponential_partitioner(num_partitions=5)
+    p = ExponentialPartitioner(num_partitions=5)
     p.set_dataset(make_dummy_dataset(n=1000))
     assert_valid_partition(p, 5)
 
@@ -55,9 +63,7 @@ def test_exponential_partitioner():
 
 
 def test_dirichlet_partitioner():
-    p = FlwrDelegatePartitioner.with_dirichlet_partitioner(
-        num_partitions=5, partition_by="label", alpha=0.5, seed=42
-    )
+    p = DirichletPartitioner(num_partitions=5, partition_by="label", alpha=0.5, seed=42)
     p.set_dataset(
         make_dummy_dataset(n=1000)
     )  # increased to avoid min_partition_size warnings
@@ -71,7 +77,7 @@ def test_dirichlet_partitioner():
 
 
 def test_pathological_partitioner():
-    p = FlwrDelegatePartitioner.with_pathological_partitioner(
+    p = PathologicalPartitioner(
         num_partitions=5, partition_by="label", num_classes_per_partition=2, seed=42
     )
     p.set_dataset(make_dummy_dataset())
@@ -86,7 +92,7 @@ def test_pathological_partitioner():
 
 
 def test_shard_partitioner():
-    p = FlwrDelegatePartitioner.with_shard_partitioner(
+    p = ShardPartitioner(
         num_partitions=5, partition_by="label", num_shards_per_partition=2, seed=42
     )
     p.set_dataset(make_dummy_dataset())
@@ -103,7 +109,7 @@ def test_shard_partitioner():
 
 
 def test_continuous_partitioner():
-    p = FlwrDelegatePartitioner.with_continuous_partitioner(
+    p = ContinuousPartitioner(
         num_partitions=5, partition_by="value", strictness=0.7, seed=42
     )
     p.set_dataset(make_dummy_dataset())

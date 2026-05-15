@@ -12,7 +12,7 @@ from __future__ import annotations
 
 import math
 from dataclasses import dataclass
-from typing import Iterable, Mapping, NamedTuple
+from typing import ClassVar, Iterable, Mapping, NamedTuple
 
 import numpy as np
 import pandas as pd
@@ -23,8 +23,8 @@ from fenris.core.eval import Category, Evaluator, LocalEvalContext
 from fenris.core.eval.evalcontext import GlobalEvalContext
 from fenris.core.eval.evaluator import (
     EvaluationMode,
-    EvaluatorDescriptor,
-    MetricDescriptor,
+    EvaluatorSpec,
+    MetricSpec,
     normalize_key,
 )
 from fenris.core.logger import log_debug
@@ -66,21 +66,15 @@ class FairnessEvaluator(Evaluator):
     * ``fairness.equal_opportunity_diff.<column>``
     """
 
-    @property
-    def name(self) -> str:
-        return "fairness"
-
-    @property
-    def metadata(self) -> EvaluatorDescriptor:
-        return EvaluatorDescriptor(
-            category=Category.FAIRNESS,
-            eval_mode=EvaluationMode.BOTH,
-            metrics=[
-                MetricDescriptor("demographic_parity_diff", suffix_type="sensitive"),
-                MetricDescriptor("equalized_odds_diff", suffix_type="sensitive"),
-                MetricDescriptor("equal_opportunity_diff", suffix_type="sensitive"),
-            ],
-        )
+    EVALUATOR_SPEC: ClassVar[EvaluatorSpec] = EvaluatorSpec(
+        category=Category.FAIRNESS,
+        eval_mode=EvaluationMode.BOTH,
+        metrics=[
+            MetricSpec("demographic_parity_diff", suffix_type="sensitive"),
+            MetricSpec("equalized_odds_diff", suffix_type="sensitive"),
+            MetricSpec("equal_opportunity_diff", suffix_type="sensitive"),
+        ],
+    )
 
     MIN_GROUP_SIZE = 30
 

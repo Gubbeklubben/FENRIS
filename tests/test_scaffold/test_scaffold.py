@@ -23,7 +23,7 @@ CLASS_NAME = "".join((w.capitalize() for w in NAME.split("_")))
 
 
 def generate_code(cls: type[Component]) -> str:
-    code = create_component_scaffold(cls, NAME, CLASS_NAME)
+    code = create_component_scaffold(cls, CLASS_NAME)
     return code
 
 
@@ -67,15 +67,7 @@ def test_can_scaffold_relevant():
 
     for group in Group:
         for base in group.bases:
-            create_component_scaffold(base, "test", "Test")
-
-
-def test_component_name(generated_code_for_base):
-    fn_def = f"""
-    def name(self) -> str:
-        return \"{NAME}\"
-    """
-    assert_in_class_body(generated_code_for_base, fn_def, Base)
+            create_component_scaffold(base, "Test")
 
 
 def test_cls_vars(generated_code_for_base):

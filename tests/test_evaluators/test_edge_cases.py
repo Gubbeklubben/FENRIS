@@ -27,6 +27,8 @@ from fenris.builtins.evaluators.fairness import FairnessEvaluator
 from fenris.builtins.evaluators.fidelity import (
     CategoricalTvMeanEvaluator,
     CorrFroDiffEvaluator,
+    DistributionSimilarityMetricsEvaluator,
+    MomentReductionMetricsEvaluator,
 )
 from fenris.builtins.evaluators.privacy import (
     AIASupervisedAttackEvaluator,
@@ -37,8 +39,6 @@ from fenris.builtins.evaluators.utility import TSTREvaluator
 
 from .conftest import (
     NUMERIC_DF,
-    _DistSimilarity,
-    _MomentReduction,
     assert_dicts_nan_safe,
     make_centralized_ctx,
     make_ctx,
@@ -53,8 +53,8 @@ from .conftest import (
 # ---------------------------------------------------------------------------
 
 ALL_EVALUATORS = [
-    _MomentReduction(),
-    _DistSimilarity(),
+    MomentReductionMetricsEvaluator(),
+    DistributionSimilarityMetricsEvaluator(),
     CategoricalTvMeanEvaluator(),
     CorrFroDiffEvaluator(),
     TSTREvaluator(),

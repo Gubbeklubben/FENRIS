@@ -28,10 +28,6 @@ class FedHello(Synthesizer):
         self._name = name
 
     @property
-    def name(self) -> str:
-        return "fed_hello"
-
-    @property
     def arrays_target(self) -> ArraysTarget:
         return ArraysTarget.NUMPY
 

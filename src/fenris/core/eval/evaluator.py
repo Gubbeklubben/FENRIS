@@ -3,7 +3,7 @@ import re
 from abc import abstractmethod
 from dataclasses import dataclass
 from enum import Flag, StrEnum, auto
-from typing import Any, Iterable, Literal
+from typing import Any, ClassVar, Iterable, Literal
 
 from fenris.core.component import Component
 from fenris.core.eval.evalcontext import GlobalEvalContext, LocalEvalContext
@@ -45,7 +45,7 @@ class EvaluationMode(Flag):
 
 
 @dataclass(frozen=True)
-class MetricDescriptor:
+class MetricSpec:
     """Metadata for a single metric emitted by an `Evaluator`.
 
     Attributes
@@ -67,8 +67,8 @@ class MetricDescriptor:
 
 
 @dataclass(frozen=True)
-class EvaluatorDescriptor:
-    """Metadata for an `Evaluator`.
+class EvaluatorSpec:
+    """Metadata declaring an evaluator's category, mode, and metrics.
 
     Attributes
     ----------
@@ -76,13 +76,13 @@ class EvaluatorDescriptor:
         Evaluation category this evaluator belongs to.
     eval_mode : EvaluationMode
         Whether the evaluator supports centralized, federated, or both modes.
-    metrics : list[MetricDescriptor]
-        Descriptors for each metric the evaluator emits.
+    metrics : list[MetricSpec]
+        Metadata for each metric the evaluator emits.
     """
 
     category: Category
     eval_mode: EvaluationMode
-    metrics: list[MetricDescriptor]
+    metrics: list[MetricSpec]
 
 
 class Evaluator(Component):
@@ -93,20 +93,25 @@ class Evaluator(Component):
     (via `local_evaluate` on clients followed by `aggregate` on the server).
     """
 
-    @property
-    @abstractmethod
-    def metadata(self) -> EvaluatorDescriptor:
-        """Descriptor declaring the evaluator's category, mode, and metrics."""
+    # [scaffold] required_cls_var
+    EVALUATOR_SPEC: ClassVar[EvaluatorSpec]
 
-    def get_metric_descriptor_dict(
+    def __init_subclass__(cls, **kwargs: Any) -> None:
+        super().__init_subclass__(**kwargs)
+        if "EVALUATOR_SPEC" not in cls.__dict__:
+            raise TypeError(
+                f"{cls}: Evaluator subclass must declare class variable EVALUATOR_SPEC."
+            )
+
+    def get_metric_spec_dict(
         self,
         target_column: str | None = None,
         sensitive_columns: tuple[str, ...] | None = None,
-    ) -> dict[str, MetricDescriptor]:
-        """Build a mapping from fully qualified metric key to `MetricDescriptor`.
+    ) -> dict[str, MetricSpec]:
+        """Build a mapping from fully qualified metric key to `MetricSpec`.
 
         Sensitive- and target-suffixed metrics are expanded from their template
-        descriptors using the provided column names.
+        specs using the provided column names.
 
         Parameters
         ----------
@@ -117,18 +122,18 @@ class Evaluator(Component):
 
         Returns
         -------
-        dict[str, MetricDescriptor]
+        dict[str, MetricSpec]
         """
-        descriptors: dict[str, MetricDescriptor] = {}
-        for metric in self.metadata.metrics:
+        specs: dict[str, MetricSpec] = {}
+        for metric in self.EVALUATOR_SPEC.metrics:
             if sensitive_columns and metric.suffix_type == "sensitive":
                 for suffix in sensitive_columns:
-                    descriptors[f"{metric.key}.{normalize_key(suffix)}"] = metric
+                    specs[f"{metric.key}.{normalize_key(suffix)}"] = metric
             elif target_column and metric.suffix_type == "target":
-                descriptors[f"{metric.key}.{normalize_key(target_column)}"] = metric
+                specs[f"{metric.key}.{normalize_key(target_column)}"] = metric
             else:
-                descriptors[metric.key] = metric
-        return descriptors
+                specs[metric.key] = metric
+        return specs
 
     def get_metric_keys(
         self,
@@ -148,7 +153,7 @@ class Evaluator(Component):
         -------
         Iterable[str]
         """
-        return self.get_metric_descriptor_dict(target_column, sensitive_columns).keys()
+        return self.get_metric_spec_dict(target_column, sensitive_columns).keys()
 
     def _nan_result(self) -> dict[str, float]:
         """Return a dict of NaN values keyed by this evaluator's metric keys."""

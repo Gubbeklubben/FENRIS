@@ -125,10 +125,6 @@ class FedSimpleGAN(Synthesizer):
         )
 
     @property
-    def name(self) -> str:
-        return "fed_simplegan"
-
-    @property
     def arrays_target(self) -> ArraysTarget:
         return ArraysTarget.TORCH
 

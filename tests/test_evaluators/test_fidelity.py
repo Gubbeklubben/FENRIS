@@ -23,16 +23,11 @@ import pytest
 from fenris.builtins.evaluators.fidelity import (
     CategoricalTvMeanEvaluator,
     CorrFroDiffEvaluator,
+    DistributionSimilarityMetricsEvaluator,
+    MomentReductionMetricsEvaluator,
 )
 
-from .conftest import (
-    CATEGORICAL_DF,
-    NUMERIC_DF,
-    _DistSimilarity,
-    _MomentReduction,
-    make_ctx,
-    make_schema,
-)
+from .conftest import CATEGORICAL_DF, NUMERIC_DF, make_ctx, make_schema
 
 # ===================================================================
 # MomentReductionMetricsEvaluator
@@ -42,7 +37,7 @@ from .conftest import (
 class TestMomentReduction:
     """Tests for mean_abs_diff and std_abs_diff metrics."""
 
-    evaluator = _MomentReduction()
+    evaluator = MomentReductionMetricsEvaluator()
 
     def test_identical_data_gives_zero(self):
         ctx = make_ctx(NUMERIC_DF, NUMERIC_DF.copy())
@@ -108,7 +103,7 @@ class TestMomentReduction:
 class TestDistributionSimilarity:
     """Tests for ks_mean, wasserstein_mean, t_stat_mean_abs metrics."""
 
-    evaluator = _DistSimilarity()
+    evaluator = DistributionSimilarityMetricsEvaluator()
 
     def test_identical_data_gives_zero(self):
         """Perfect replication → all distribution-similarity metrics = 0."""

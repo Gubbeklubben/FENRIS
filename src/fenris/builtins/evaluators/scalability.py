@@ -22,7 +22,7 @@ Registered metric keys (spec §9)
 
 from __future__ import annotations
 
-from typing import Iterable
+from typing import ClassVar, Iterable
 
 from fenris.builtins.evaluators._helpers import weighted_mean
 from fenris.core.eval import Category
@@ -30,8 +30,8 @@ from fenris.core.eval.evalcontext import GlobalEvalContext, LocalEvalContext
 from fenris.core.eval.evaluator import (
     EvaluationMode,
     Evaluator,
-    EvaluatorDescriptor,
-    MetricDescriptor,
+    EvaluatorSpec,
+    MetricSpec,
 )
 
 
@@ -43,23 +43,17 @@ class ScalabilityEvaluator(Evaluator):
     merged into aggregated_metrics outside the evaluator pipeline.
     """
 
-    @property
-    def name(self) -> str:
-        return "scalability"
-
-    @property
-    def metadata(self) -> EvaluatorDescriptor:
-        return EvaluatorDescriptor(
-            category=Category.SCALABILITY,
-            eval_mode=EvaluationMode.FEDERATED,
-            metrics=[
-                MetricDescriptor("wall_clock_seconds", default_stop_mode=None),
-                MetricDescriptor("bytes_sent", default_stop_mode=None),
-                MetricDescriptor("bytes_received", default_stop_mode=None),
-                MetricDescriptor("rounds_to_converge", default_stop_mode=None),
-                MetricDescriptor("local_train_seconds_mean", default_stop_mode=None),
-            ],
-        )
+    EVALUATOR_SPEC: ClassVar[EvaluatorSpec] = EvaluatorSpec(
+        category=Category.SCALABILITY,
+        eval_mode=EvaluationMode.FEDERATED,
+        metrics=[
+            MetricSpec("wall_clock_seconds", default_stop_mode=None),
+            MetricSpec("bytes_sent", default_stop_mode=None),
+            MetricSpec("bytes_received", default_stop_mode=None),
+            MetricSpec("rounds_to_converge", default_stop_mode=None),
+            MetricSpec("local_train_seconds_mean", default_stop_mode=None),
+        ],
+    )
 
     # ------------------------------------------------------------------
     # Centralized / global path

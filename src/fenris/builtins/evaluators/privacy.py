@@ -41,7 +41,7 @@ AIASupervisedAttackEvaluator — **exact** federated aggregation (per
 import hashlib
 import math
 from dataclasses import dataclass
-from typing import Any, Iterable, Mapping
+from typing import Any, ClassVar, Iterable, Mapping
 
 import numpy as np
 import pandas as pd
@@ -56,8 +56,8 @@ from fenris.core.eval import Category, Evaluator, LocalEvalContext
 from fenris.core.eval.evalcontext import CentralizedEvalContext, GlobalEvalContext
 from fenris.core.eval.evaluator import (
     EvaluationMode,
-    EvaluatorDescriptor,
-    MetricDescriptor,
+    EvaluatorSpec,
+    MetricSpec,
     normalize_key,
 )
 from fenris.core.logger import log_debug
@@ -99,24 +99,18 @@ class DirectOverlapDiagnosticEvaluator(Evaluator):
     (same synthetic DF broadcast to all), so any client's value is used.
     """
 
-    @property
-    def name(self) -> str:
-        return "direct_overlap_diagnostic"
-
-    @property
-    def metadata(self) -> EvaluatorDescriptor:
-        return EvaluatorDescriptor(
-            category=Category.PRIVACY,
-            eval_mode=EvaluationMode.FEDERATED,
-            metrics=[
-                MetricDescriptor("exact_row_match_rate_train"),
-                MetricDescriptor("exact_row_match_any"),
-                MetricDescriptor("partial_match_rate_top1"),
-                MetricDescriptor("partial_match_rate_top2"),
-                MetricDescriptor("partial_match_rate_top3"),
-                MetricDescriptor("partial_match_any"),
-            ],
-        )
+    EVALUATOR_SPEC: ClassVar[EvaluatorSpec] = EvaluatorSpec(
+        category=Category.PRIVACY,
+        eval_mode=EvaluationMode.FEDERATED,
+        metrics=[
+            MetricSpec("exact_row_match_rate_train"),
+            MetricSpec("exact_row_match_any"),
+            MetricSpec("partial_match_rate_top1"),
+            MetricSpec("partial_match_rate_top2"),
+            MetricSpec("partial_match_rate_top3"),
+            MetricSpec("partial_match_any"),
+        ],
+    )
 
     # noinspection PyMethodMayBeStatic
     def _canonical_value(self, val: Any) -> str:
@@ -265,21 +259,15 @@ class MIANearestNeighborAttackEvaluator(Evaluator):
     reference guide §15.3.2).
     """
 
-    @property
-    def name(self) -> str:
-        return "mia_nearest_neighbor_attack"
-
-    @property
-    def metadata(self) -> EvaluatorDescriptor:
-        return EvaluatorDescriptor(
-            category=Category.PRIVACY,
-            eval_mode=EvaluationMode.BOTH,
-            metrics=[
-                MetricDescriptor("mia_auc"),
-                MetricDescriptor("mia_accuracy"),
-                MetricDescriptor("mia_advantage"),
-            ],
-        )
+    EVALUATOR_SPEC: ClassVar[EvaluatorSpec] = EvaluatorSpec(
+        category=Category.PRIVACY,
+        eval_mode=EvaluationMode.BOTH,
+        metrics=[
+            MetricSpec("mia_auc"),
+            MetricSpec("mia_accuracy"),
+            MetricSpec("mia_advantage"),
+        ],
+    )
 
     DEFAULT_MIA_K = 1000
 
@@ -440,21 +428,15 @@ class AIASupervisedAttackEvaluator(Evaluator):
     Weighted mean per metric key, weighted by ``n_test``.
     """
 
-    @property
-    def name(self) -> str:
-        return "aia_supervised_attack"
-
-    @property
-    def metadata(self) -> EvaluatorDescriptor:
-        return EvaluatorDescriptor(
-            category=Category.PRIVACY,
-            eval_mode=EvaluationMode.BOTH,
-            metrics=[
-                MetricDescriptor("aia_auc", suffix_type="sensitive"),
-                MetricDescriptor("aia_accuracy", suffix_type="sensitive"),
-                MetricDescriptor("aia_rmse", suffix_type="sensitive"),
-            ],
-        )
+    EVALUATOR_SPEC: ClassVar[EvaluatorSpec] = EvaluatorSpec(
+        category=Category.PRIVACY,
+        eval_mode=EvaluationMode.BOTH,
+        metrics=[
+            MetricSpec("aia_auc", suffix_type="sensitive"),
+            MetricSpec("aia_accuracy", suffix_type="sensitive"),
+            MetricSpec("aia_rmse", suffix_type="sensitive"),
+        ],
+    )
 
     # noinspection PyMethodMayBeStatic
     def _compute_column(

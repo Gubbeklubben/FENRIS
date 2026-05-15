@@ -5,7 +5,8 @@ from typing import Annotated
 
 import typer
 
-from fenris.app.registry import Group, Metadata
+from fenris.app.registry import Group
+from fenris.core.component import Metadata
 
 app = typer.Typer()
 
@@ -48,15 +49,11 @@ def show(
     def show_evaluators() -> None:
         # Sort evaluator metadata by category
         evaluators_by_category = defaultdict(list)
-        for evaluator in Group.EVALUATORS.get_registry().metadata():
-            evaluator_factory = Group.EVALUATORS.get_registry().load(evaluator.name)
-            try:
-                metadata = evaluator_factory().metadata
-                category = metadata.category
-            except NotImplementedError:
-                metadata = None
-                category = "Uncategorized"
-            evaluators_by_category[category].append((evaluator, metadata))
+        for metadata in Group.EVALUATORS.get_registry().metadata():
+            evaluator_cls = Group.EVALUATORS.get_registry().load(metadata.name)
+            spec = evaluator_cls.EVALUATOR_SPEC
+            category = spec.category
+            evaluators_by_category[category].append((metadata, spec))
 
         for category, entries in evaluators_by_category.items():
             # Category title
@@ -65,24 +62,18 @@ def show(
             typer.echo(f"{'':<2}{title}")
             typer.echo(f"{'':<2}{'\u2500' * len(title)}")
 
-            for metadata, evaluator_metadata in entries:
+            for metadata, spec in entries:
                 # Evaluator title
                 typer.echo(f"{'':<4}{metadata.name}")
 
                 if show_metadata:
                     _show_metadata(metadata, indent=6)
 
-                    if not evaluator_metadata:
-                        typer.echo(
-                            f"{'':<6}Error: Metadata missing for this evaluator."
-                        )
-                        continue
-
-                    eval_mode = evaluator_metadata.eval_mode.name or ""
+                    eval_mode = spec.eval_mode.name or ""
                     typer.echo(f"{'':<6}Evaluation mode: {eval_mode.lower()}")
 
                     typer.echo(f"{'':<6}Metrics:")
-                    for metric in evaluator_metadata.metrics:
+                    for metric in spec.metrics:
                         typer.echo(f"{'':<8}{metric.key}", nl=False)
                         typer.echo(
                             f".<{metric.suffix_type}_column>"

@@ -11,10 +11,7 @@ __all__ = [
 _modules: dict[type[Component], cst.Module] = {}
 
 
-def create_component_scaffold(
-    target_cls: type[Component], name: str, cls_name: str
-) -> str:
-
+def create_component_scaffold(target_cls: type[Component], cls_name: str) -> str:
     if not issubclass(target_cls, Component):
         raise TypeError(f"{target_cls} is not a subclass of {Component}.")
     try:
@@ -24,4 +21,4 @@ def create_component_scaffold(
         module = resolver.resolve(target)
         _modules[target_cls] = module
 
-    return module.visit(ComponentTransformer(name, cls_name)).code
+    return module.visit(ComponentTransformer(cls_name)).code

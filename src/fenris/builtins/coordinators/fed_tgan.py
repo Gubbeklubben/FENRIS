@@ -82,10 +82,6 @@ class FedTGAN(SingleStepCoordinator):
         self._client_counts: list[int] = []
 
     @property
-    def name(self) -> str:
-        return "fed_tgan"
-
-    @property
     def arrays_target(self) -> ArraysTarget:
         return ArraysTarget.TORCH
 

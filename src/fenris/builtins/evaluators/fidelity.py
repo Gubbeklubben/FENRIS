@@ -34,7 +34,7 @@ from __future__ import annotations
 
 import math
 from dataclasses import dataclass
-from typing import Iterable, Mapping
+from typing import ClassVar, Iterable, Mapping
 
 import numpy as np
 import pandas as pd
@@ -50,8 +50,8 @@ from fenris.core.eval import Category, Evaluator, LocalEvalContext
 from fenris.core.eval.evalcontext import GlobalEvalContext
 from fenris.core.eval.evaluator import (
     EvaluationMode,
-    EvaluatorDescriptor,
-    MetricDescriptor,
+    EvaluatorSpec,
+    MetricSpec,
 )
 from fenris.core.logger import log_debug
 
@@ -97,20 +97,14 @@ class MomentReductionMetricsEvaluator(Evaluator):
     |Δstd| over columns.
     """
 
-    @property
-    def name(self) -> str:
-        return "moment_reduction_metrics"
-
-    @property
-    def metadata(self) -> EvaluatorDescriptor:
-        return EvaluatorDescriptor(
-            category=Category.FIDELITY,
-            eval_mode=EvaluationMode.BOTH,
-            metrics=[
-                MetricDescriptor("mean_abs_diff"),
-                MetricDescriptor("std_abs_diff"),
-            ],
-        )
+    EVALUATOR_SPEC: ClassVar[EvaluatorSpec] = EvaluatorSpec(
+        category=Category.FIDELITY,
+        eval_mode=EvaluationMode.BOTH,
+        metrics=[
+            MetricSpec("mean_abs_diff"),
+            MetricSpec("std_abs_diff"),
+        ],
+    )
 
     # noinspection PyMethodMayBeStatic
     def _to_numeric_series(self, series: pd.Series) -> pd.Series:
@@ -237,21 +231,15 @@ class DistributionSimilarityMetricsEvaluator(Evaluator):
     and ``n_rows`` is the number of real rows used on this client.
     """
 
-    @property
-    def name(self) -> str:
-        return "distribution_similarity_metrics"
-
-    @property
-    def metadata(self) -> EvaluatorDescriptor:
-        return EvaluatorDescriptor(
-            category=Category.FIDELITY,
-            eval_mode=EvaluationMode.BOTH,
-            metrics=[
-                MetricDescriptor("ks_mean"),
-                MetricDescriptor("wasserstein_mean"),
-                MetricDescriptor("t_stat_mean_abs"),
-            ],
-        )
+    EVALUATOR_SPEC: ClassVar[EvaluatorSpec] = EvaluatorSpec(
+        category=Category.FIDELITY,
+        eval_mode=EvaluationMode.BOTH,
+        metrics=[
+            MetricSpec("ks_mean"),
+            MetricSpec("wasserstein_mean"),
+            MetricSpec("t_stat_mean_abs"),
+        ],
+    )
 
     # noinspection PyMethodMayBeStatic
     def _compute(
@@ -334,19 +322,13 @@ class CategoricalTvMeanEvaluator(Evaluator):
     frequencies from global totals, then derives TV distance.
     """
 
-    @property
-    def name(self) -> str:
-        return "categorical_tv_mean"
-
-    @property
-    def metadata(self) -> EvaluatorDescriptor:
-        return EvaluatorDescriptor(
-            category=Category.FIDELITY,
-            eval_mode=EvaluationMode.BOTH,
-            metrics=[
-                MetricDescriptor("categorical_tv_mean"),
-            ],
-        )
+    EVALUATOR_SPEC: ClassVar[EvaluatorSpec] = EvaluatorSpec(
+        category=Category.FIDELITY,
+        eval_mode=EvaluationMode.BOTH,
+        metrics=[
+            MetricSpec("categorical_tv_mean"),
+        ],
+    )
 
     # noinspection PyMethodMayBeStatic
     def _compute(
@@ -428,19 +410,13 @@ class CorrFroDiffEvaluator(Evaluator):
     guide §3.3.1 and §15.1.
     """
 
-    @property
-    def name(self) -> str:
-        return "corr_fro_diff"
-
-    @property
-    def metadata(self) -> EvaluatorDescriptor:
-        return EvaluatorDescriptor(
-            category=Category.FIDELITY,
-            eval_mode=EvaluationMode.CENTRALIZED,
-            metrics=[
-                MetricDescriptor("corr_fro_diff"),
-            ],
-        )
+    EVALUATOR_SPEC: ClassVar[EvaluatorSpec] = EvaluatorSpec(
+        category=Category.FIDELITY,
+        eval_mode=EvaluationMode.CENTRALIZED,
+        metrics=[
+            MetricSpec("corr_fro_diff"),
+        ],
+    )
 
     def global_evaluate(self, ctx: GlobalEvalContext) -> dict[str, float]:
         numeric_columns = ctx.schema.numeric_columns(ctx.holdout_df)
