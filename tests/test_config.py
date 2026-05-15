@@ -331,19 +331,19 @@ def test_coerce_str():
 
 def test_is_optional_with_optional_type():
     """Test is_optional returns True for Optional[T]."""
-    annotation = Optional[str]
+    annotation = Optional[str]  # noqa: UP045
     assert is_optional(annotation) is True
 
 
 def test_is_optional_with_union_with_none():
     """Test is_optional returns True for Union with None."""
-    annotation = Union[str, None]
+    annotation = Union[str, None]  # noqa: UP007
     assert is_optional(annotation) is True
 
 
 def test_is_optional_with_union_without_none():
     """Test is_optional returns False for Union without None."""
-    annotation = Union[str, int]
+    annotation = Union[str, int]  # noqa: UP007
     assert is_optional(annotation) is False
 
 
@@ -361,7 +361,7 @@ def test_is_optional_with_list():
 
 def test_is_optional_with_optional_list():
     """Test is_optional returns True for Optional[list[T]]."""
-    annotation = Optional[list]
+    annotation = Optional[list]  # noqa: UP045
     assert is_optional(annotation) is True
 
 
@@ -421,7 +421,7 @@ def test_parse_for_function_overrides_default():
 def test_parse_for_function_with_optional_type_annotation():
     """Test parsing optional type annotations."""
 
-    def dummy_func(optional_param: Optional[str]):
+    def dummy_func(optional_param: Optional[str]):  # noqa: UP045
         pass
 
     # Should not raise even though parameter is not provided
@@ -468,7 +468,7 @@ def test_parse_for_function_multiple_parameters_mixed():
     def dummy_func(
         required: str,
         with_default: int = 10,
-        optional_type: Optional[str] = None,
+        optional_type: Optional[str] = None,  # noqa: UP045
     ):
         pass
 
@@ -631,8 +631,8 @@ def test_parse_for_function_all_optional_with_union():
     """Test parsing when all parameters are optional with Union types."""
 
     def dummy_func(
-        param1: Optional[str] = None,
-        param2: Optional[int] = None,
+        param1: Optional[str] = None,  # noqa: UP045
+        param2: Optional[int] = None,  # noqa: UP045
     ):
         pass
 
@@ -646,7 +646,7 @@ def test_parse_for_function_partial_parameters():
     def dummy_func(
         param1: str,
         param2: str = "default",
-        param3: Optional[str] = None,
+        param3: Optional[str] = None,  # noqa: UP045
     ):
         pass
 
