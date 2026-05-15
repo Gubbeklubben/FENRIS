@@ -1,11 +1,13 @@
 from __future__ import annotations
 
 import importlib.metadata
+import inspect
+from collections.abc import Iterable
 from enum import Enum
 from importlib.metadata import entry_points
 from typing import Any, Iterator, Self
 
-from fenris.core.algorithm import Coordinator, SingleStepCoordinator, Synthesizer
+from fenris.core.algorithm import Coordinator, Synthesizer
 from fenris.core.component import Component, Metadata
 from fenris.core.data import Partitioner
 from fenris.core.eval import Evaluator
@@ -16,22 +18,30 @@ _ROOT_PKG = __name__.split(".")[0]
 # PyCharm static analysis is most pleased if using Enum not StrEnum,
 # typer is happy as long as _value_ is str.
 class Group(Enum):
-    SYNTHESIZERS = ("synthesizers", (Synthesizer,))
-    COORDINATORS = ("coordinators", (Coordinator, SingleStepCoordinator))
-    PARTITIONERS = ("partitioners", (Partitioner,))
-    EVALUATORS = ("evaluators", (Evaluator,))
+    SYNTHESIZERS = ("synthesizers", Synthesizer)
+    COORDINATORS = ("coordinators", Coordinator)
+    PARTITIONERS = ("partitioners", Partitioner)
+    EVALUATORS = ("evaluators", Evaluator)
 
-    def __new__(cls, name: str, bases: tuple[type[Component]]) -> Self:
+    def __new__(cls, name: str, base: type[Component]) -> Self:
         obj = object.__new__(cls)
         obj._value_ = name
         return obj
 
-    def __init__(self, _: str, bases: tuple[type[Component]]) -> None:
-        self._bases = bases
+    def __init__(self, _: str, base: type[Component]) -> None:
+        self._base = base
 
     @property
-    def bases(self) -> tuple[type[Component]]:
-        return self._bases
+    def base(self) -> type[Component]:
+        return self._base
+
+    @property
+    def bases(self) -> Iterable[type[Component]]:
+        yield self._base
+        for cls in self._base.__subclasses__():
+            if inspect.isabstract(cls):
+                # noinspection PyTypeChecker
+                yield cls
 
     @property
     def entry_point(self) -> str:
