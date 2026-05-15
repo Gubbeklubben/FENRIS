@@ -1,16 +1,15 @@
 import json
 import time
 from collections.abc import Generator, Iterable
-from typing import Any, Self, cast
+from typing import Any, cast
 
 from flwr.app import ConfigRecord, Message, RecordDict
 from flwr.serverapp import Grid
 
 from fenris.app.run.early_stopping_monitor import EarlyStoppingMonitor
 from fenris.app.run.eventbus import EventBus
-from fenris.config import Config, SeedConfig
+from fenris.config import Config
 from fenris.core.algorithm import Coordinator
-from fenris.core.data import TableSchema
 from fenris.core.encoder import FenrisEncoder
 from fenris.core.events import (
     ClientReply,
@@ -27,31 +26,14 @@ from fenris.flwr.serde import FlwrSerde, count_rdict_bytes
 
 
 class Strategy:
-    @classmethod
-    def from_seed_config(
-        cls,
-        seed_config: SeedConfig,
-        schema: TableSchema,
-        serde: FlwrSerde,
-        eventbus: EventBus,
-        coordinator: Coordinator,
-        monitor: EarlyStoppingMonitor,
-    ) -> Self:
-
-        return cls(seed_config.init, schema, serde, eventbus, coordinator, monitor)
-
     def __init__(
         self,
-        init_seed: int,
-        schema: TableSchema,
         serde: FlwrSerde,
         eventbus: EventBus,
         coordinator: Coordinator,
         monitor: EarlyStoppingMonitor,
     ) -> None:
 
-        self._init_seed = init_seed
-        self._schema = schema
         self._serde = serde
         self._eventbus = eventbus
         self._coordinator = coordinator

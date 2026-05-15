@@ -61,9 +61,7 @@ def make_server_app(ctx: RunContext) -> ServerApp:
         )
         ctx.eventbus.emit(ClientsConfigured())
 
-        strategy = Strategy.from_seed_config(
-            seed_config=ctx.config.seed,
-            schema=ctx.dataset.schema,
+        strategy = Strategy(
             serde=serde,
             eventbus=ctx.eventbus,
             coordinator=ctx.coordinator,
