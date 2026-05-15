@@ -50,7 +50,7 @@ def make_server_app(ctx: RunContext) -> ServerApp:
     @app.main()
     def main(grid: Grid, _: Context) -> None:
         serde = FlwrSerde(
-            object_serde=Pickle(disabled=ctx.config.disable_pickle),
+            object_serde=Pickle(),
             default_arrays_target=ctx.coordinator.arrays_target,
         )
         configure_clients(

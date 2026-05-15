@@ -47,11 +47,18 @@ class Payload:
     arrays : dict[str, Arrays]
         Named collections of numeric arrays (NumPy arrays or PyTorch tensors).
     objects : dict[str, Objects]
-        Named JSON-serializable object dictionaries.
+        Named object dictionaries.
     metrics : dict[str, Metrics]
         Named metric dictionaries containing scalar or list numeric values.
     extras : dict[str, Extras]
         Named dictionaries for primitive scalar or list values.
+
+    Notes
+    -----
+    The only currently available federation backend built on
+    flwr simulation will serialize the contents of the objects field
+    using pickle and otherwise delegate to flwr to do numpy serialization.
+
     """
 
     arrays: dict[str, Arrays] = field(default_factory=dict)

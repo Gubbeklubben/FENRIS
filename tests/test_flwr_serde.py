@@ -12,14 +12,9 @@ from fenris.flwr.serde import FlwrSerde, Pickle
 _RNG = np.random.default_rng(42)
 
 
-@pytest.fixture(
-    params=[
-        pytest.param(False, id="pickle"),
-        pytest.param(True, id="disable_pickle"),
-    ]
-)
+@pytest.fixture
 def serde(request) -> FlwrSerde:
-    return FlwrSerde(object_serde=Pickle(disabled=request.param))
+    return FlwrSerde(object_serde=Pickle())
 
 
 @pytest.fixture
@@ -190,11 +185,3 @@ def test_deserialize_rdict_view(serde, make_random_ndarrays):
     assert "not-my-arrays" not in update.arrays
     assert "not-my-config" not in update.extras
     assert "not-my-metrics" not in update.metrics
-
-
-def test_disable_pickle_raises():
-    serde = FlwrSerde(Pickle(disabled=True))
-    update = Payload()
-    update.objects["test-objects"] = {"pickle-me": None}
-    with pytest.raises(TypeError):
-        serde.to_flwr(update)
