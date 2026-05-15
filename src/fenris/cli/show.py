@@ -35,15 +35,14 @@ def show(
         ),
     ] = False,
 ) -> None:
-    """
-    Show available components.
+    """Show available components.
 
-    Examples:
+    Examples
+    --------
       fenris show
       fenris show synthesizers
       fenris show synthesizers coordinators --metadata
     """
-
     selected = groups if groups else list(Group)
 
     def show_evaluators() -> None:

@@ -92,7 +92,6 @@ def test_from_flwr_multiple_array_groups(serde, make_random_ndarrays) -> None:
 
 def test_round_trip_combined(serde, make_random_ndarrays) -> None:
     """Update with arrays, metrics, and extras all populated simultaneously."""
-
     update = Payload()
     update.arrays["weights"] = make_random_ndarrays()
     update.metrics["train-metrics"] = {"loss": 0.42, "acc": 0.91}

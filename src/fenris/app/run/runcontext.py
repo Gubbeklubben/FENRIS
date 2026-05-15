@@ -64,18 +64,18 @@ class _RunCtxField[T]:
 
 
 class RunContext:
-    df_loader             = _RunCtxField[Callable[[], DataFrame]]()
-    synthesizer           = _RunCtxField[Synthesizer]()
-    coordinator           = _RunCtxField[Coordinator]()
-    partitioner           = _RunCtxField[Partitioner]()
-    eval_suite            = _RunCtxField[EvaluationSuite]()
-    dataset               = _RunCtxField[PartitionedDataset]()
+    df_loader = _RunCtxField[Callable[[], DataFrame]]()
+    synthesizer = _RunCtxField[Synthesizer]()
+    coordinator = _RunCtxField[Coordinator]()
+    partitioner = _RunCtxField[Partitioner]()
+    eval_suite = _RunCtxField[EvaluationSuite]()
+    dataset = _RunCtxField[PartitionedDataset]()
     global_init_artifacts = _RunCtxField[GlobalInitArtifacts]()
-    train_artifacts       = _RunCtxField[Payload]()
-    per_client_metrics    = _RunCtxField[Mapping[int, Mapping[str, Any]]]()
-    aggregated_metrics    = _RunCtxField[Mapping[str, float]]()
-    centralized_metrics   = _RunCtxField[Mapping[str, float]]()
-    synthetic_df          = _RunCtxField[DataFrame]()
+    train_artifacts = _RunCtxField[Payload]()
+    per_client_metrics = _RunCtxField[Mapping[int, Mapping[str, Any]]]()
+    aggregated_metrics = _RunCtxField[Mapping[str, float]]()
+    centralized_metrics = _RunCtxField[Mapping[str, float]]()
+    synthetic_df = _RunCtxField[DataFrame]()
 
     def __init__(
         self,

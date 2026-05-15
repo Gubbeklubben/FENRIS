@@ -1,4 +1,4 @@
-"""Naughty synthesizer for testing the framework.
+r"""Naughty synthesizer for testing the framework.
 
 Intentionally injects errors, corrupts data, and violates protocol
 assumptions at configurable lifecycle points. Used to discover weak spots.

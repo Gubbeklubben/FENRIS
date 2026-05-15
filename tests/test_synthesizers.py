@@ -1,5 +1,4 @@
-"""
-Tests for synthesizer edge cases.
+"""Tests for synthesizer edge cases.
 
 Regression tests for GitHub issue #35: synthesizers should handle datasets with
 only categorical columns or only numerical columns without crashing.

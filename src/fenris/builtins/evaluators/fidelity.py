@@ -1,5 +1,4 @@
-"""
-Fidelity evaluators.
+"""Fidelity evaluators.
 
 Measures how well the statistical properties of the synthetic data match
 those of the training data. Includes moment comparison, distribution

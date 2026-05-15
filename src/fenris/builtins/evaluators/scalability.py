@@ -1,5 +1,4 @@
-"""
-Scalability evaluators.
+"""Scalability evaluators.
 
 Most scalability metrics are *measurements*, not computations: wall-clock time,
 byte counts, and round count are accumulated by ScalabilityCollector via the

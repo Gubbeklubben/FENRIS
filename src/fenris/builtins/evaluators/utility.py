@@ -1,5 +1,4 @@
-"""
-Utility evaluators.
+"""Utility evaluators.
 
 Measures the downstream predictive usefulness of the synthetic data
 using a Train-on-Synthetic / Test-on-Real (TSTR) approach with

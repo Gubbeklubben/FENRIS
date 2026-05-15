@@ -33,7 +33,8 @@ class BGMTransformer:
 
     Categorical columns are one-hot encoded.
 
-    Attributes:
+    Attributes
+    ----------
         n_clusters: Maximum number of Gaussian modes per column
         eps: Weight threshold for mode selection (default: 0.005)
         meta: Column metadata (type, ranges, etc.)

@@ -6,7 +6,8 @@ import pytest
 @pytest.fixture(scope="session", autouse=True)
 def ray_session():
     """Speed up back-to-back framework runs by initializing Ray once
-    and keeping it loaded until the test suite is finished."""
+    and keeping it loaded until the test suite is finished.
+    """
     import ray
 
     os.environ["RAY_ACCEL_ENV_VAR_OVERRIDE_ON_ZERO"] = "0"

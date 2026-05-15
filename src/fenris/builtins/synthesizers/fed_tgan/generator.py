@@ -1,5 +1,4 @@
-"""
-Generator with Residual blocks for Fed-TGAN.
+"""Generator with Residual blocks for Fed-TGAN.
 
 Ported from the original Fed-TGAN implementation:
 https://github.com/zhao-zilong/Fed-TGAN/blob/main/Server/dtds/synthesizers/ctgan.py

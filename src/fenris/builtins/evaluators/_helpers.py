@@ -73,8 +73,7 @@ def sanitize_numeric_df(
     df: pd.DataFrame,
     numeric_cols: Iterable[str],
 ) -> pd.DataFrame:
-    """
-    Return a numeric-only dataframe safe for statistics.
+    """Return a numeric-only dataframe safe for statistics.
 
     Steps
     -----

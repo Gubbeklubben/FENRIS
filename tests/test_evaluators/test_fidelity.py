@@ -181,8 +181,7 @@ class TestCategoricalTvMean:
         assert result["categorical_tv_mean"] == pytest.approx(1.0, abs=1e-9)
 
     def test_half_overlap(self):
-        """
-        Synthetic data covers only one of two equally likely categories,
+        """Synthetic data covers only one of two equally likely categories,
         giving TV = 0.5.
 
         real = [A, A, B, B]  → P(A)=0.5, P(B)=0.5
@@ -242,8 +241,7 @@ class TestCorrFroDiff:
         assert math.isnan(result["corr_fro_diff"])
 
     def test_perfect_positive_vs_negative_correlation(self):
-        """
-        Frobenius norm of correlation diff between perfectly positive and negative
+        """Frobenius norm of correlation diff between perfectly positive and negative
         correlations.
 
         real: b = a  → corr = [[1, 1], [1, 1]]
@@ -268,8 +266,7 @@ class TestCorrFroDiff:
         assert math.isnan(result["corr_fro_diff"])
 
     def test_constant_column_in_syn_emits_nan_not_zero(self):
-        """
-        Two numeric columns where one is constant in syn but not in real.
+        """Two numeric columns where one is constant in syn but not in real.
 
         With the old implementation, safe_corr filtered each DataFrame
         independently.  The constant column survived in the real correlation

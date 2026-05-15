@@ -445,7 +445,8 @@ class TestAIACollapse:
         seed: int = 0,
     ) -> tuple[pd.DataFrame, pd.DataFrame]:
         """Two-class synthetic and test DataFrames with 'income' as the
-        sensitive attribute and 'age'/'hours' as numeric quasi-identifiers."""
+        sensitive attribute and 'age'/'hours' as numeric quasi-identifiers.
+        """
         rng = np.random.default_rng(seed)
         syn = pd.DataFrame(
             {
@@ -472,7 +473,8 @@ class TestAIACollapse:
         seed: int = 0,
     ) -> tuple[pd.DataFrame, pd.DataFrame]:
         """Same as _binary_frames but every synthetic row has income='low'
-        (simulating a fully-collapsed generator)."""
+        (simulating a fully-collapsed generator).
+        """
         rng = np.random.default_rng(seed)
         syn = pd.DataFrame(
             {

@@ -11,8 +11,7 @@ from fenris.flwr.rdict import RDictNamespaceView
 
 
 def count_rdict_bytes(rdict: RecordDict) -> int:
-    """
-    Count the uncompressed model-parameter payload bytes in a RecordDict.
+    """Count the uncompressed model-parameter payload bytes in a RecordDict.
 
     Counts only array_records (which carry both real tensors and
     pickle-serialized objects). Excludes metric_records and config_records,

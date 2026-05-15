@@ -274,52 +274,52 @@ def test_omitted_columns_no_error(tmp_path, synthesizers, coordinators, partitio
 
 
 def test_coerce_bool_true_variants():
-    """Test coercion of various truthy boolean strings"""
+    """Test coercion of various truthy boolean strings."""
     for value in ["true", "True", "TRUE", "1", "yes", "Yes", "on", "ON"]:
         assert coerce(value, bool) is True, f"Failed for value: {value}"
 
 
 def test_coerce_bool_false_variants():
-    """Test coercion of various falsy boolean strings"""
+    """Test coercion of various falsy boolean strings."""
     for value in ["false", "False", "FALSE", "0", "no", "No", "off", "OFF", ""]:
         assert coerce(value, bool) is False, f"Failed for value: {value}"
 
 
 def test_coerce_int():
-    """Test coercion of string to int"""
+    """Test coercion of string to int."""
     assert coerce("42", int) == 42
     assert coerce("-10", int) == -10
     assert coerce("0", int) == 0
 
 
 def test_coerce_float():
-    """Test coercion of string to float"""
+    """Test coercion of string to float."""
     assert coerce("3.14", float) == 3.14
     assert coerce("0.5", float) == 0.5
     assert coerce("-2.5", float) == -2.5
 
 
 def test_coerce_list():
-    """Test coercion of string to list"""
+    """Test coercion of string to list."""
     assert coerce("[1,2,3]", list[int]) == [1, 2, 3]
     assert coerce("[a,b,c]", list[str]) == ["a", "b", "c"]
 
 
 def test_coerce_tuple():
-    """Test coercion of string to tuple"""
+    """Test coercion of string to tuple."""
     assert coerce("(1,2,3)", tuple[int]) == (1, 2, 3)
     assert coerce("(x,y)", tuple[str]) == ("x", "y")
 
 
 @pytest.mark.parametrize("list_type", [list, list[Any], tuple, tuple[Any]])
 def test_coerce_invalid_list_raises(list_type):
-    """Test that invalid list syntax raises error"""
+    """Test that invalid list syntax raises error."""
     with pytest.raises(TypeError):
         coerce("not a valid list", list_type)
 
 
 def test_coerce_str():
-    """Test coercion of string to string"""
+    """Test coercion of string to string."""
     result = coerce("hello", str)
     assert result == "hello"
 
@@ -328,37 +328,37 @@ def test_coerce_str():
 
 
 def test_is_optional_with_optional_type():
-    """Test is_optional returns True for Optional[T]"""
+    """Test is_optional returns True for Optional[T]."""
     annotation = Optional[str]
     assert is_optional(annotation) is True
 
 
 def test_is_optional_with_union_with_none():
-    """Test is_optional returns True for Union with None"""
+    """Test is_optional returns True for Union with None."""
     annotation = Union[str, None]
     assert is_optional(annotation) is True
 
 
 def test_is_optional_with_union_without_none():
-    """Test is_optional returns False for Union without None"""
+    """Test is_optional returns False for Union without None."""
     annotation = Union[str, int]
     assert is_optional(annotation) is False
 
 
 def test_is_optional_with_non_optional_type():
-    """Test is_optional returns False for regular types"""
+    """Test is_optional returns False for regular types."""
     assert is_optional(str) is False
     assert is_optional(int) is False
     assert is_optional(bool) is False
 
 
 def test_is_optional_with_list():
-    """Test is_optional returns False for list types"""
+    """Test is_optional returns False for list types."""
     assert is_optional(list) is False
 
 
 def test_is_optional_with_optional_list():
-    """Test is_optional returns True for Optional[list[T]]"""
+    """Test is_optional returns True for Optional[list[T]]."""
     annotation = Optional[list]
     assert is_optional(annotation) is True
 
@@ -367,7 +367,7 @@ def test_is_optional_with_optional_list():
 
 
 def test_parse_for_function_with_no_parameters():
-    """Test parsing a function with no parameters"""
+    """Test parsing a function with no parameters."""
 
     def dummy_func():
         pass
@@ -377,7 +377,7 @@ def test_parse_for_function_with_no_parameters():
 
 
 def test_parse_for_function_with_required_parameter():
-    """Test parsing required parameters"""
+    """Test parsing required parameters."""
 
     def dummy_func(required_param: str):
         pass
@@ -387,7 +387,7 @@ def test_parse_for_function_with_required_parameter():
 
 
 def test_parse_for_function_missing_required_parameter_raises():
-    """Test that missing required parameter raises TypeError"""
+    """Test that missing required parameter raises TypeError."""
 
     def dummy_func(required_param: str):
         pass
@@ -397,7 +397,7 @@ def test_parse_for_function_missing_required_parameter_raises():
 
 
 def test_parse_for_function_with_default_parameter():
-    """Test parsing function with default parameters"""
+    """Test parsing function with default parameters."""
 
     def dummy_func(param_with_default: str = "default_value"):
         pass
@@ -407,7 +407,7 @@ def test_parse_for_function_with_default_parameter():
 
 
 def test_parse_for_function_overrides_default():
-    """Test that provided parameters override defaults"""
+    """Test that provided parameters override defaults."""
 
     def dummy_func(param: str = "default"):
         pass
@@ -417,7 +417,7 @@ def test_parse_for_function_overrides_default():
 
 
 def test_parse_for_function_with_optional_type_annotation():
-    """Test parsing optional type annotations"""
+    """Test parsing optional type annotations."""
 
     def dummy_func(optional_param: Optional[str]):
         pass
@@ -428,7 +428,7 @@ def test_parse_for_function_with_optional_type_annotation():
 
 
 def test_parse_for_function_unknown_parameter_raises():
-    """Test that unknown parameters raise TypeError"""
+    """Test that unknown parameters raise TypeError."""
 
     def dummy_func(known_param: str):
         pass
@@ -441,7 +441,7 @@ def test_parse_for_function_unknown_parameter_raises():
 
 
 def test_parse_for_function_coerces_types():
-    """Test that parameters are coerced to correct types"""
+    """Test that parameters are coerced to correct types."""
 
     def dummy_func(num: int, enabled: bool, items: list[int]):
         pass
@@ -461,7 +461,7 @@ def test_parse_for_function_coerces_types():
 
 
 def test_parse_for_function_multiple_parameters_mixed():
-    """Test parsing mix of required, optional, and default parameters"""
+    """Test parsing mix of required, optional, and default parameters."""
 
     def dummy_func(
         required: str,
@@ -483,29 +483,29 @@ def test_parse_for_function_multiple_parameters_mixed():
 
 
 def test_coerce_int_invalid_raises():
-    """Test that invalid integer strings raise ValueError"""
+    """Test that invalid integer strings raise ValueError."""
     with pytest.raises(ValueError):
         coerce("not_a_number", int)
 
 
 def test_coerce_float_invalid_raises():
-    """Test that invalid float strings raise ValueError"""
+    """Test that invalid float strings raise ValueError."""
     with pytest.raises(ValueError):
         coerce("not_a_float", float)
 
 
 def test_coerce_empty_list():
-    """Test coercion of empty list string"""
+    """Test coercion of empty list string."""
     assert coerce("[]", list) == []
 
 
 def test_coerce_empty_tuple():
-    """Test coercion of empty tuple string"""
+    """Test coercion of empty tuple string."""
     assert coerce("()", tuple) == ()
 
 
 def test_coerce_nested_structures():
-    """Test coercion of nested list structures"""
+    """Test coercion of nested list structures."""
     result = coerce("[[1, 2], [3, 4]]", list[list[int]])
     assert result == [[1, 2], [3, 4]]
 
@@ -516,7 +516,7 @@ def test_coerce_nested_structures():
 def test_dataset_path_expanduser(
     tmp_path, monkeypatch, synthesizers, partitioners, coordinators
 ):
-    """Test that dataset paths with ~ are expanded"""
+    """Test that dataset paths with ~ are expanded."""
     # Create a dataset file
     dataset = tmp_path / "data.csv"
     dataset.write_text("a,b\n1,2\n")
@@ -537,7 +537,7 @@ def test_dataset_path_expanduser(
 def test_outputdir_path_expanduser(
     tmp_path, monkeypatch, synthesizers, partitioners, coordinators
 ):
-    """Test that outputdir paths are expanded and resolved"""
+    """Test that outputdir paths are expanded and resolved."""
     dataset = tmp_path / "data.csv"
     dataset.write_text("a,b\n1,2\n")
 
@@ -557,7 +557,7 @@ def test_outputdir_path_expanduser(
 def test_categories_all_defaults_to_all_enum_members(
     tmp_path, synthesizers, partitioners, coordinators
 ):
-    """Test that no categories specified defaults to all Category enum members"""
+    """Test that no categories specified defaults to all Category enum members."""
     cfg = minimal_valid_cfg(tmp_path)
     # Don't specify run_categories
 
@@ -569,7 +569,7 @@ def test_categories_all_defaults_to_all_enum_members(
 
 
 def test_single_category_parsing(tmp_path, synthesizers, coordinators, partitioners):
-    """Test parsing a single category"""
+    """Test parsing a single category."""
     cfg = minimal_valid_cfg(
         tmp_path,
         run_categories=(Category.PRIVACY,),
@@ -585,7 +585,7 @@ def test_single_category_parsing(tmp_path, synthesizers, coordinators, partition
 def test_multiple_categories_parsing(
     tmp_path, synthesizers, partitioners, coordinators
 ):
-    """Test parsing multiple categories"""
+    """Test parsing multiple categories."""
     cfg = minimal_valid_cfg(
         tmp_path,
         run_categories=(Category.UTILITY, Category.PRIVACY),
@@ -602,7 +602,7 @@ def test_multiple_categories_parsing(
 
 
 def test_synthesizer_kwargs_empty(tmp_path, synthesizers, coordinators, partitioners):
-    """Test that empty synthesizer_kwargs defaults to empty dict"""
+    """Test that empty synthesizer_kwargs defaults to empty dict."""
     cfg = minimal_valid_cfg(tmp_path)
 
     config = build_config(cfg, synthesizers, coordinators, partitioners)
@@ -613,7 +613,7 @@ def test_synthesizer_kwargs_empty(tmp_path, synthesizers, coordinators, partitio
 def test_partitioner_kwargs_preserved(
     tmp_path, synthesizers, partitioners, coordinators
 ):
-    """Test that partitioner_kwargs are preserved"""
+    """Test that partitioner_kwargs are preserved."""
     cfg = minimal_valid_cfg(tmp_path, num_clients=5)
 
     config = build_config(cfg, synthesizers, coordinators, partitioners)
@@ -626,7 +626,7 @@ def test_partitioner_kwargs_preserved(
 
 
 def test_parse_for_function_all_optional_with_union():
-    """Test parsing when all parameters are optional with Union types"""
+    """Test parsing when all parameters are optional with Union types."""
 
     def dummy_func(
         param1: Optional[str] = None,
@@ -639,7 +639,7 @@ def test_parse_for_function_all_optional_with_union():
 
 
 def test_parse_for_function_partial_parameters():
-    """Test parsing when only some of multiple parameters are provided"""
+    """Test parsing when only some of multiple parameters are provided."""
 
     def dummy_func(
         param1: str,
@@ -656,7 +656,7 @@ def test_parse_for_function_partial_parameters():
 
 
 def test_parse_for_function_with_tuple_coercion():
-    """Test coercion of tuple parameters"""
+    """Test coercion of tuple parameters."""
 
     def dummy_func(items: tuple[int]):
         pass
@@ -707,7 +707,7 @@ def test_parse_for_function_untyped_missing_required_still_raises():
 def test_validate_partitioner_not_in_registry(
     tmp_path, synthesizers, partitioners, coordinators
 ):
-    """Test that unregistered partitioner raises ValueError"""
+    """Test that unregistered partitioner raises ValueError."""
     cfg = minimal_valid_cfg(
         tmp_path,
         partitioner="nonexistent-partitioner",

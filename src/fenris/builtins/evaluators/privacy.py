@@ -1,5 +1,4 @@
-"""
-Privacy evaluators.
+"""Privacy evaluators.
 
 Includes three complementary privacy diagnostics:
 
@@ -348,7 +347,6 @@ class MIANearestNeighborAttackEvaluator(Evaluator):
         Members are sampled from ``ctx.client_train_df``; non-members from
         ``ctx.holdout_df``.  This is the recommended mode for MIA.
         """
-
         if not isinstance(ctx, CentralizedEvalContext):
             log_debug(
                 "MIANearestNeighborAttackEvaluator",
@@ -450,7 +448,6 @@ class AIASupervisedAttackEvaluator(Evaluator):
         Returns an ``_AIAResult`` with accuracy/auc for classification or
         rmse for regression (NaN for inapplicable metrics).
         """
-
         result = _AIAResult()
 
         qi = set(test_df.columns) - {sensitive_column}
