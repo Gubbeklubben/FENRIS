@@ -64,7 +64,6 @@ class _RunCtxField[T]:
 
 
 class RunContext:
-    # fmt: off
     df_loader             = _RunCtxField[Callable[[], DataFrame]]()
     synthesizer           = _RunCtxField[Synthesizer]()
     coordinator           = _RunCtxField[Coordinator]()
@@ -77,7 +76,6 @@ class RunContext:
     aggregated_metrics    = _RunCtxField[Mapping[str, float]]()
     centralized_metrics   = _RunCtxField[Mapping[str, float]]()
     synthetic_df          = _RunCtxField[DataFrame]()
-    # fmt: on
 
     def __init__(
         self,
