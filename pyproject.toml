@@ -116,10 +116,20 @@ src = ["src", "tests"]
 preview = true  # required for pydoclint to work
 
 select = [
+    # Code related linting rules
+
     "E", # E: pycodestyle errors
     "W", # W: pycodestyle warnings
     "F", # F: pyflakes (unused variables/imports)
     "I", # I: isort (automatic import sorting)
+    "UP", # UP: pyupgrade
+
+    "PIE790", # remove unnecessary pass statements
+    "RUF010", # remove unnecessary str() inside f-string
+    "RUF022", # sort __all__ list in __init__.py files
+    "RUF036", # put None at the end of type unions
+
+    # Docstring related linting rules
 
     "D", # D: pydocstyle (checks docstring formatting)
     "DOC", # DOC: pydoclint (checks that docstrings match function signatures)
