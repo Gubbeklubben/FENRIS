@@ -45,8 +45,6 @@ from typing import Any, Iterable, Mapping
 
 import numpy as np
 import pandas as pd
-from sklearn.linear_model import LogisticRegression, Ridge
-from sklearn.metrics import accuracy_score, mean_squared_error, roc_auc_score
 
 from fenris.builtins.evaluators._helpers import (
     fit_tabular_model,
@@ -345,6 +343,9 @@ class MIANearestNeighborAttackEvaluator(Evaluator):
         scores = np.where(np.isfinite(scores), scores, finite.min())
 
         threshold = np.median(scores)
+
+        from sklearn.metrics import accuracy_score, roc_auc_score
+
         return _MIAResult(
             K=k,
             mia_auc=roc_auc_score(y, scores),
@@ -486,6 +487,9 @@ class AIASupervisedAttackEvaluator(Evaluator):
         x_syn = syn_df[quasi_ids]
         y_syn = syn_df[sensitive_column]
         result.n_test = len(test_df)
+
+        from sklearn.linear_model import LogisticRegression, Ridge
+        from sklearn.metrics import accuracy_score, mean_squared_error, roc_auc_score
 
         if schema.kind_of(sensitive_column) in ["binary", "categorical"]:
             y_syn = y_syn.astype(str)

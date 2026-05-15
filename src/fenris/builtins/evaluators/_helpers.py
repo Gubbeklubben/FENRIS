@@ -7,15 +7,15 @@ privacy, fairness, scalability) but are not part of the public evaluator API.
 from __future__ import annotations
 
 import math
-from typing import Iterable, Mapping
+from typing import TYPE_CHECKING, Iterable, Mapping
 
 import numpy as np
 import pandas as pd
-from sklearn.base import BaseEstimator
-from sklearn.compose import ColumnTransformer
-from sklearn.impute import SimpleImputer
-from sklearn.pipeline import Pipeline
-from sklearn.preprocessing import OneHotEncoder, StandardScaler
+
+if TYPE_CHECKING:
+    from sklearn.base import BaseEstimator
+    from sklearn.compose import ColumnTransformer
+    from sklearn.pipeline import Pipeline
 
 from fenris.core.data import TableSchema
 
@@ -24,6 +24,11 @@ def make_tabular_preprocessor(
     df: pd.DataFrame, schema: TableSchema
 ) -> ColumnTransformer:
     """Returns a ColumnTransformer for numeric + categorical preprocessing."""
+    from sklearn.compose import ColumnTransformer
+    from sklearn.impute import SimpleImputer
+    from sklearn.pipeline import Pipeline
+    from sklearn.preprocessing import OneHotEncoder, StandardScaler
+
     num_cols = schema.numeric_columns(df)
     cat_cols = schema.nominal_columns(df)
 
@@ -56,6 +61,8 @@ def make_tabular_preprocessor(
 def fit_tabular_model(
     x: pd.DataFrame, y: pd.Series, model: BaseEstimator, schema: TableSchema
 ) -> Pipeline:
+    from sklearn.pipeline import Pipeline
+
     preprocessor = make_tabular_preprocessor(x, schema)
     pipe = Pipeline([("pre", preprocessor), ("model", model)])
     pipe.fit(x, y)

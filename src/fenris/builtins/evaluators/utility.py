@@ -10,8 +10,6 @@ from typing import Iterable, Mapping
 
 import numpy as np
 import pandas as pd
-from sklearn.linear_model import LogisticRegression, Ridge
-from sklearn.metrics import accuracy_score, mean_squared_error, roc_auc_score
 
 from fenris.builtins.evaluators._helpers import (
     fit_tabular_model,
@@ -66,6 +64,9 @@ class TSTREvaluator(Evaluator):
 
         if x_syn.empty:
             return metrics
+
+        from sklearn.linear_model import LogisticRegression, Ridge
+        from sklearn.metrics import accuracy_score, mean_squared_error, roc_auc_score
 
         if schema.kind_of(y_col) in ["binary", "categorical"]:
             y_syn = y_syn.astype(str)

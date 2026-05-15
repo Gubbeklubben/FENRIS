@@ -16,7 +16,6 @@ from typing import Iterable, Mapping, NamedTuple
 
 import numpy as np
 import pandas as pd
-from sklearn.linear_model import LogisticRegression
 
 from fenris.builtins.evaluators._helpers import fit_tabular_model
 from fenris.core.data import TableSchema
@@ -239,6 +238,8 @@ class FairnessEvaluator(Evaluator):
                 "Fairness", "Target column must be binary (exactly two unique values)."
             )
             return {}
+
+        from sklearn.linear_model import LogisticRegression
 
         model = LogisticRegression(max_iter=1000, solver="lbfgs", random_state=seed)
         try:
