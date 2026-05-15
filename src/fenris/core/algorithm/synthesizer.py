@@ -123,7 +123,6 @@ class Synthesizer(Component):
 
     def __init_subclass__(cls, **kwargs: Any) -> None:
         super().__init_subclass__(**kwargs)
-        print(cls)
         if "SUPPORTED_COORDINATORS" not in cls.__dict__:
             raise TypeError(
                 f"{cls}: Synthesizer subclass must declare class attribute "
