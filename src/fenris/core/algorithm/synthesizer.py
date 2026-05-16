@@ -127,8 +127,7 @@ class Synthesizer(Component):
         Raises
         ------
         TypeError
-            If ``SUPPORTED_COORDINATORS`` is not declared, or if ``sample``
-            returns something other than a :class:`~pandas.DataFrame`.
+            If ``SUPPORTED_COORDINATORS`` is not declared.
         """
         super().__init_subclass__(**kwargs)
         if "SUPPORTED_COORDINATORS" not in cls.__dict__:

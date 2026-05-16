@@ -5,7 +5,7 @@ from typing import Any, final
 
 @dataclass(frozen=True)
 class Metadata:
-    """Registry metadata attached to every Component subclass."""
+    """Metadata attached to every loaded Component subclass."""
 
     name: str
     group: str
