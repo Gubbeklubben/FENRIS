@@ -9,24 +9,24 @@ from fenris.config.parsing import coerce, is_optional
 from fenris.core.algorithm import Coordinator, Synthesizer
 from fenris.core.data import Partitioner
 from fenris.core.eval import Category
-from tests.fake_components import mock_entry_points
+from tests.fake_components import sane_entry_points
 
 
 @pytest.fixture
 def synthesizers(monkeypatch):
-    monkeypatch.setattr("fenris.app.plugins.entry_points", mock_entry_points)
+    monkeypatch.setattr("fenris.app.plugins.entry_points", sane_entry_points)
     return Registry(group="fenris.synthesizers", base=Synthesizer)
 
 
 @pytest.fixture
 def coordinators(monkeypatch):
-    monkeypatch.setattr("fenris.app.plugins.entry_points", mock_entry_points)
+    monkeypatch.setattr("fenris.app.plugins.entry_points", sane_entry_points)
     return Registry(group="fenris.coordinators", base=Coordinator)
 
 
 @pytest.fixture
 def partitioners(monkeypatch):
-    monkeypatch.setattr("fenris.app.plugins.entry_points", mock_entry_points)
+    monkeypatch.setattr("fenris.app.plugins.entry_points", sane_entry_points)
     return Registry(group="fenris.partitioners", base=Partitioner)
 
 
