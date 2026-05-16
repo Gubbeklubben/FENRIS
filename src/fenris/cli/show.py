@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import inspect
 from collections import defaultdict
 from dataclasses import fields
@@ -5,8 +7,8 @@ from typing import Annotated
 
 import typer
 
-from fenris.app.registry import Group
-from fenris.core.component import Metadata
+from fenris.app.plugins import Group, plugins
+from fenris.core.component import Component, Metadata
 
 app = typer.Typer()
 
@@ -14,24 +16,26 @@ app = typer.Typer()
 @app.command()
 def show(
     groups: Annotated[
-        list[Group] | None,
+        list[str] | None,
         typer.Argument(
+            ...,
+            metavar=f"{'|'.join(plugins.groups.keys())} ...",
             help="Groups of components to show. If omitted, all are shown.",
+            callback=validate_groups,
         ),
     ] = None,
     show_metadata: Annotated[
         bool,
         typer.Option(
             "--metadata",
-            help="Include factory metadata in the output.",
+            help="Show relevant metadata.",
         ),
     ] = False,
     keywords: Annotated[
         bool,
         typer.Option(
             "--keywords",
-            help="Include valid factory keyword arguments and their default values in "
-            "the output.",
+            help="Show valid constructor arguments and associated default values.",
         ),
     ] = False,
 ) -> None:
@@ -43,13 +47,14 @@ def show(
       fenris show synthesizers
       fenris show synthesizers coordinators --metadata
     """
-    selected = groups if groups else list(Group)
+    selected = groups if groups else list(plugins.groups.keys())
 
     def show_evaluators() -> None:
         # Sort evaluator metadata by category
         evaluators_by_category = defaultdict(list)
-        for metadata in Group.EVALUATORS.get_registry().metadata():
-            evaluator_cls = Group.EVALUATORS.get_registry().load(metadata.name)
+        registry = plugins.evaluators.registry
+        for metadata in registry.metadata():
+            evaluator_cls = registry.load(metadata.name)
             spec = evaluator_cls.EVALUATOR_SPEC
             category = spec.category
             evaluators_by_category[category].append((metadata, spec))
@@ -81,20 +86,17 @@ def show(
                         )
                     typer.echo()
 
-    def maybe_show(group: Group) -> None:
-        if group not in selected:
-            return
-
+    def _show(group: Group[Component]) -> None:
         # Component type heading
         typer.echo()
         typer.echo(group.name)
         typer.echo("\u2500" * len(group.name))
 
-        if group == Group.EVALUATORS:
+        if group is plugins.evaluators:
             show_evaluators()
             return
 
-        registry = group.get_registry()
+        registry = group.registry
         for metadata in registry.metadata():
             # Component name
             typer.echo(f"{'':<2}{metadata.name}")
@@ -110,10 +112,8 @@ def show(
                         typer.echo(f"{'':<6}{param}")
                     typer.echo()
 
-    maybe_show(Group.SYNTHESIZERS)
-    maybe_show(Group.COORDINATORS)
-    maybe_show(Group.PARTITIONERS)
-    maybe_show(Group.EVALUATORS)
+    for name in selected:
+        _show(plugins.groups[name])
 
     typer.echo()
 
@@ -124,3 +124,13 @@ def _show_metadata(metadata: Metadata, indent: int) -> None:
             continue
         typer.echo(f"{'':<{indent}}{f.name}: {getattr(metadata, f.name)}")
     typer.echo()
+
+
+def validate_groups(groups: list[str] | None) -> list[str] | None:
+    if groups is None:
+        return None
+
+    for group in groups:
+        if group not in plugins.groups:
+            raise typer.BadParameter(f"'{group}' is not a valid group.")
+    return groups

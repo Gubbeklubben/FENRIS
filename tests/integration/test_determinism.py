@@ -15,7 +15,7 @@ import pandas as pd
 import pytest
 
 import fenris.app.run.runner as runner
-from fenris.app.registry import Group
+from fenris.app.plugins import plugins
 from fenris.app.run.pipeline import pipeline
 from fenris.config.builder import build_config
 
@@ -23,19 +23,20 @@ _DATASET = Path(__file__).parent.parent.parent / "datasets" / "breast_cancer.csv
 
 
 def _synthesizer_names() -> list[str]:
-    return list(Group.SYNTHESIZERS.get_registry())
+    return list(plugins.synthesizers.registry)
 
 
 def _coordinator_for(synthesizer_name: str) -> str:
     """Return the first registered coordinator compatible with the synthesizer."""
-    factory = Group.SYNTHESIZERS.get_registry().load(synthesizer_name)
-    coord_registry = Group.COORDINATORS.get_registry()
-    for coord_name in sorted(factory.SUPPORTED_COORDINATORS):
+    cls = plugins.synthesizers.registry.load(synthesizer_name)
+    coord_registry = plugins.coordinators.registry
+    for coord_name in cls.SUPPORTED_COORDINATORS:
         if coord_name in coord_registry:
             return coord_name
+
     raise ValueError(
         f"No registered coordinator found for synthesizer {synthesizer_name!r}. "
-        f"Supported: {factory.SUPPORTED_COORDINATORS}"
+        f"Supported: {cls.SUPPORTED_COORDINATORS}"
     )
 
 
