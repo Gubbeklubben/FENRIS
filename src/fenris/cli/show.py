@@ -21,7 +21,7 @@ def show(
             ...,
             metavar=f"{'|'.join(plugins.groups.keys())} ...",
             help="Groups of components to show. If omitted, all are shown.",
-            callback=validate_groups,
+            callback=_validate_groups,
         ),
     ] = None,
     show_metadata: Annotated[
@@ -89,7 +89,7 @@ def show(
     def _show(group: Group[Component]) -> None:
         # Component type heading
         typer.echo()
-        typer.echo(group.name)
+        typer.echo(group.name.upper())
         typer.echo("\u2500" * len(group.name))
 
         if group is plugins.evaluators:
@@ -126,7 +126,7 @@ def _show_metadata(metadata: Metadata, indent: int) -> None:
     typer.echo()
 
 
-def validate_groups(groups: list[str] | None) -> list[str] | None:
+def _validate_groups(groups: list[str] | None) -> list[str] | None:
     if groups is None:
         return None
 
