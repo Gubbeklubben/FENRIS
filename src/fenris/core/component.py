@@ -5,6 +5,8 @@ from typing import Any, final
 
 @dataclass(frozen=True)
 class Metadata:
+    """Metadata attached to every loaded Component subclass."""
+
     name: str
     group: str
     value: str
@@ -20,6 +22,13 @@ class Component(ABC):
     metadata: Metadata
 
     def __init_subclass__(cls, **kwargs: Any) -> None:
+        """Enforce reserved-attribute rules on every Component subclass.
+
+        Raises
+        ------
+        TypeError
+            If the subclass declares ``metadata`` or ``name``.
+        """
         super().__init_subclass__(**kwargs)
         if "metadata" in cls.__dict__:
             raise TypeError(
@@ -35,4 +44,5 @@ class Component(ABC):
     @final
     @property
     def name(self) -> str:
+        """Registry name of this component."""
         return self.__class__.metadata.name

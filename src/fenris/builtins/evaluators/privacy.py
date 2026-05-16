@@ -1,5 +1,4 @@
-"""
-Privacy evaluators.
+"""Privacy evaluators.
 
 Includes three complementary privacy diagnostics:
 
@@ -18,7 +17,7 @@ DirectOverlapDiagnosticEvaluator — **exact** federated aggregation.
   Server global rate = Σ match_counts / n_syn  (synthetic set is identical
   for all clients so n_syn is the same everywhere).
   global_evaluate returns NaN — overlap against a server holdout is a
-  structural false negative by construction (see reference guide §16.5).
+  structural false negative by construction.
 
 MIANearestNeighborAttackEvaluator — **approximate** federated aggregation.
   global_evaluate requires a CentralizedEvalContext because it needs access
@@ -28,7 +27,6 @@ MIANearestNeighborAttackEvaluator — **approximate** federated aggregation.
   In federated mode each client computes a local AUC from its own
   members/non-members and reports (local_auc, n_pos, n_neg).
   Server produces a weighted-mean proxy AUC (not equivalent to centralized).
-  See reference guide §3.3.3 and §15.3.2 for the exactness caveat.
 
 AIASupervisedAttackEvaluator — **exact** federated aggregation (per
   sensitive column).  The attacker model is trained on the same synthetic
@@ -150,13 +148,13 @@ class DirectOverlapDiagnosticEvaluator(Evaluator):
 
         Centralized evaluation using a server-held holdout produces a structural
         false negative by construction — memorized training records cannot appear
-        in a holdout that is disjoint from D_train. See reference guide §16.5.
+        in a holdout that is disjoint from D_train.
         """
         log_debug(
             "DirectOverlapDiagnosticEvaluator",
             "global_evaluate is not meaningful for overlap diagnostics: the server "
             "holdout is disjoint from D_train by construction. Use federated mode "
-            "(local_evaluate + aggregate) instead. Returning NaN. See §16.5.",
+            "(local_evaluate + aggregate) instead. Returning NaN.",
         )
         return self._nan_result()
 
@@ -255,8 +253,7 @@ class MIANearestNeighborAttackEvaluator(Evaluator):
     ---------------
     ``local_evaluate`` runs the NN attack locally per client using its own
     training partition as members and its local test split as non-members.
-    The server aggregates via a weighted mean AUC (approximate; see
-    reference guide §15.3.2).
+    The server aggregates via a weighted mean AUC (approximate).
     """
 
     EVALUATOR_SPEC: ClassVar[EvaluatorSpec] = EvaluatorSpec(
@@ -348,10 +345,8 @@ class MIANearestNeighborAttackEvaluator(Evaluator):
         """Centralized MIA — requires CentralizedEvalContext.
 
         Members are sampled from ``ctx.client_train_df``; non-members from
-        ``ctx.holdout_df``.  This is the recommended mode for MIA per the
-        reference guide (§15.3.2).
+        ``ctx.holdout_df``.  This is the recommended mode for MIA.
         """
-
         if not isinstance(ctx, CentralizedEvalContext):
             log_debug(
                 "MIANearestNeighborAttackEvaluator",
@@ -453,7 +448,6 @@ class AIASupervisedAttackEvaluator(Evaluator):
         Returns an ``_AIAResult`` with accuracy/auc for classification or
         rmse for regression (NaN for inapplicable metrics).
         """
-
         result = _AIAResult()
 
         qi = set(test_df.columns) - {sensitive_column}

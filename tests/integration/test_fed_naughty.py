@@ -1,5 +1,4 @@
-"""
-Integration tests for FedNaughty — exhaustive scenario/point/exception matrix.
+"""Integration tests for FedNaughty — exhaustive scenario/point/exception matrix.
 
 These tests are intentionally excluded from the standard pytest suite because
 they run the full federated pipeline and are time-consuming.

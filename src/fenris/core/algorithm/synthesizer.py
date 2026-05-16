@@ -122,6 +122,13 @@ class Synthesizer(Component):
     SUPPORTED_COORDINATORS: ClassVar[set[str]]
 
     def __init_subclass__(cls, **kwargs: Any) -> None:
+        """Wrap ``sample`` in subclasses to validate the returned DataFrame.
+
+        Raises
+        ------
+        TypeError
+            If ``SUPPORTED_COORDINATORS`` is not declared.
+        """
         super().__init_subclass__(**kwargs)
         if "SUPPORTED_COORDINATORS" not in cls.__dict__:
             raise TypeError(
@@ -166,6 +173,13 @@ class Synthesizer(Component):
         setattr(cls, "sample", wrapper)
 
     def __repr__(self) -> str:
+        """Return ``<ClassName>`` string representation.
+
+        Returns
+        -------
+        str
+            ``<ClassName>`` where *ClassName* is the concrete subclass name.
+        """
         return f"<{self.__class__.__name__}>"
 
     @property

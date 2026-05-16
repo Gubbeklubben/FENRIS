@@ -1,4 +1,4 @@
-"""Collect hardware and software metadata for metrics.json (spec §23.3)."""
+"""Collect hardware and software metadata for metrics.json."""
 
 from __future__ import annotations
 
@@ -9,7 +9,7 @@ from importlib.metadata import version as _pkg_version
 
 
 def collect_platform_info() -> dict[str, str | int | None]:
-    """Return hardware/software metadata required by spec §23.3 Table 27.
+    """Return hardware/software metadata.
 
     Every field is best-effort: unsupported platforms produce ``None``
     rather than raising.  No external dependencies are required.

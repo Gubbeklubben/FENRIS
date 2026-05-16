@@ -7,8 +7,8 @@ obvious, so no deep statistical expertise is required to verify correctness.
 Where the formula allows an exact analytic result (e.g. Wasserstein shift of
 1, TV = 0.5, Frobenius = 2√2) the expected value is derived in the docstring.
 
-Note on the NaN contract (Code Structure Guide §7.1.2)
-------------------------------------------------------
+Note on the NaN contract
+------------------------
 Evaluators emit ``float("nan")`` for inapplicable metrics rather than
 omitting the key.  Tests assert that inapplicable metrics are ``nan`` and
 that the full expected key set is always present.
@@ -79,7 +79,7 @@ class TestMomentReduction:
         assert result["std_abs_diff"] == pytest.approx(0.0, abs=1e-9)
 
     def test_no_numeric_columns_emits_nan_keys(self):
-        """No numeric columns → both keys present but nan (NaN contract §7.1.2)."""
+        """No numeric columns → both keys present but nan."""
         ctx = make_ctx(CATEGORICAL_DF, CATEGORICAL_DF.copy())
         result = self.evaluator.global_evaluate(ctx)
 
@@ -134,7 +134,7 @@ class TestDistributionSimilarity:
         assert result["ks_mean"] > 0.99
 
     def test_no_numeric_columns_emits_nan_keys(self):
-        """No numeric columns → all keys present but nan (NaN contract §7.1.2)."""
+        """No numeric columns → all keys present but nan."""
         ctx = make_ctx(CATEGORICAL_DF, CATEGORICAL_DF.copy())
         result = self.evaluator.global_evaluate(ctx)
 
@@ -181,7 +181,9 @@ class TestCategoricalTvMean:
         assert result["categorical_tv_mean"] == pytest.approx(1.0, abs=1e-9)
 
     def test_half_overlap(self):
-        """
+        """Synthetic data covers only one of two equally likely categories,
+        giving TV = 0.5.
+
         real = [A, A, B, B]  → P(A)=0.5, P(B)=0.5
         syn  = [A, A, A, A]  → P(A)=1.0, P(B)=0.0
         TV = 0.5 * (|0.5-1.0| + |0.5-0.0|) = 0.5
@@ -195,7 +197,7 @@ class TestCategoricalTvMean:
         assert result["categorical_tv_mean"] == pytest.approx(0.5, abs=1e-9)
 
     def test_no_categorical_columns_emits_nan_key(self):
-        """No categorical columns → key present but nan (NaN contract §7.1.2)."""
+        """No categorical columns → key present but nan."""
         ctx = make_ctx(NUMERIC_DF, NUMERIC_DF.copy())
         result = self.evaluator.global_evaluate(ctx)
 
@@ -230,7 +232,7 @@ class TestCorrFroDiff:
         assert result["corr_fro_diff"] == pytest.approx(0.0, abs=1e-9)
 
     def test_fewer_than_two_columns_emits_nan_key(self):
-        """Single numeric column → key present but nan (NaN contract §7.1.2)."""
+        """Single numeric column → key present but nan."""
         real = pd.DataFrame({"x": [1.0, 2.0, 3.0]})
         syn = pd.DataFrame({"x": [4.0, 5.0, 6.0]})
         ctx = make_ctx(real, syn)
@@ -239,7 +241,9 @@ class TestCorrFroDiff:
         assert math.isnan(result["corr_fro_diff"])
 
     def test_perfect_positive_vs_negative_correlation(self):
-        """
+        """Frobenius norm of correlation diff between perfectly positive and negative
+        correlations.
+
         real: b = a  → corr = [[1, 1], [1, 1]]
         syn:  b = -a → corr = [[1, -1], [-1, 1]]
         diff = [[0, 2], [2, 0]]
@@ -255,15 +259,14 @@ class TestCorrFroDiff:
         assert result["corr_fro_diff"] == pytest.approx(expected, abs=1e-6)
 
     def test_only_categorical_emits_nan_key(self):
-        """No numeric columns → key present but nan (NaN contract §7.1.2)."""
+        """No numeric columns → key present but nan."""
         ctx = make_ctx(CATEGORICAL_DF, CATEGORICAL_DF.copy())
         result = self.evaluator.global_evaluate(ctx)
 
         assert math.isnan(result["corr_fro_diff"])
 
     def test_constant_column_in_syn_emits_nan_not_zero(self):
-        """
-        Two numeric columns where one is constant in syn but not in real.
+        """Two numeric columns where one is constant in syn but not in real.
 
         With the old implementation, safe_corr filtered each DataFrame
         independently.  The constant column survived in the real correlation

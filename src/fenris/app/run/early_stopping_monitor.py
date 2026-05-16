@@ -25,7 +25,6 @@ class EarlyStoppingMonitor:
 
     def should_run(self, current_round: int, num_rounds: int) -> bool:
         """True if this round should compute the stopping metric."""
-
         # Check if early stopping is enabled
         if not self._config.early_stop:
             return False

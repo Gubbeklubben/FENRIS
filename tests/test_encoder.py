@@ -98,7 +98,7 @@ class TestRoundTrip:
         assert roundtrip(payload) == payload
 
     def test_nested_dict_of_dataclasses(self):
-        """dict[str, dict[str, dataclass]]"""
+        """dict[str, dict[str, dataclass]]."""
         payload = {
             "sensitive_col": {
                 "group_0": _Inner(a=5, b=40),
@@ -130,7 +130,8 @@ class TestPassThrough:
 
     def test_locally_defined_dataclass_decodes_to_dict(self):
         """A locally-defined dataclass is not reachable as a module attribute
-        on the decoding side, so decode falls back to a plain dict."""
+        on the decoding side, so decode falls back to a plain dict.
+        """
 
         @dataclass
         class _Local:

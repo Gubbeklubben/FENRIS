@@ -65,7 +65,8 @@ class Cond:
     category within that column to condition the generator on. This ensures
     the generator learns all categories, especially rare ones.
 
-    Attributes:
+    Attributes
+    ----------
         model: Category values per categorical column
         interval: Start position and size for each categorical column
         n_col: Number of categorical columns

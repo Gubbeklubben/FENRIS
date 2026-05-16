@@ -1,5 +1,4 @@
-"""
-Fairness evaluators.
+"""Fairness evaluators.
 
 Measures whether the synthetic data preserves the fairness properties of
 the real training data. Fairness is assessed via a TSTR-style binary

@@ -19,8 +19,7 @@ def timestep_embedding(
     dim_out: int,
     max_period: int = 10000,
 ) -> Tensor:
-    """
-    Create sinusoidal timestep embeddings.
+    """Create sinusoidal timestep embeddings.
     :param timesteps: a 1-D Tensor of N indices, one per batch element.
                       These may be fractional.
     :param dim_out: the dimension of the output.
@@ -41,7 +40,7 @@ def timestep_embedding(
 
 
 class MLP(nn.Module):  # type: ignore[misc]
-    """Base FeedForward Network"""
+    """Base FeedForward Network."""
 
     def __init__(
         self,
@@ -96,8 +95,7 @@ class MLPSynthesizer(nn.Module):  # type: ignore[misc]
         embedding_learned: bool = True,
         n_classes: int | None = None,
     ) -> None:
-        """
-        Constructor for initializing the synthesizer
+        """Constructor for initializing the synthesizer.
 
         Args:
             d_in (int): dimensionality of the input data
@@ -150,23 +148,24 @@ class MLPSynthesizer(nn.Module):  # type: ignore[misc]
         self.head = nn.Linear(hidden_layers[-1], d_in)
 
     def get_embeddings(self) -> Tensor:
-        """Extract embedding vectors
+        """Extract embedding vectors.
 
-        Returns:
+        Returns
+        -------
             tensor: embedding vectors
         """
         return self.embedding.weight.data
 
     def embed_categorical(self, x_cat: Tensor) -> Tensor:
-        """Perform embedding mapping for categorical attributes
+        """Perform embedding mapping for categorical attributes.
 
         Args:
             x_cat (tensor): categorical tokens
 
-        Returns:
+        Returns
+        -------
             tensor: embeddings
         """
-
         # perform embedding mapping and then reshape
         x_cat_emb = self.embedding(x_cat)
         x_cat_emb = x_cat_emb.view(-1, x_cat_emb.shape[1] * x_cat_emb.shape[2])

@@ -7,15 +7,15 @@ The evaluator implements a TSTR-style fairness audit:
        ``demographic_parity_diff.{col}``, ``equalized_odds_diff.{col}``,
        ``equal_opportunity_diff.{col}``
 
-Note on the NaN contract (Code Structure Guide §7.1.2)
-------------------------------------------------------
+Note on the NaN contract
+------------------------
 Evaluators emit ``float("nan")`` when a metric is not applicable, rather
 than omitting the key.  Guard-path tests assert the full nan key set is
 returned; metric-path tests assert values are either finite or nan (never ±inf).
 
 Fallback behavior
 ------------------
-If prerequistes fail **before** any sensitive column is processed, the
+If prerequisites fail **before** any sensitive column is processed, the
 evaluator returns the generic three-key nan result:
     ``{"demographic_parity_diff": nan, "equalized_odds_diff": nan,
        "equal_opportunity_diff": nan}``
@@ -61,7 +61,7 @@ def _biased_df(n_per_group: int = 80) -> pd.DataFrame:
     causing a large ``demographic_parity_diff`` (close to 1.0) because
     group 0 receives almost all positive predictions.
 
-    ``n_per_group`` must be ≥ 30 so that both groups exceed the evaluator’s
+    ``n_per_group`` must be ≥ 30 so that both groups exceed the evaluator's
     ``min_group_size`` threshold and are included in the metric computation.
     """
     rng = np.random.default_rng(0)
@@ -241,7 +241,7 @@ class TestFairnessMetrics:
         assert dp > 0.3, f"expected large bias, got dp_diff={dp:.4f}"
 
     def test_values_are_finite_or_nan(self):
-        """No ±infinity values emitted for valid inputs (NaN contract §7.1.2)."""
+        """No ±infinity values emitted for valid inputs."""
         df = _biased_df()
         ctx = make_ctx(
             df,

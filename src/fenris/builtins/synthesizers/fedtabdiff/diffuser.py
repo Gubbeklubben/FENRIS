@@ -1,5 +1,4 @@
-"""
-FedTabDiff Diffuser.
+"""FedTabDiff Diffuser.
 
 From https://github.com/sattarov/FedTabDiff/blob/main/BaseDiffuser.py.
 """
@@ -62,7 +61,8 @@ class Diffuser:
             n (int): number of timesteps
             generator (torch.Generator): local generator for reproducibility
 
-        Returns:
+        Returns
+        -------
             Tensor: Sampled timesteps
         """
         t = torch.randint(
@@ -85,7 +85,8 @@ class Diffuser:
             timesteps (Tensor): list of timesteps
             generator (torch.Generator): local generator for reproducibility
 
-        Returns:
+        Returns
+        -------
             tuple[Tensor, Tensor]
         """
         # numeric attributes
@@ -104,8 +105,7 @@ class Diffuser:
         timesteps: Tensor,
         generator: torch.Generator,
     ) -> Tensor:
-        """
-        Sampling or denoising step.
+        """Sampling or denoising step.
 
         Args:
             model_out: trained model used for noise removal
@@ -113,7 +113,8 @@ class Diffuser:
             timesteps (Tensor): timesteps
             generator (torch.Generator): local generator for reproducibility
 
-        Returns:
+        Returns
+        -------
             Tensor: denoised tensor
         """
         sqrt_alpha_t = torch.sqrt(self.alphas[timesteps])[:, None]

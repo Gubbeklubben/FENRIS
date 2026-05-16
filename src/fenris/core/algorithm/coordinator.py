@@ -31,6 +31,13 @@ class Coordinator(Component):
     """
 
     def __repr__(self) -> str:
+        """Return ``<ClassName>`` string representation.
+
+        Returns
+        -------
+        str
+            ``<ClassName>`` where *ClassName* is the concrete subclass name.
+        """
         return f"<{self.__class__.__name__}>"
 
     @property
@@ -141,5 +148,12 @@ class SingleStepCoordinator(Coordinator):
         Iterable[tuple[int, Payload]],
         None,
     ]:
+        """Run a single configure -> aggregate training step.
+
+        Yields
+        ------
+        Iterable[tuple[int, `fenris.core.payload.Payload`]]
+            The requests produced by :meth:`configure_train`.
+        """
         replies = yield self.configure_train(client_ids)
         self.aggregate_train(replies)

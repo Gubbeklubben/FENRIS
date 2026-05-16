@@ -70,7 +70,6 @@ def extend(
     ] = False,
 ) -> None:
     """Add new components to an existing plugin project."""
-
     packages = [plugin.stem.lower()]
     if not no_group:
         packages.append(group.value)
