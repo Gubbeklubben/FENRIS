@@ -1,9 +1,12 @@
+from __future__ import annotations
+
 import functools
 from collections import defaultdict
 from collections.abc import Callable, Iterable
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
-from pandas import DataFrame
+if TYPE_CHECKING:
+    from pandas import DataFrame
 
 from fenris.app.plugins import Registry, plugins
 from fenris.core.algorithm import Coordinator, Synthesizer

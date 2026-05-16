@@ -1,4 +1,9 @@
-import pandas as pd
+from __future__ import annotations
+
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    import pandas as pd
 
 from fenris.core.data.partitioner import Partitioner
 from fenris.core.data.schemas import TableSchema
@@ -68,4 +73,6 @@ class PartitionedDataset:
 
     def load_all_train_data(self) -> pd.DataFrame:
         partitions = [self.load_train_partition(i) for i in range(self.num_partitions)]
-        return pd.concat(partitions, ignore_index=True)
+        import pandas as _pd
+
+        return _pd.concat(partitions, ignore_index=True)

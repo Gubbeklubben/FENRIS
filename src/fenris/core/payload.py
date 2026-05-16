@@ -4,9 +4,9 @@ from dataclasses import dataclass, field
 from enum import StrEnum
 from typing import TYPE_CHECKING, Any
 
-from numpy.typing import NDArray
+if TYPE_CHECKING:
+    from numpy.typing import NDArray
 
-# Avoid importing torch at runtime
 if TYPE_CHECKING:
     import torch
 
@@ -58,7 +58,6 @@ class Payload:
     The only currently available federation backend built on
     flwr simulation will serialize the contents of the objects field
     using pickle and otherwise delegate to flwr to do numpy serialization.
-
     """
 
     arrays: dict[str, Arrays] = field(default_factory=dict)

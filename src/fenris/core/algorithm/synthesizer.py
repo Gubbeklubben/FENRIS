@@ -14,12 +14,15 @@ SampleContext
     Context passed to `Synthesizer.sample`.
 """
 
+from __future__ import annotations
+
 import functools
 from abc import abstractmethod
 from dataclasses import dataclass
-from typing import Any, ClassVar
+from typing import TYPE_CHECKING, Any, ClassVar
 
-from pandas import DataFrame
+if TYPE_CHECKING:
+    from pandas import DataFrame
 
 from fenris.core.component import Component
 from fenris.core.data import TableSchema
@@ -138,6 +141,8 @@ class Synthesizer(Component):
         if "sample" not in cls.__dict__:
             return
         original = cls.__dict__["sample"]
+
+        from pandas import DataFrame
 
         @functools.wraps(original)
         def wrapper(
