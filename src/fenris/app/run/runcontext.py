@@ -1,9 +1,10 @@
 from __future__ import annotations
 
 from collections.abc import Callable, Iterable, Mapping
-from typing import Any, cast, overload
+from typing import TYPE_CHECKING, Any, cast, overload
 
-from pandas import DataFrame
+if TYPE_CHECKING:
+    from pandas import DataFrame
 
 from fenris.app.run.eventbus import EventBus
 from fenris.app.run.partitioned_dataset import PartitionedDataset
@@ -64,18 +65,18 @@ class _RunCtxField[T]:
 
 
 class RunContext:
-    df_loader = _RunCtxField[Callable[[], DataFrame]]()
-    synthesizer = _RunCtxField[Synthesizer]()
-    coordinator = _RunCtxField[Coordinator]()
-    partitioner = _RunCtxField[Partitioner]()
-    eval_suite = _RunCtxField[EvaluationSuite]()
-    dataset = _RunCtxField[PartitionedDataset]()
-    global_init_artifacts = _RunCtxField[GlobalInitArtifacts]()
-    train_artifacts = _RunCtxField[Payload]()
-    per_client_metrics = _RunCtxField[Mapping[int, Mapping[str, Any]]]()
-    aggregated_metrics = _RunCtxField[Mapping[str, float]]()
-    centralized_metrics = _RunCtxField[Mapping[str, float]]()
-    synthetic_df = _RunCtxField[DataFrame]()
+    df_loader: _RunCtxField[Callable[[], DataFrame]] = _RunCtxField()
+    synthesizer: _RunCtxField[Synthesizer] = _RunCtxField()
+    coordinator: _RunCtxField[Coordinator] = _RunCtxField()
+    partitioner: _RunCtxField[Partitioner] = _RunCtxField()
+    eval_suite: _RunCtxField[EvaluationSuite] = _RunCtxField()
+    dataset: _RunCtxField[PartitionedDataset] = _RunCtxField()
+    global_init_artifacts: _RunCtxField[GlobalInitArtifacts] = _RunCtxField()
+    train_artifacts: _RunCtxField[Payload] = _RunCtxField()
+    per_client_metrics: _RunCtxField[Mapping[int, Mapping[str, Any]]] = _RunCtxField()
+    aggregated_metrics: _RunCtxField[Mapping[str, float]] = _RunCtxField()
+    centralized_metrics: _RunCtxField[Mapping[str, float]] = _RunCtxField()
+    synthetic_df: _RunCtxField[DataFrame] = _RunCtxField()
 
     def __init__(
         self,

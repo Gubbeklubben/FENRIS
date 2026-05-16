@@ -1,7 +1,11 @@
+from __future__ import annotations
+
 from abc import ABC
 from dataclasses import dataclass
+from typing import TYPE_CHECKING
 
-import pandas as pd
+if TYPE_CHECKING:
+    import pandas as pd
 
 from fenris.core.data.schemas import TableSchema
 

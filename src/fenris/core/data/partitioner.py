@@ -1,7 +1,10 @@
-from abc import abstractmethod
-from typing import Literal
+from __future__ import annotations
 
-from pandas import DataFrame
+from abc import abstractmethod
+from typing import TYPE_CHECKING, Literal
+
+if TYPE_CHECKING:
+    from pandas import DataFrame
 
 from fenris.core.component import Component
 

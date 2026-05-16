@@ -3,9 +3,10 @@ from __future__ import annotations
 import json
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Literal
+from typing import TYPE_CHECKING, Literal
 
-import pandas as pd
+if TYPE_CHECKING:
+    import pandas as pd
 
 Kind = Literal["continuous", "categorical", "binary", "integer"]
 
@@ -183,6 +184,8 @@ def infer_schema(df: pd.DataFrame) -> TableSchema:
     -------
     TableSchema
     """
+    import pandas as _pd
+
     columns: list[ColumnSchema] = []
 
     for name, col in df.items():
@@ -194,9 +197,9 @@ def infer_schema(df: pd.DataFrame) -> TableSchema:
             kind = "binary"
         elif col.nunique(dropna=True) <= 10:  # TODO allow override via CLI
             kind = "categorical"
-        elif pd.api.types.is_integer_dtype(dtype):
+        elif _pd.api.types.is_integer_dtype(dtype):
             kind = "integer"
-        elif pd.api.types.is_float_dtype(dtype):
+        elif _pd.api.types.is_float_dtype(dtype):
             kind = "continuous"
         else:
             kind = "categorical"

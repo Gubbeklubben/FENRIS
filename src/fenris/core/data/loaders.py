@@ -1,7 +1,10 @@
-from pathlib import Path
+from __future__ import annotations
 
-import pandas as pd
-from pandas import DataFrame
+from pathlib import Path
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from pandas import DataFrame
 
 
 def load_csv(file_path: str | Path) -> DataFrame:
@@ -16,4 +19,6 @@ def load_csv(file_path: str | Path) -> DataFrame:
     -------
     pandas.DataFrame
     """
+    import pandas as pd
+
     return pd.read_csv(str(file_path))
