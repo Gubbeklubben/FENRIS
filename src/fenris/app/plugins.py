@@ -5,7 +5,6 @@ import inspect
 from collections.abc import Iterable, Mapping
 from dataclasses import dataclass, fields
 from importlib.metadata import entry_points
-from types import MappingProxyType
 from typing import Iterator
 
 from fenris.core.algorithm import Coordinator, Synthesizer
@@ -120,11 +119,11 @@ class _Plugins:
     synthesizers: Group[Synthesizer] = Group("synthesizers", Synthesizer)  # type: ignore[type-abstract]
     coordinators: Group[Coordinator] = Group("coordinators", Coordinator)  # type: ignore[type-abstract]
     partitioners: Group[Partitioner] = Group("partitioners", Partitioner)  # type: ignore[type-abstract]
-    evaluators: Group[Evaluator] = Group[Evaluator]("evaluators", Evaluator)  # type: ignore[type-abstract]
+    evaluators: Group[Evaluator] = Group("evaluators", Evaluator)  # type: ignore[type-abstract]
 
     @property
     def groups(self) -> Mapping[str, Group[Component]]:
-        return MappingProxyType({f.name: getattr(self, f.name) for f in fields(self)})
+        return {f.name: getattr(self, f.name) for f in fields(self)}
 
 
 plugins = _Plugins()
