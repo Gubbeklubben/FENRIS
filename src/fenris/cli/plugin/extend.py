@@ -10,7 +10,7 @@ import typer
 from tomlkit import TOMLDocument
 from tomlkit.items import Table
 
-from fenris.app.registry import Group
+from fenris.app.plugins import Group, plugins
 from fenris.cli.plugin._util import validate_identifier
 from fenris.core.component import Component
 
@@ -32,9 +32,11 @@ def extend(
         ),
     ],
     group: Annotated[
-        Group,
+        str,
         typer.Argument(
+            metavar=f"{'|'.join(plugins.groups.keys())}",
             help="The group to extend.",
+            callback=_validate_group,
             is_eager=True,  # _validate_base needs group to have been parsed
         ),
     ],
@@ -65,14 +67,14 @@ def extend(
         typer.Option(
             "--no-group",
             help="Pass this flag if the default behaviour of grouping components by "
-            "entry point is not desirable.",
+            "entry point group is not desirable.",
         ),
     ] = False,
 ) -> None:
-    """Add new components to an existing plugin project."""
+    """Add components to an existing plugin project."""
     packages = [plugin.stem.lower()]
     if not no_group:
-        packages.append(group.value)
+        packages.append(group)
     if package is not None:
         packages.extend(package.split("."))
 
@@ -81,9 +83,9 @@ def extend(
         toml = tomlkit.load(f)
 
     root_pkg = plugin.joinpath("src").joinpath(packages[0])
-    cls = _get_class(group, base)
+    cls = _get_class(plugins.groups[group], base)
     try:
-        entry_point = _ensure_entry_point(group, toml)
+        entry_point = _ensure_entry_point(plugins.groups[group], toml)
     except TypeError as exc:
         typer.echo(f"Error in {py_proj}: {str(exc)}", file=sys.stderr)
         raise typer.Abort()
@@ -110,7 +112,7 @@ def extend(
         tomlkit.dump(toml, f)
 
 
-def _ensure_entry_point(group: Group, toml: TOMLDocument) -> Table:
+def _ensure_entry_point(group: Group[Component], toml: TOMLDocument) -> Table:
     project = toml["project"]
     if not isinstance(project, Table):
         raise TypeError(f"{project} is not a toml Table.")
@@ -125,10 +127,10 @@ def _ensure_entry_point(group: Group, toml: TOMLDocument) -> Table:
         raise TypeError(f"{entry_points} is not a toml Table.")
 
     try:
-        entry_point = entry_points[group.entry_point]
+        entry_point = entry_points[group.entry_point_group]
     except KeyError:
         entry_point = tomlkit.table()
-        entry_points[group.entry_point] = entry_point
+        entry_points[group.entry_point_group] = entry_point
 
     if not isinstance(entry_point, Table):
         raise TypeError(f"{entry_point} is not a toml Table.")
@@ -146,6 +148,12 @@ def _validate_plugin(plugin: Path) -> Path:
             f"{pkg_root} does not exist or is not a python package."
         )
     return plugin
+
+
+def _validate_group(group: str) -> str:
+    if group not in plugins.groups:
+        raise typer.BadParameter(f"'{group}' is not a valid group.")
+    return group
 
 
 def _validate_and_normalize_names(names: list[str]) -> set[str]:
@@ -168,11 +176,11 @@ def _validate_base(base: str | None, ctx: typer.Context) -> str | None:
     if base is None:
         return None
 
-    group = Group(cast(str, ctx.params.get("group")))  # type: ignore[call-arg]
-    for cls in group.bases:
+    group = cast(str, ctx.params.get("group"))
+    for cls in plugins.groups[group].bases:
         if cls.__name__ == base:
             return base
-    raise typer.BadParameter(f"Invalid base {base} for group {group.value}.")
+    raise typer.BadParameter(f"Invalid base '{base}' for group {group}.")
 
 
 def _descend_and_create_as_needed(path: Path, packages: Sequence[str]) -> Path:
@@ -191,7 +199,7 @@ def _descend_and_create_as_needed(path: Path, packages: Sequence[str]) -> Path:
     return _descend_and_create_as_needed(curr, packages[1:])
 
 
-def _get_class(group: Group, base: str | None) -> type[Component]:
+def _get_class(group: Group[Component], base: str | None) -> type[Component]:
     if base is None:
         return group.base
 
@@ -200,7 +208,7 @@ def _get_class(group: Group, base: str | None) -> type[Component]:
             return cls
 
     raise RuntimeError(
-        f"Invalid base {base} for group {group.value}. Please validate base"
+        f"Invalid base {base} for group {group.name}. Please validate base"
         f"arg before calling _get_class."
     ) from None
 

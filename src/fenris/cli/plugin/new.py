@@ -28,7 +28,7 @@ def new(
     """Create a new plugin project.
 
     A plugin project can supply any number of components to any available
-    entry point.
+    entry point group.
     """
     parent = parent_dir if parent_dir is not None else Path.cwd()
     parent = parent.resolve()

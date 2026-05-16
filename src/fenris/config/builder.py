@@ -2,10 +2,10 @@ import csv
 import inspect
 from dataclasses import fields
 from pathlib import Path
-from typing import Any, Callable, TypeVar
+from typing import Any, Callable
 
 from fenris.app.factory import create_evaluation_suite
-from fenris.app.registry import Group, Registry
+from fenris.app.plugins import Registry, plugins
 from fenris.config.config import (
     Config,
     ConfigCls,
@@ -20,14 +20,12 @@ from fenris.core.data import Partitioner
 from fenris.core.eval import Category
 from fenris.core.eval.evaluator import EvaluationMode
 
-ComponentT = TypeVar("ComponentT", bound=Component)
-
 
 def build_config(
     cli_input: dict[str, Any],
-    synthesizer_registry: Registry | None = None,
-    coordinator_registry: Registry | None = None,
-    partitioner_registry: Registry | None = None,
+    synthesizer_registry: Registry[Synthesizer] | None = None,
+    coordinator_registry: Registry[Coordinator] | None = None,
+    partitioner_registry: Registry[Partitioner] | None = None,
 ) -> Config:
 
     # Remove seed from cli_input so it doesn't become part of the cfg dict.
@@ -48,9 +46,9 @@ def build_config(
     resolve_run_categories(metrics_cfg)
     validate_stop_metrics(metrics_cfg, data_cfg)
 
-    synthesizer_registry = synthesizer_registry or Group.SYNTHESIZERS.get_registry()
-    coordinator_registry = coordinator_registry or Group.COORDINATORS.get_registry()
-    partitioner_registry = partitioner_registry or Group.PARTITIONERS.get_registry()
+    synthesizer_registry = synthesizer_registry or plugins.synthesizers.registry
+    coordinator_registry = coordinator_registry or plugins.coordinators.registry
+    partitioner_registry = partitioner_registry or plugins.partitioners.registry
 
     validate_synthesizer(synthesizer_registry, cfg)
     validate_coordinator(coordinator_registry, cfg)
@@ -169,7 +167,7 @@ def validate_stop_metrics(
         metrics_cfg["stop_mode"] = metric.default_stop_mode
 
 
-def validate_synthesizer(registry: Registry, cfg: dict[str, Any]) -> None:
+def validate_synthesizer(registry: Registry[Synthesizer], cfg: dict[str, Any]) -> None:
 
     def callback(factory: type[Synthesizer]) -> None:
         if cfg["coordinator"] not in factory.SUPPORTED_COORDINATORS:
@@ -187,12 +185,15 @@ def validate_synthesizer(registry: Registry, cfg: dict[str, Any]) -> None:
     validate_component(Synthesizer, registry, cfg, callback)  # type: ignore[type-abstract]
 
 
-def validate_coordinator(registry: Registry, cfg: dict[str, Any]) -> None:
+def validate_coordinator(registry: Registry[Coordinator], cfg: dict[str, Any]) -> None:
     validate_component(Coordinator, registry, cfg)  # type: ignore[type-abstract]
 
 
 def validate_partitioner(
-    registry: Registry, cfg: dict[str, Any], data_cfg: dict[str, Any], seed: SeedConfig
+    registry: Registry[Partitioner],
+    cfg: dict[str, Any],
+    data_cfg: dict[str, Any],
+    seed: SeedConfig,
 ) -> None:
 
     def callback(factory: type[Partitioner]) -> None:
@@ -201,9 +202,9 @@ def validate_partitioner(
     validate_component(Partitioner, registry, data_cfg, callback)  # type: ignore[type-abstract]
 
 
-def validate_component(
+def validate_component[ComponentT: Component](
     component_type: type[ComponentT],
-    registry: Registry,
+    registry: Registry[ComponentT],
     cfg: dict[str, Any],
     preprocess_callback: Callable[[type[ComponentT]], None] | None = None,
 ) -> None:

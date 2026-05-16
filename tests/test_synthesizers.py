@@ -15,8 +15,8 @@ Run a single synthesizer (e.g. fedtabdiff):
 import pandas as pd
 import pytest
 
-from fenris.app.registry import Group
-from fenris.core.algorithm import GlobalInitContext, TrainContext
+from fenris.app.plugins import plugins
+from fenris.core.algorithm import GlobalInitContext, Synthesizer, TrainContext
 from fenris.core.data.schemas import ColumnSchema, TableSchema
 
 # Kwargs that reduce compute so the tests stay fast. Synthesizers not listed
@@ -29,12 +29,12 @@ _FAST_KWARGS: dict[str, dict] = {
 
 
 def _synthesizer_names() -> list[str]:
-    return list(Group.SYNTHESIZERS.get_registry())
+    return list(plugins.synthesizers.registry)
 
 
-def _make_instance(name: str):
-    factory = Group.SYNTHESIZERS.get_registry().load(name)
-    return factory(**_FAST_KWARGS.get(name, {}))
+def _make_instance(name: str) -> Synthesizer:
+    cls = plugins.synthesizers.registry.load(name)
+    return cls(**_FAST_KWARGS.get(name, {}))
 
 
 def _run_global_init_and_train(synth, df: pd.DataFrame, schema: TableSchema) -> None:

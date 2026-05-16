@@ -1,3 +1,4 @@
+from abc import ABC, abstractmethod
 from types import SimpleNamespace
 from typing import Generator, Iterable, Literal
 
@@ -74,7 +75,91 @@ class FakePartitioner(Partitioner):
         return NotImplemented
 
 
-def mock_entry_points(group: str) -> list[SimpleNamespace]:
+class NotASynthesizer:
+    SUPPORTED_COORDINATORS = {"fake_coordinator"}
+
+    @property
+    def arrays_target(self) -> ArraysTarget:
+        return ArraysTarget.NUMPY
+
+    def global_init(
+        self, df: DataFrame, context: GlobalInitContext
+    ) -> GlobalInitArtifacts:
+        pass
+
+    def train(self, request: Payload, df: DataFrame, context: TrainContext) -> Payload:
+        pass
+
+    def sample(self, request: Payload, context: SampleContext) -> DataFrame:
+        pass
+
+
+def not_a_synth_entry_points(group: str) -> list[SimpleNamespace]:
+    return [
+        SimpleNamespace(
+            name="not_a_synthesizer",
+            group="fenris.synthesizers",
+            value="fake:NotASynthesizer",
+            module="fake",
+            attr="NotASynthesizer",
+            dist=SimpleNamespace(name="", version=""),
+            load=lambda: NotASynthesizer,
+        )
+    ]
+
+
+class AbstractSynthesizer(Synthesizer, ABC):
+    SUPPORTED_COORDINATORS = {"fake_coordinator"}
+
+    @property
+    def arrays_target(self) -> ArraysTarget:
+        return ArraysTarget.NUMPY
+
+    def global_init(
+        self, df: DataFrame, context: GlobalInitContext
+    ) -> GlobalInitArtifacts:
+        pass
+
+    def train(self, request: Payload, df: DataFrame, context: TrainContext) -> Payload:
+        pass
+
+    def sample(self, request: Payload, context: SampleContext) -> DataFrame:
+        pass
+
+    @abstractmethod
+    def abstract(self) -> None:
+        pass
+
+
+def abstract_synth_entry_points(group: str) -> list[SimpleNamespace]:
+    return [
+        SimpleNamespace(
+            name="abstract_synthesizer",
+            group="fenris.synthesizers",
+            value="fake:AbstractSynthesizer",
+            module="fake",
+            attr="AbstractSynthesizer",
+            dist=SimpleNamespace(name="", version=""),
+            load=lambda: AbstractSynthesizer,
+        )
+    ]
+
+
+def not_a_class_entry_points(group: str) -> list[SimpleNamespace]:
+    return [
+        SimpleNamespace(
+            name="not_a_class",
+            group="fenris.synthesizers",
+            value="fake:NOT_A_CLASS",
+            module="fake",
+            attr="NOT_A_CLASS",
+            dist=SimpleNamespace(name="", version=""),
+            load=lambda: object(),
+        )
+    ]
+
+
+def sane_entry_points(group: str) -> list[SimpleNamespace]:
     match group:
         case "fenris.synthesizers":
             ep = SimpleNamespace(

@@ -63,9 +63,9 @@ def test_syntax_valid(generated_code_for_base):
 def test_can_scaffold_relevant():
     # If scaffolding were to crash for some component ABC,
     # this test should reveal it.
-    from fenris.app.registry import Group
+    from fenris.app.plugins import plugins
 
-    for group in Group:
+    for group in plugins.groups.values():
         for base in group.bases:
             create_component_scaffold(base, "Test")
 
