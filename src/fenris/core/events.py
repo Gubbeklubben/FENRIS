@@ -174,7 +174,7 @@ class ServerRequest(Event):
     msg_type : str
         Type label of the message.
     byte_count : int
-        Serialised size of the request payload in bytes.
+        Serialized size of the request payload in bytes.
     """
 
     client_id: int
@@ -193,7 +193,7 @@ class ClientReply(Event):
     msg_type : str
         Type label of the message.
     byte_count : int
-        Serialised size of the reply payload in bytes.
+        Serialized size of the reply payload in bytes.
     """
 
     client_id: int

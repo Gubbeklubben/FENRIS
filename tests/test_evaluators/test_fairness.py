@@ -15,7 +15,7 @@ returned; metric-path tests assert values are either finite or nan (never ±inf)
 
 Fallback behavior
 ------------------
-If prerequistes fail **before** any sensitive column is processed, the
+If prerequisites fail **before** any sensitive column is processed, the
 evaluator returns the generic three-key nan result:
     ``{"demographic_parity_diff": nan, "equalized_odds_diff": nan,
        "equal_opportunity_diff": nan}``
