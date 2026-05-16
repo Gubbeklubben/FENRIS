@@ -19,7 +19,7 @@ from tests.test_scaffold.components.override_cls_var import (
 from tests.test_scaffold.components.with_mixin import WithMixin
 
 NAME = "fed_up"
-CLASS_NAME = "".join((w.capitalize() for w in NAME.split("_")))
+CLASS_NAME = "".join(w.capitalize() for w in NAME.split("_"))
 
 
 def generate_code(cls: type[Component]) -> str:

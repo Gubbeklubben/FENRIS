@@ -57,7 +57,7 @@ class MLP(nn.Module):  # type: ignore[misc]
         activation: str = "lrelu",
     ) -> None:
 
-        super(MLP, self).__init__()
+        super().__init__()
         # init encoder architecture
         self.layers = self.init_layers(hidden_size)
         if activation == "lrelu":
@@ -131,7 +131,7 @@ class MLPSynthesizer(nn.Module):  # type: ignore[misc]
             Total number of classes, if conditional
             sampling is required. Defaults to None.
         """
-        super(MLPSynthesizer, self).__init__()
+        super().__init__()
         self.dim_t = dim_t
         self.mlp = MLP([dim_t, *hidden_layers], activation=activation)
         if embedding is not None:

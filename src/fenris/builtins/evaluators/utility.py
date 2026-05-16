@@ -5,7 +5,8 @@ using a Train-on-Synthetic / Test-on-Real (TSTR) approach with
 logistic regression (classification) or ridge regression (regression).
 """
 
-from typing import ClassVar, Iterable, Mapping
+from collections.abc import Iterable, Mapping
+from typing import ClassVar
 
 import numpy as np
 import pandas as pd

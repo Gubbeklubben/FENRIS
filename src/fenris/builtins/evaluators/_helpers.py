@@ -7,7 +7,8 @@ privacy, fairness, scalability) but are not part of the public evaluator API.
 from __future__ import annotations
 
 import math
-from typing import TYPE_CHECKING, Iterable, Mapping
+from collections.abc import Iterable, Mapping
+from typing import TYPE_CHECKING
 
 import numpy as np
 import pandas as pd

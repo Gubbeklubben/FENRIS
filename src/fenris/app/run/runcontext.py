@@ -1,7 +1,7 @@
 from __future__ import annotations
 
-from collections.abc import Callable, Iterable
-from typing import Any, Mapping, cast, overload
+from collections.abc import Callable, Iterable, Mapping
+from typing import Any, cast, overload
 
 from pandas import DataFrame
 

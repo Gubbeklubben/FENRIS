@@ -25,7 +25,7 @@ class Discriminator(nn.Module):  # type: ignore[misc]
     def __init__(
         self, input_dim: int, dis_dims: tuple[int, int] = (256, 256), pack: int = 10
     ):
-        super(Discriminator, self).__init__()
+        super().__init__()
         self.pack = pack
         self.packdim = input_dim * pack
 

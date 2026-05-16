@@ -1,5 +1,5 @@
 import math
-from typing import Callable
+from collections.abc import Callable
 
 from fenris.config import MetricsConfig
 from fenris.core.logger import log_debug, log_error, log_info

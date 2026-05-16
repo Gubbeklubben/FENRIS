@@ -1,8 +1,9 @@
 import csv
 import inspect
+from collections.abc import Callable
 from dataclasses import fields
 from pathlib import Path
-from typing import Any, Callable
+from typing import Any
 
 from fenris.app.factory import create_evaluation_suite
 from fenris.app.plugins import Registry, plugins

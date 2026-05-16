@@ -4,7 +4,7 @@ from fenris.core.data.schemas import ColumnSchema, TableSchema
 
 __all__ = [
     "ColumnSchema",
-    "TableSchema",
     "Partitioner",
+    "TableSchema",
     "load_csv",
 ]

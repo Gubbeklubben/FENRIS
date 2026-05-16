@@ -1,6 +1,7 @@
 from abc import ABC, abstractmethod
+from collections.abc import Generator, Iterable
 from types import SimpleNamespace
-from typing import Generator, Iterable, Literal
+from typing import Literal
 
 from pandas import DataFrame
 

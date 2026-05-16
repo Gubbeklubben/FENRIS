@@ -1,6 +1,7 @@
 import inspect
+from collections.abc import Callable, Mapping
 from types import UnionType
-from typing import Any, Callable, Literal, Mapping, Union, get_args, get_origin
+from typing import Any, Literal, Union, get_args, get_origin
 
 
 def parse_kwargs(value: str) -> dict[str, str]:

@@ -8,10 +8,10 @@ from fenris.core.eval.evaluator import Category, Evaluator, EvaluatorSpec
 
 __all__ = [
     "Category",
-    "Evaluator",
-    "EvaluationSuite",
-    "EvaluatorSpec",
-    "LocalEvalContext",
-    "GlobalEvalContext",
     "CentralizedEvalContext",
+    "EvaluationSuite",
+    "Evaluator",
+    "EvaluatorSpec",
+    "GlobalEvalContext",
+    "LocalEvalContext",
 ]

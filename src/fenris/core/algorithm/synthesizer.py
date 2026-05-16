@@ -146,24 +146,24 @@ class Synthesizer(Component):
             synthetic_df = original(self, request, context)
             if not isinstance(synthetic_df, DataFrame):
                 raise TypeError(
-                    f"{str(self)}.sample() must return a DataFrame "
+                    f"{self!s}.sample() must return a DataFrame "
                     f"(got {type(synthetic_df)})."
                 )
             if synthetic_df.empty:
                 raise ValueError(
-                    f"DataFrame returned from {str(self)}.sample() is empty. "
+                    f"DataFrame returned from {self!s}.sample() is empty. "
                     f"Expected {context.num_rows} synthetic rows."
                 )
             if len(synthetic_df) != context.num_rows:
                 raise ValueError(
-                    f"DataFrame returned from {str(self)}.sample() has "
+                    f"DataFrame returned from {self!s}.sample() has "
                     f"an incorrect number of synthetic rows. "
                     f"Expected: {context.num_rows}. Actual: {len(synthetic_df)}."
                 )
             schema_columns = {col.name for col in context.schema.columns}
             if schema_columns != set(synthetic_df.columns):
                 raise ValueError(
-                    f"DataFrame returned from {str(self)}.sample() "
+                    f"DataFrame returned from {self!s}.sample() "
                     f"does not match schema."
                     f"\nSchema columns: {sorted(schema_columns)}"
                     f"\nDataFrame columns: {sorted(synthetic_df.columns)}"
