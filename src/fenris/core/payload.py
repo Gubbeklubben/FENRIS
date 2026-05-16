@@ -42,12 +42,6 @@ class Payload:
     Each field is a named dict so callers can store multiple independent
     datasets or parameter groups under distinct keys.
 
-    Notes
-    -----
-    The only currently available federation backend built on
-    flwr simulation will serialize the contents of the objects field
-    using pickle and otherwise delegate to flwr to do numpy serialization.
-
     Attributes
     ----------
     arrays : dict[str, Arrays]
@@ -58,6 +52,12 @@ class Payload:
         Named metric dictionaries containing scalar or list numeric values.
     extras : dict[str, Extras]
         Named dictionaries for primitive scalar or list values.
+
+    Notes
+    -----
+    The only currently available federation backend built on
+    flwr simulation will serialize the contents of the objects field
+    using pickle and otherwise delegate to flwr to do numpy serialization.
     """
 
     arrays: dict[str, Arrays] = field(default_factory=dict)
