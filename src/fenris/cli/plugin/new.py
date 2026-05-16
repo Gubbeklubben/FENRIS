@@ -9,6 +9,7 @@ import tomlkit
 import typer
 from tomlkit.toml_document import TOMLDocument
 
+from fenris import ROOT_PACKAGE
 from fenris.cli.plugin._util import validate_identifier
 
 app = typer.Typer()
@@ -59,7 +60,7 @@ def _create_toml(project_name: str) -> TOMLDocument:
     project.add("authors", tomlkit.array())
     project.add("license", "MIT")
     project.add(tomlkit.nl())
-    dist = distribution(__name__.split(".")[0])
+    dist = distribution(ROOT_PACKAGE)
     deps = tomlkit.array()
     deps.append(f"{dist.name} (>={dist.version},<={dist.version})")
     project.add("dependencies", deps)

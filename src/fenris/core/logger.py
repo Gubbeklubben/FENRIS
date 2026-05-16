@@ -7,6 +7,8 @@ from collections.abc import Callable
 from pprint import pformat
 from typing import Any, ParamSpec, TypeVar
 
+from fenris import ROOT_PACKAGE
+
 TEE = "\u251c\u2500\u2500"
 ELBOW = "\u2514\u2500\u2500"
 
@@ -20,8 +22,7 @@ LOG_COLORS = {
     "RESET": "\033[0m",  # Reset to default
 }
 
-LOGGER_NAME = "FENRIS"
-logger = logging.getLogger(LOGGER_NAME)
+logger = logging.getLogger(ROOT_PACKAGE)
 logger.setLevel(logging.DEBUG)
 
 
