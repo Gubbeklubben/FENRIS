@@ -88,34 +88,28 @@ def mixed_schema() -> TableSchema:
 
 @pytest.fixture
 def cat_only_df() -> pd.DataFrame:
-    return pd.DataFrame(
-        {
-            "sex": ["M", "F", "M", "F", "M", "M", "F", "M", "F", "M"],
-            "status": ["a", "b", "c", "a", "b", "c", "a", "b", "c", "a"],
-        }
-    )
+    return pd.DataFrame({
+        "sex": ["M", "F", "M", "F", "M", "M", "F", "M", "F", "M"],
+        "status": ["a", "b", "c", "a", "b", "c", "a", "b", "c", "a"],
+    })
 
 
 @pytest.fixture
 def num_only_df() -> pd.DataFrame:
-    return pd.DataFrame(
-        {
-            "age": [25, 30, 45, 50, 60, 35, 40, 55, 28, 33],
-            "weight": [70.0, 80.0, 65.0, 90.0, 75.0, 85.0, 60.0, 95.0, 72.0, 68.0],
-        }
-    )
+    return pd.DataFrame({
+        "age": [25, 30, 45, 50, 60, 35, 40, 55, 28, 33],
+        "weight": [70.0, 80.0, 65.0, 90.0, 75.0, 85.0, 60.0, 95.0, 72.0, 68.0],
+    })
 
 
 @pytest.fixture
 def mixed_df() -> pd.DataFrame:
-    return pd.DataFrame(
-        {
-            "age": [25, 30, 45, 50, 60, 35, 40, 55, 28, 33],
-            "weight": [70.0, 80.0, 65.0, 90.0, 75.0, 85.0, 60.0, 95.0, 72.0, 68.0],
-            "sex": ["M", "F", "M", "F", "M", "M", "F", "M", "F", "M"],
-            "status": ["a", "b", "c", "a", "b", "c", "a", "b", "c", "a"],
-        }
-    )
+    return pd.DataFrame({
+        "age": [25, 30, 45, 50, 60, 35, 40, 55, 28, 33],
+        "weight": [70.0, 80.0, 65.0, 90.0, 75.0, 85.0, 60.0, 95.0, 72.0, 68.0],
+        "sex": ["M", "F", "M", "F", "M", "M", "F", "M", "F", "M"],
+        "status": ["a", "b", "c", "a", "b", "c", "a", "b", "c", "a"],
+    })
 
 
 # ── Tests ─────────────────────────────────────────────────────────────────────

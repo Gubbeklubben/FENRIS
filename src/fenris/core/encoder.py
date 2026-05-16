@@ -62,11 +62,9 @@ class FenrisEncoder(json.JSONEncoder):
             module = importlib.import_module(obj["__module__"])
             cls = getattr(module, obj["__dataclass__"], None)
             if cls is not None:
-                return cls(
-                    **{
-                        k: v
-                        for k, v in obj.items()
-                        if k not in ("__dataclass__", "__module__")
-                    }
-                )
+                return cls(**{
+                    k: v
+                    for k, v in obj.items()
+                    if k not in ("__dataclass__", "__module__")
+                })
         return obj

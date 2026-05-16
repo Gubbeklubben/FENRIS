@@ -3,7 +3,7 @@ from __future__ import annotations
 import json
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Literal, Tuple
+from typing import Literal
 
 import pandas as pd
 
@@ -46,7 +46,7 @@ class TableSchema:
 
     schema_format: str = FENRIS_SCHEMA_FORMAT_IDENTIFIER
     schema_format_version: str = FENRIS_SCHEMA_FORMAT_VERSION
-    columns: Tuple[ColumnSchema, ...] = field(default_factory=tuple)
+    columns: tuple[ColumnSchema, ...] = field(default_factory=tuple)
 
     def lookup(self, name: str) -> ColumnSchema:
         """Return the `ColumnSchema` for *name*.

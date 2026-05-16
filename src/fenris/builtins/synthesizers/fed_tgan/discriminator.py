@@ -25,7 +25,7 @@ class Discriminator(nn.Module):  # type: ignore[misc]
     def __init__(
         self, input_dim: int, dis_dims: tuple[int, int] = (256, 256), pack: int = 10
     ):
-        super(Discriminator, self).__init__()
+        super().__init__()
         self.pack = pack
         self.packdim = input_dim * pack
 
@@ -33,13 +33,11 @@ class Discriminator(nn.Module):  # type: ignore[misc]
         layers = []
         dim = self.packdim
         for hidden_dim in dis_dims:
-            layers.extend(
-                [
-                    nn.Linear(dim, hidden_dim),
-                    nn.LeakyReLU(0.2),
-                    nn.Dropout(0.5),
-                ]
-            )
+            layers.extend([
+                nn.Linear(dim, hidden_dim),
+                nn.LeakyReLU(0.2),
+                nn.Dropout(0.5),
+            ])
             dim = hidden_dim
 
         # Final output layer

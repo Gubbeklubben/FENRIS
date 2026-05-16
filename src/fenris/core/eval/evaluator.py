@@ -1,9 +1,10 @@
 import math
 import re
 from abc import abstractmethod
+from collections.abc import Iterable
 from dataclasses import dataclass
 from enum import Flag, StrEnum, auto
-from typing import Any, ClassVar, Iterable, Literal
+from typing import Any, ClassVar, Literal
 
 from fenris.core.component import Component
 from fenris.core.eval.evalcontext import GlobalEvalContext, LocalEvalContext

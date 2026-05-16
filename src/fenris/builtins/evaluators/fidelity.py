@@ -31,8 +31,9 @@ Federated aggregation notes
 from __future__ import annotations
 
 import math
+from collections.abc import Iterable, Mapping
 from dataclasses import dataclass
-from typing import ClassVar, Iterable, Mapping
+from typing import ClassVar
 
 import numpy as np
 import pandas as pd

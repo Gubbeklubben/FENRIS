@@ -18,7 +18,7 @@ class Residual(nn.Module):  # type: ignore[misc]
     """
 
     def __init__(self, input_dim: int, output_dim: int):
-        super(Residual, self).__init__()
+        super().__init__()
         self.fc = nn.Linear(input_dim, output_dim)
         self.bn = nn.BatchNorm1d(output_dim)
         self.relu = nn.ReLU()
@@ -46,7 +46,7 @@ class Generator(nn.Module):  # type: ignore[misc]
         gen_dims : tuple[int, int]
             Hidden dimensions for residual blocks (default: (256, 256))
         """
-        super(Generator, self).__init__()
+        super().__init__()
 
         # Build sequence of residual blocks
         layers = []

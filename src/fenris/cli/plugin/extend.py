@@ -87,7 +87,7 @@ def extend(
     try:
         entry_point = _ensure_entry_point(plugins.groups[group], toml)
     except TypeError as exc:
-        typer.echo(f"Error in {py_proj}: {str(exc)}", file=sys.stderr)
+        typer.echo(f"Error in {py_proj}: {exc!s}", file=sys.stderr)
         raise typer.Abort()
 
     # Triggers some relatively heavy libcst imports. Importing here

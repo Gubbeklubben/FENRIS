@@ -1,5 +1,6 @@
+from collections.abc import Iterable, Iterator
 from dataclasses import dataclass
-from typing import Iterable, Iterator, Literal, Self, cast
+from typing import Literal, Self, cast
 
 import numpy as np
 import pandas as pd

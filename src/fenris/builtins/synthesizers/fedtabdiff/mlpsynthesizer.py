@@ -20,11 +20,20 @@ def timestep_embedding(
     max_period: int = 10000,
 ) -> Tensor:
     """Create sinusoidal timestep embeddings.
-    :param timesteps: a 1-D Tensor of N indices, one per batch element.
-                      These may be fractional.
-    :param dim_out: the dimension of the output.
-    :param max_period: controls the minimum frequency of the embeddings.
-    :return: an [N x dim] Tensor of positional embeddings.
+
+    Parameters
+    ----------
+    timesteps : Tensor
+        A 1-D Tensor of N indices, one per batch element. May be fractional.
+    dim_out : int
+        Dimension of the output.
+    max_period : int
+        Controls the minimum frequency of the embeddings.
+
+    Returns
+    -------
+    Tensor
+        An [N x dim_out] Tensor of positional embeddings.
     """
     half = dim_out // 2
     freqs = torch.exp(
@@ -48,7 +57,7 @@ class MLP(nn.Module):  # type: ignore[misc]
         activation: str = "lrelu",
     ) -> None:
 
-        super(MLP, self).__init__()
+        super().__init__()
         # init encoder architecture
         self.layers = self.init_layers(hidden_size)
         if activation == "lrelu":
@@ -97,22 +106,32 @@ class MLPSynthesizer(nn.Module):  # type: ignore[misc]
     ) -> None:
         """Constructor for initializing the synthesizer.
 
-        Args:
-            d_in (int): dimensionality of the input data
-            n_cat_tokens (int, optional): Number of total categorical tokens.
-            n_cat_emb (int, optional): Dim of categorical embeddings.
-            hidden_layers (list): list of the neurons in every hidden layer
-            activation (str, optional): activation function. Defaults to 'lrelu'.
-            dim_t (int, optional): Dimensionality of the intermediate layer for
-                connecting embeddings. Defaults to 64.
-            embedding (tensor, optional): Provide if learned embeddings are given.
-                Defaults to None.
-            embedding_learned (bool, optional): Flag whether embeddings need to be
-                learned. Defaults to True.
-            n_classes (int, optional): Total number of classes, if conditional
-                sampling is required. Defaults to None.
+        Parameters
+        ----------
+        d_in : int
+            Dimensionality of the input data.
+        n_cat_tokens : int
+            Number of total categorical tokens.
+        n_cat_emb : int
+            Dim of categorical embeddings.
+        hidden_layers : list
+            List of the neurons in every hidden layer.
+        activation : str, optional
+            Activation function.
+        dim_t : int, optional
+            Dimensionality of the intermediate layer for
+            connecting embeddings. Defaults to 64.
+        embedding : tensor, optional
+            Provide if learned embeddings are given.
+            Defaults to None.
+        embedding_learned : bool, optional
+            Flag whether embeddings need to be
+            learned. Defaults to True.
+        n_classes : int, optional
+            Total number of classes, if conditional
+            sampling is required. Defaults to None.
         """
-        super(MLPSynthesizer, self).__init__()
+        super().__init__()
         self.dim_t = dim_t
         self.mlp = MLP([dim_t, *hidden_layers], activation=activation)
         if embedding is not None:
@@ -152,19 +171,23 @@ class MLPSynthesizer(nn.Module):  # type: ignore[misc]
 
         Returns
         -------
-            tensor: embedding vectors
+        Tensor
+            Embedding weight vectors.
         """
         return self.embedding.weight.data
 
     def embed_categorical(self, x_cat: Tensor) -> Tensor:
         """Perform embedding mapping for categorical attributes.
 
-        Args:
-            x_cat (tensor): categorical tokens
+        Parameters
+        ----------
+        x_cat : Tensor
+            categorical tokens
 
         Returns
         -------
-            tensor: embeddings
+        Tensor
+            Embedded categorical tokens.
         """
         # perform embedding mapping and then reshape
         x_cat_emb = self.embedding(x_cat)

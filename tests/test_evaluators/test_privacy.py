@@ -76,13 +76,11 @@ class TestDirectOverlap:
     def test_no_overlap(self):
         """Completely different synthetic data → 0 % match."""
         rng = np.random.default_rng(999)
-        syn = pd.DataFrame(
-            {
-                "age": rng.normal(200, 1, len(NUMERIC_DF)),
-                "income": rng.normal(999_999, 1, len(NUMERIC_DF)),
-                "score": rng.uniform(100, 200, len(NUMERIC_DF)),
-            }
-        )
+        syn = pd.DataFrame({
+            "age": rng.normal(200, 1, len(NUMERIC_DF)),
+            "income": rng.normal(999_999, 1, len(NUMERIC_DF)),
+            "score": rng.uniform(100, 200, len(NUMERIC_DF)),
+        })
         ctx = make_local_ctx(NUMERIC_DF, syn)
         result = self.evaluator.aggregate([self.evaluator.local_evaluate(ctx)])
 
@@ -93,13 +91,11 @@ class TestDirectOverlap:
         """First half from train, second half random → ~50 % match."""
         half = len(NUMERIC_DF) // 2
         rng = np.random.default_rng(123)
-        random_half = pd.DataFrame(
-            {
-                "age": rng.normal(200, 1, half),
-                "income": rng.normal(999_999, 1, half),
-                "score": rng.uniform(100, 200, half),
-            }
-        )
+        random_half = pd.DataFrame({
+            "age": rng.normal(200, 1, half),
+            "income": rng.normal(999_999, 1, half),
+            "score": rng.uniform(100, 200, half),
+        })
         syn = pd.concat(
             [NUMERIC_DF.iloc[:half].reset_index(drop=True), random_half],
             ignore_index=True,
@@ -139,18 +135,14 @@ class TestMIA:
 
     def _make_disjoint_datasets(self, rng, n=200):
         """Create train and test with different distributions."""
-        train = pd.DataFrame(
-            {
-                "x": rng.normal(0, 1, n),
-                "y": rng.normal(0, 1, n),
-            }
-        )
-        test = pd.DataFrame(
-            {
-                "x": rng.normal(10, 1, n),
-                "y": rng.normal(10, 1, n),
-            }
-        )
+        train = pd.DataFrame({
+            "x": rng.normal(0, 1, n),
+            "y": rng.normal(0, 1, n),
+        })
+        test = pd.DataFrame({
+            "x": rng.normal(10, 1, n),
+            "y": rng.normal(10, 1, n),
+        })
         return train, test
 
     def test_memorized_syn_high_auc(self):
@@ -328,12 +320,10 @@ class TestAIA:
         labels = ["A"] * n_per_class + ["B"] * n_per_class + ["C"] * n_per_class
         rng = np.random.default_rng(3)
         n = len(labels)
-        df = pd.DataFrame(
-            {
-                "x": rng.standard_normal(n),
-                "sensitive": labels,
-            }
-        )
+        df = pd.DataFrame({
+            "x": rng.standard_normal(n),
+            "sensitive": labels,
+        })
         schema = make_schema(("x", "continuous"), ("sensitive", "categorical"))
 
         ctx = make_ctx(
@@ -448,22 +438,18 @@ class TestAIACollapse:
         sensitive attribute and 'age'/'hours' as numeric quasi-identifiers.
         """
         rng = np.random.default_rng(seed)
-        syn = pd.DataFrame(
-            {
-                "age": rng.integers(20, 65, n_syn).astype(float),
-                "hours": rng.integers(20, 60, n_syn).astype(float),
-                "income": ["low"] * (n_syn // 2) + ["high"] * (n_syn - n_syn // 2),
-                "target": rng.integers(0, 2, n_syn),
-            }
-        )
-        test = pd.DataFrame(
-            {
-                "age": rng.integers(20, 65, n_test).astype(float),
-                "hours": rng.integers(20, 60, n_test).astype(float),
-                "income": ["low"] * (n_test // 2) + ["high"] * (n_test - n_test // 2),
-                "target": rng.integers(0, 2, n_test),
-            }
-        )
+        syn = pd.DataFrame({
+            "age": rng.integers(20, 65, n_syn).astype(float),
+            "hours": rng.integers(20, 60, n_syn).astype(float),
+            "income": ["low"] * (n_syn // 2) + ["high"] * (n_syn - n_syn // 2),
+            "target": rng.integers(0, 2, n_syn),
+        })
+        test = pd.DataFrame({
+            "age": rng.integers(20, 65, n_test).astype(float),
+            "hours": rng.integers(20, 60, n_test).astype(float),
+            "income": ["low"] * (n_test // 2) + ["high"] * (n_test - n_test // 2),
+            "target": rng.integers(0, 2, n_test),
+        })
         return syn, test
 
     @staticmethod
@@ -476,22 +462,18 @@ class TestAIACollapse:
         (simulating a fully-collapsed generator).
         """
         rng = np.random.default_rng(seed)
-        syn = pd.DataFrame(
-            {
-                "age": rng.integers(20, 65, n_syn).astype(float),
-                "hours": rng.integers(20, 60, n_syn).astype(float),
-                "income": ["low"] * n_syn,
-                "target": rng.integers(0, 2, n_syn),
-            }
-        )
-        test = pd.DataFrame(
-            {
-                "age": rng.integers(20, 65, n_test).astype(float),
-                "hours": rng.integers(20, 60, n_test).astype(float),
-                "income": ["low"] * (n_test // 2) + ["high"] * (n_test - n_test // 2),
-                "target": rng.integers(0, 2, n_test),
-            }
-        )
+        syn = pd.DataFrame({
+            "age": rng.integers(20, 65, n_syn).astype(float),
+            "hours": rng.integers(20, 60, n_syn).astype(float),
+            "income": ["low"] * n_syn,
+            "target": rng.integers(0, 2, n_syn),
+        })
+        test = pd.DataFrame({
+            "age": rng.integers(20, 65, n_test).astype(float),
+            "hours": rng.integers(20, 60, n_test).astype(float),
+            "income": ["low"] * (n_test // 2) + ["high"] * (n_test - n_test // 2),
+            "target": rng.integers(0, 2, n_test),
+        })
         return syn, test
 
     # ------------------------------------------------------------------
@@ -536,20 +518,16 @@ class TestAIACollapse:
         Exercises the same ValueError path in the multiclass branch.
         """
         n = 90
-        syn_df = pd.DataFrame(
-            {
-                "x": np.ones(n),
-                "group": ["A"] * n,  # collapsed: only class A
-                "target": [0] * n,
-            }
-        )
-        test_df = pd.DataFrame(
-            {
-                "x": np.arange(n, dtype=float),
-                "group": ["A"] * 30 + ["B"] * 30 + ["C"] * 30,
-                "target": [0] * n,
-            }
-        )
+        syn_df = pd.DataFrame({
+            "x": np.ones(n),
+            "group": ["A"] * n,  # collapsed: only class A
+            "target": [0] * n,
+        })
+        test_df = pd.DataFrame({
+            "x": np.arange(n, dtype=float),
+            "group": ["A"] * 30 + ["B"] * 30 + ["C"] * 30,
+            "target": [0] * n,
+        })
         schema = make_schema(
             ("x", "continuous"),
             ("group", "categorical"),
@@ -581,20 +559,16 @@ class TestAIACollapse:
         the collapse fix (i.e., the try/except does not suppress valid fits).
         """
         n = 100
-        syn_df = pd.DataFrame(
-            {
-                "age": [20.0] * (n // 2) + [60.0] * (n - n // 2),
-                "income": ["low"] * (n // 2) + ["high"] * (n - n // 2),
-                "target": [0] * n,
-            }
-        )
-        test_df = pd.DataFrame(
-            {
-                "age": [20.0] * (n // 2) + [60.0] * (n - n // 2),
-                "income": ["low"] * (n // 2) + ["high"] * (n - n // 2),
-                "target": [0] * n,
-            }
-        )
+        syn_df = pd.DataFrame({
+            "age": [20.0] * (n // 2) + [60.0] * (n - n // 2),
+            "income": ["low"] * (n // 2) + ["high"] * (n - n // 2),
+            "target": [0] * n,
+        })
+        test_df = pd.DataFrame({
+            "age": [20.0] * (n // 2) + [60.0] * (n - n // 2),
+            "income": ["low"] * (n // 2) + ["high"] * (n - n // 2),
+            "target": [0] * n,
+        })
         schema = make_schema(
             ("age", "continuous"),
             ("income", "binary"),
@@ -626,13 +600,11 @@ class TestAIACollapse:
         """
         rng = np.random.default_rng(7)
         n = 200
-        df = pd.DataFrame(
-            {
-                "noise": rng.standard_normal(n),
-                "income": ["low"] * (n // 2) + ["high"] * (n - n // 2),
-                "target": [0] * n,
-            }
-        )
+        df = pd.DataFrame({
+            "noise": rng.standard_normal(n),
+            "income": ["low"] * (n // 2) + ["high"] * (n - n // 2),
+            "target": [0] * n,
+        })
         schema = make_schema(
             ("noise", "continuous"),
             ("income", "binary"),

@@ -57,13 +57,17 @@ class Diffuser:
     def sample_timesteps(self, n: int, generator: torch.Generator) -> Tensor:
         """Sample random timesteps.
 
-        Args:
-            n (int): number of timesteps
-            generator (torch.Generator): local generator for reproducibility
+        Parameters
+        ----------
+        n : int
+            Number of timesteps.
+        generator : torch.Generator
+            Local generator for reproducibility.
 
         Returns
         -------
-            Tensor: Sampled timesteps
+        Tensor
+            Sampled timesteps.
         """
         t = torch.randint(
             low=1,
@@ -80,14 +84,19 @@ class Diffuser:
         """Add gaussian noise to the input data given a specific timestep
         value.
 
-        Args:
-            x_num (Tensor): input data tensor
-            timesteps (Tensor): list of timesteps
-            generator (torch.Generator): local generator for reproducibility
+        Parameters
+        ----------
+        x_num : Tensor
+            Input data tensor.
+        timesteps : Tensor
+            List of timesteps.
+        generator : torch.Generator
+            Local generator for reproducibility.
 
         Returns
         -------
-            tuple[Tensor, Tensor]
+        tuple[Tensor, Tensor]
+            Noisy input tensor and the noise that was added.
         """
         # numeric attributes
         sqrt_alpha_hat = torch.sqrt(self.alphas_hat[timesteps])[:, None]
@@ -107,15 +116,21 @@ class Diffuser:
     ) -> Tensor:
         """Sampling or denoising step.
 
-        Args:
-            model_out: trained model used for noise removal
-            z_norm (Tensor): initial data tensor
-            timesteps (Tensor): timesteps
-            generator (torch.Generator): local generator for reproducibility
+        Parameters
+        ----------
+        model_out : Any
+            Trained model used for noise removal.
+        z_norm : Tensor
+            Initial data tensor.
+        timesteps : Tensor
+            Timesteps.
+        generator : torch.Generator
+            Local generator for reproducibility.
 
         Returns
         -------
-            Tensor: denoised tensor
+        Tensor
+            Denoised tensor.
         """
         sqrt_alpha_t = torch.sqrt(self.alphas[timesteps])[:, None]
         betas_t = self.betas[timesteps][:, None]

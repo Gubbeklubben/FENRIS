@@ -9,10 +9,10 @@ from fenris.core.algorithm.synthesizer import (
 
 __all__ = [
     "Coordinator",
+    "GlobalInitArtifacts",
+    "GlobalInitContext",
+    "SampleContext",
     "SingleStepCoordinator",
     "Synthesizer",
-    "GlobalInitContext",
-    "GlobalInitArtifacts",
     "TrainContext",
-    "SampleContext",
 ]

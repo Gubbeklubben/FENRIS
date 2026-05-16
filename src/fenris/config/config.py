@@ -14,7 +14,7 @@ class DataConfig:
     dataset: str
     schema: str
     partitioner: str
-    partitioner_kwargs: dict[str, None | bool | str | float | int] = field(
+    partitioner_kwargs: dict[str, bool | str | float | int | None] = field(
         default_factory=dict
     )
     target_col: str | None = None
@@ -103,11 +103,11 @@ class Config:
     data: DataConfig
     synthesizer_kwargs: dict[
         str,
-        None | bool | str | float | int,
+        bool | str | float | int | None,
     ] = field(default_factory=dict)
     coordinator_kwargs: dict[
         str,
-        None | bool | str | float | int,
+        bool | str | float | int | None,
     ] = field(default_factory=dict)
     num_clients: int = 3
     num_rounds: int = 3

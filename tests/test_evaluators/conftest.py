@@ -151,20 +151,16 @@ def make_centralized_ctx(
 _RNG = np.random.default_rng(0)
 N = 200
 
-NUMERIC_DF = pd.DataFrame(
-    {
-        "age": _RNG.normal(50, 10, N),
-        "income": _RNG.normal(60_000, 15_000, N),
-        "score": _RNG.uniform(0, 1, N),
-    }
-)
+NUMERIC_DF = pd.DataFrame({
+    "age": _RNG.normal(50, 10, N),
+    "income": _RNG.normal(60_000, 15_000, N),
+    "score": _RNG.uniform(0, 1, N),
+})
 
-CATEGORICAL_DF = pd.DataFrame(
-    {
-        "color": _RNG.choice(["red", "blue", "green"], N),
-        "size": _RNG.choice(["S", "M", "L"], N),
-    }
-)
+CATEGORICAL_DF = pd.DataFrame({
+    "color": _RNG.choice(["red", "blue", "green"], N),
+    "size": _RNG.choice(["S", "M", "L"], N),
+})
 
 MIXED_DF = pd.concat([NUMERIC_DF, CATEGORICAL_DF], axis=1)
 

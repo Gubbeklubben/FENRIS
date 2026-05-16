@@ -5,7 +5,7 @@ from torch import Tensor, nn
 
 class Generator(nn.Module):  # type: ignore[misc]
     def __init__(self, latent_dim: int, output_dim: int):
-        super(Generator, self).__init__()
+        super().__init__()
         self.fc1 = nn.Linear(latent_dim, 128)
         self.fc2 = nn.Linear(128, 64)
         self.fc3 = nn.Linear(

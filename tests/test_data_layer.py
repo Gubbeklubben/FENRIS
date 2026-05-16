@@ -9,27 +9,25 @@ from fenris.core.data.schemas import infer_schema
 
 @pytest.fixture
 def sample_df():
-    return pd.DataFrame(
-        {
-            "id": [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12],
-            "age": [25.0, 30.0, 45.0, 50.0, 1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 99.0],
-            "label": [0, 1, 1, 0, 1, 0, 1, 0, 1, 0, 1, 0],
-            "cat": [
-                "car",
-                "truck",
-                "car",
-                "bike",
-                "car",
-                "truck",
-                "car",
-                "bike",
-                "car",
-                "truck",
-                "car",
-                "airplane",
-            ],
-        }
-    )
+    return pd.DataFrame({
+        "id": [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12],
+        "age": [25.0, 30.0, 45.0, 50.0, 1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 99.0],
+        "label": [0, 1, 1, 0, 1, 0, 1, 0, 1, 0, 1, 0],
+        "cat": [
+            "car",
+            "truck",
+            "car",
+            "bike",
+            "car",
+            "truck",
+            "car",
+            "bike",
+            "car",
+            "truck",
+            "car",
+            "airplane",
+        ],
+    })
 
 
 def test_load_csv_and_schema(sample_df, tmp_path):

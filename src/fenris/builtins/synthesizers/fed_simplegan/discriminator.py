@@ -5,7 +5,7 @@ from torch import Tensor, nn
 
 class Discriminator(nn.Module):  # type: ignore[misc]
     def __init__(self, input_dim: int):
-        super(Discriminator, self).__init__()
+        super().__init__()
         self.fc1 = nn.Linear(input_dim, 128)
         self.fc2 = nn.Linear(128, 64)
         self.fc3 = nn.Linear(64, 1)  # Output probability

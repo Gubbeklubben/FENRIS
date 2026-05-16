@@ -12,8 +12,9 @@ resolve
 import heapq
 import sys
 from collections import defaultdict
+from collections.abc import Iterable
 from enum import IntEnum
-from typing import Iterable, Self, cast
+from typing import Self, cast
 
 import libcst as cst
 from libcst import MetadataWrapper

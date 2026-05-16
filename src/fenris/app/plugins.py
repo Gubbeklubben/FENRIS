@@ -2,10 +2,9 @@ from __future__ import annotations
 
 import importlib.metadata
 import inspect
-from collections.abc import Iterable, Mapping
+from collections.abc import Iterable, Iterator, Mapping
 from dataclasses import dataclass, fields
 from importlib.metadata import entry_points
-from typing import Iterator
 
 from fenris.core.algorithm import Coordinator, Synthesizer
 from fenris.core.component import Component, Metadata
