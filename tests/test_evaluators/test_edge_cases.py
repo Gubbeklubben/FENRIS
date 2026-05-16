@@ -119,12 +119,10 @@ class TestEdgeCases:
         where every value is NaN (e.g. after coercion).  The evaluator should
         still return a valid dict with float values.
         """
-        real = pd.DataFrame(
-            {
-                "good": [1.0, 2.0, 3.0],
-                "bad": [float("nan")] * 3,
-            }
-        )
+        real = pd.DataFrame({
+            "good": [1.0, 2.0, 3.0],
+            "bad": [float("nan")] * 3,
+        })
         syn = real.copy()
         ctx = _make_eval_ctx(evaluator, real, syn)
         result = evaluator.global_evaluate(ctx)

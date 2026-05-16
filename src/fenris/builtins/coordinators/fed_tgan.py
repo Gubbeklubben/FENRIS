@@ -264,9 +264,9 @@ class FedTGAN(SingleStepCoordinator):
             for client_idx in range(n_clients):
                 client_dict = cat_distributions[client_idx][col_name]
                 # Convert client dict to aligned array
-                client_dist: np.ndarray = np.array(
-                    [client_dict.get(cat, 0.0) for cat in all_categories_sorted]
-                )
+                client_dist: np.ndarray = np.array([
+                    client_dict.get(cat, 0.0) for cat in all_categories_sorted
+                ])
                 js_div = distance.jensenshannon(global_dist, client_dist)
                 similarity_matrix[client_idx, col_idx] = js_div
 

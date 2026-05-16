@@ -187,12 +187,10 @@ class TestTSTRRegression:
         """Continuous target → rmse computed; auc and accuracy are nan."""
         rng = np.random.default_rng(0)
         n = 100
-        df = pd.DataFrame(
-            {
-                "x": rng.normal(0, 1, n),
-                "target": rng.normal(0, 1, n),
-            }
-        )
+        df = pd.DataFrame({
+            "x": rng.normal(0, 1, n),
+            "target": rng.normal(0, 1, n),
+        })
         schema = make_schema(("x", "continuous"), ("target", "continuous"))
 
         ctx = make_ctx(df, df.copy(), target_column="target", schema=schema)
@@ -233,9 +231,9 @@ class TestTSTRLabelCoercion:
         synthetic labels are string-encoded floats.
         """
         rows_per_class = 20
-        x_vals = np.concatenate(
-            [rng.normal(i * 10, 0.1, rows_per_class) for i in range(n_classes)]
-        )
+        x_vals = np.concatenate([
+            rng.normal(i * 10, 0.1, rows_per_class) for i in range(n_classes)
+        ])
         y_float = pd.Series(
             np.repeat(np.arange(n_classes, dtype=float), rows_per_class)
         )

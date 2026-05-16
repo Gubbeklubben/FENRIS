@@ -43,9 +43,9 @@ class FedHello(Synthesizer):
                     "extras": {"schema": json.dumps(context.schema, cls=FenrisEncoder)}
                 },
             ),
-            coordinator=GlobalState(
-                [rng.integers(0, 100, (3, 3)) for _ in range(10)]
-            ).encode(),
+            coordinator=GlobalState([
+                rng.integers(0, 100, (3, 3)) for _ in range(10)
+            ]).encode(),
         )
 
     def train(

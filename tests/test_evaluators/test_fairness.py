@@ -37,13 +37,11 @@ from .conftest import assert_dicts_nan_safe, make_ctx
 # ---------------------------------------------------------------------------
 # Sentinel set for quick key-presence assertions (generic fallback)
 # ---------------------------------------------------------------------------
-GENERIC_NAN_KEYS = frozenset(
-    {
-        "demographic_parity_diff",
-        "equalized_odds_diff",
-        "equal_opportunity_diff",
-    }
-)
+GENERIC_NAN_KEYS = frozenset({
+    "demographic_parity_diff",
+    "equalized_odds_diff",
+    "equal_opportunity_diff",
+})
 
 
 # ---------------------------------------------------------------------------
@@ -65,20 +63,16 @@ def _biased_df(n_per_group: int = 80) -> pd.DataFrame:
     ``min_group_size`` threshold and are included in the metric computation.
     """
     rng = np.random.default_rng(0)
-    group0 = pd.DataFrame(
-        {
-            "feature": rng.normal(3.0, 0.5, n_per_group),
-            "sensitive": 0,
-            "target": 1,
-        }
-    )
-    group1 = pd.DataFrame(
-        {
-            "feature": rng.normal(-3.0, 0.5, n_per_group),
-            "sensitive": 1,
-            "target": 0,
-        }
-    )
+    group0 = pd.DataFrame({
+        "feature": rng.normal(3.0, 0.5, n_per_group),
+        "sensitive": 0,
+        "target": 1,
+    })
+    group1 = pd.DataFrame({
+        "feature": rng.normal(-3.0, 0.5, n_per_group),
+        "sensitive": 1,
+        "target": 0,
+    })
     return pd.concat([group0, group1], ignore_index=True)
 
 
@@ -137,13 +131,11 @@ class TestFairnessPerColumnNan:
 
     def test_non_binary_target_emits_per_column_nan_keys(self):
         """Multi-class target → non-binary check → per-column nan keys emitted."""
-        df = pd.DataFrame(
-            {
-                "feat": [1.0, 2.0, 3.0, 4.0, 5.0],
-                "sens": [0, 0, 1, 1, 0],
-                "target": [0, 1, 2, 3, 4],
-            }
-        )
+        df = pd.DataFrame({
+            "feat": [1.0, 2.0, 3.0, 4.0, 5.0],
+            "sens": [0, 0, 1, 1, 0],
+            "target": [0, 1, 2, 3, 4],
+        })
         ctx = make_ctx(
             df,
             df.copy(),
@@ -160,13 +152,11 @@ class TestFairnessPerColumnNan:
 
     def test_insufficient_group_size_emits_per_column_nan_keys(self):
         """Groups smaller than min_group_size (30) → per-column nan keys."""
-        small = pd.DataFrame(
-            {
-                "feat": [1.0, 2.0, 3.0, 4.0],
-                "sens": [0, 0, 1, 1],
-                "target": [0, 1, 0, 1],
-            }
-        )
+        small = pd.DataFrame({
+            "feat": [1.0, 2.0, 3.0, 4.0],
+            "sens": [0, 0, 1, 1],
+            "target": [0, 1, 0, 1],
+        })
         ctx = make_ctx(
             small,
             small.copy(),

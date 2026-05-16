@@ -92,23 +92,19 @@ class BGMTransformer:
         for col in df.columns:
             if col in categorical_columns:
                 unique_vals = df[col].value_counts().index.tolist()
-                self.meta.append(
-                    {
-                        "name": col,
-                        "type": "categorical",
-                        "size": len(unique_vals),
-                        "i2s": unique_vals,  # index to string mapping
-                    }
-                )
+                self.meta.append({
+                    "name": col,
+                    "type": "categorical",
+                    "size": len(unique_vals),
+                    "i2s": unique_vals,  # index to string mapping
+                })
             elif col in continuous_columns:
-                self.meta.append(
-                    {
-                        "name": col,
-                        "type": "continuous",
-                        "min": float(df[col].min()),
-                        "max": float(df[col].max()),
-                    }
-                )
+                self.meta.append({
+                    "name": col,
+                    "type": "continuous",
+                    "min": float(df[col].min()),
+                    "max": float(df[col].max()),
+                })
             else:
                 raise ValueError(f"Column {col} not in categorical or continuous lists")
 

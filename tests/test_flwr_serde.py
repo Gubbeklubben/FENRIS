@@ -73,12 +73,10 @@ def test_to_flwr_multiple_array_groups(serde, make_random_ndarrays) -> None:
 def test_from_flwr_multiple_array_groups(serde, make_random_ndarrays) -> None:
     orig1 = make_random_ndarrays()
     orig2 = make_random_ndarrays()
-    rdict = RecordDict(
-        {
-            "test-arrays1": ArrayRecord(orig1),
-            "test-arrays2": ArrayRecord(orig2),
-        }
-    )
+    rdict = RecordDict({
+        "test-arrays1": ArrayRecord(orig1),
+        "test-arrays2": ArrayRecord(orig2),
+    })
     update = serde.from_flwr(rdict)
     retrieved1 = update.arrays["test-arrays1"]
     retrieved2 = update.arrays["test-arrays2"]

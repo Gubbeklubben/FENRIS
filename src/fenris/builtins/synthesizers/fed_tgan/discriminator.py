@@ -33,13 +33,11 @@ class Discriminator(nn.Module):  # type: ignore[misc]
         layers = []
         dim = self.packdim
         for hidden_dim in dis_dims:
-            layers.extend(
-                [
-                    nn.Linear(dim, hidden_dim),
-                    nn.LeakyReLU(0.2),
-                    nn.Dropout(0.5),
-                ]
-            )
+            layers.extend([
+                nn.Linear(dim, hidden_dim),
+                nn.LeakyReLU(0.2),
+                nn.Dropout(0.5),
+            ])
             dim = hidden_dim
 
         # Final output layer

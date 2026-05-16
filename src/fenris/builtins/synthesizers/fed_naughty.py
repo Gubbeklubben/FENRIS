@@ -42,30 +42,24 @@ _EXCEPTION_MAP: dict[str, type[Exception]] = {
     "Exception": Exception,
 }
 
-_VALID_SCENARIOS = frozenset(
-    {
-        "crash",
-        "corrupt",
-        "nan_columns",
-        "wrong_type",
-        "empty",
-    }
-)
+_VALID_SCENARIOS = frozenset({
+    "crash",
+    "corrupt",
+    "nan_columns",
+    "wrong_type",
+    "empty",
+})
 
-_VALID_POINTS = frozenset(
-    {
-        "global_init",
-        "synth_train",
-        "synth_sample",
-    }
-)
+_VALID_POINTS = frozenset({
+    "global_init",
+    "synth_train",
+    "synth_sample",
+})
 
-_INVALID_COMBINATIONS = frozenset(
-    {
-        ("nan_columns", "global_init"),
-        ("nan_columns", "synth_train"),
-    }
-)
+_INVALID_COMBINATIONS = frozenset({
+    ("nan_columns", "global_init"),
+    ("nan_columns", "synth_train"),
+})
 
 
 @dataclass(frozen=True)
@@ -239,22 +233,20 @@ class FedNaughty(Synthesizer):
             if scenario == "crash":
                 _do_crash(config, "synth_sample")
             elif scenario == "corrupt":
-                return pd.DataFrame(
-                    {
-                        "WRONG_COL_1": [math.nan] * context.num_rows,
-                        "WRONG_COL_2": [math.inf] * context.num_rows,
-                    }
-                )
+                return pd.DataFrame({
+                    "WRONG_COL_1": [math.nan] * context.num_rows,
+                    "WRONG_COL_2": [math.inf] * context.num_rows,
+                })
             elif scenario == "nan_columns":
-                return pd.DataFrame(
-                    {name: [math.nan] * context.num_rows for name in column_names}
-                )
+                return pd.DataFrame({
+                    name: [math.nan] * context.num_rows for name in column_names
+                })
             elif scenario == "wrong_type":
                 return {"THIS_IS": "NOT_A_DATAFRAME"}  # type: ignore[return-value]
             elif scenario == "empty":
                 return pd.DataFrame()
 
         rng = np.random.default_rng(context.seed)
-        return pd.DataFrame(
-            {name: rng.random(context.num_rows) for name in column_names}
-        )
+        return pd.DataFrame({
+            name: rng.random(context.num_rows) for name in column_names
+        })
