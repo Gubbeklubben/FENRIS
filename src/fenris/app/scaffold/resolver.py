@@ -24,6 +24,7 @@ from libcst.metadata import (
     ScopeProvider,
 )
 
+from fenris import ROOT_PACKAGE
 from fenris.app.scaffold.collector import ClsVar, FunctionDef, TargetData
 
 
@@ -121,7 +122,7 @@ class _Group(IntEnum):
         base = module.split(".")[0]
         if base in sys.stdlib_module_names:
             return cls(1)
-        if base == __name__.split(".")[0]:
+        if base == ROOT_PACKAGE:
             return cls(3)
         return cls(2)
 

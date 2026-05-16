@@ -6,12 +6,11 @@ from collections.abc import Iterable, Iterator, Mapping
 from dataclasses import dataclass, fields
 from importlib.metadata import entry_points
 
+from fenris import ROOT_PACKAGE
 from fenris.core.algorithm import Coordinator, Synthesizer
 from fenris.core.component import Component, Metadata
 from fenris.core.data import Partitioner
 from fenris.core.eval import Evaluator
-
-_ROOT_PKG = __name__.split(".")[0]
 
 
 class Registry[T: Component]:
@@ -82,7 +81,7 @@ class Group[T: Component]:
     def __init__(self, name: str, base: type[T]) -> None:
         self._name = name
         self._base = base
-        self._entry_point_group = f"{_ROOT_PKG}.{self._name}"
+        self._entry_point_group = f"{ROOT_PACKAGE}.{self._name}"
         self._registry: Registry[T] | None = None
 
     @property

@@ -2,6 +2,7 @@ from importlib.metadata import version
 
 import typer
 
+from fenris import ROOT_PACKAGE
 from fenris.cli.generate_schema import app as generate_schema
 from fenris.cli.plugin import app as plugins
 from fenris.cli.run import app as run
@@ -24,7 +25,7 @@ app.add_typer(generate_schema)
 
 def _version_callback(value: bool) -> None:
     if value:
-        typer.echo(version("fenris"))
+        typer.echo(version(ROOT_PACKAGE))
         raise typer.Exit()
 
 
