@@ -1,6 +1,6 @@
 [project]
 name = "fenris"
-version = "0.1.0"
+version = "0.1.0-rc.1"
 description = "An Extensible Benchmarking Framework for Federated Synthetic Tabular Data Generators"
 readme = "README.md"
 authors = [
