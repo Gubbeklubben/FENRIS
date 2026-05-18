@@ -148,7 +148,14 @@ def _resolve_assignments(
             for alias in aliases:
                 push(alias.split(" ")[0], f"import {alias}")
         else:
-            push(from_module, f"from {from_module} import {', '.join(sorted(aliases))}")
+            sorted_aliases = sorted(aliases)
+            stmt = f"from {from_module} import {', '.join(sorted_aliases)}"
+            if len(stmt) >= 80:
+                stmt = (
+                    f"from {from_module} import ("
+                    f"\n    {',\n    '.join(sorted_aliases)},\n)"
+                )
+            push(from_module, stmt)
 
     prev_group = None
     while heap:

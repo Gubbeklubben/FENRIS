@@ -132,12 +132,10 @@ def test_reference_import_asname(generated_code_for_base):
 
 
 def test_reference_local(generated_code_for_base):
-    imp = (
-        f"from {Base.__module__} import Base, SOME_CONSTANT, SomeClass, "
-        f"SomeOtherClass, "
-        f"some_decorator"
-    )
-    assert_in_imports(generated_code_for_base, imp, Base)
+    assert_in_imports(generated_code_for_base, "SOME_CONSTANT", Base)
+    assert_in_imports(generated_code_for_base, "SomeClass", Base)
+    assert_in_imports(generated_code_for_base, "SomeOtherClass", Base)
+    assert_in_imports(generated_code_for_base, "some_decorator", Base)
 
 
 def test_removes_irrelevant_imports(generated_code_for_base):
