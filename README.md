@@ -3,7 +3,7 @@
 [![CI](https://github.com/Gubbeklubben/FENRIS/actions/workflows/ci.yml/badge.svg)](https://github.com/Gubbeklubben/FENRIS/actions/workflows/ci.yml)
 [![PyPI](https://img.shields.io/pypi/v/fenris)](https://pypi.org/project/fenris/)
 [![Python Version](https://img.shields.io/badge/python-3.12%20%7C%203.13-blue.svg)](https://www.python.org/downloads/)
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://github.com/Gubbeklubben/FENRIS/blob/main/LICENSE)
 
 [Example Pipelines](https://github.com/Gubbeklubben/FENRIS/blob/main/EXAMPLES.md) |
 [CLI Reference](https://github.com/Gubbeklubben/FENRIS/blob/main/CLI.md) |
