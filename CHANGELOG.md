@@ -4,7 +4,7 @@ This file documents all FENRIS releases.
 The format is based on [Common Changelog](https://common-changelog.org/).<br>
 This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [0.1.0-rc.1] - 2026-05-18
+## [0.1.0] - 2026-05-18
 
 ### Added
 

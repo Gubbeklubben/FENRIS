@@ -1,7 +1,7 @@
 [project]
 name = "fenris"
-version = "0.1.0-rc.1"
-description = "An Extensible Benchmarking Framework for Federated Synthetic Tabular Data Generators"
+version = "0.1.0"
+description = "FENRIS: Federated Extensible Norwegian Research Interface for Synthetic data"
 readme = "README.md"
 authors = [
     {name = "Trond Thorsteinsson", email = "trondthorsteinsson@gmail.com"},
