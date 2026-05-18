@@ -116,9 +116,8 @@ class Synthesizer(Component):
 
     Attributes
     ----------
-    SUPPORTED_COORDINATORS : set[str]
-        Names of supported coordinators. Looked up at class level. If not overridden,
-        it is an empty set.
+    SUPPORTED_COORDINATORS : ClassVar[set[str]]
+        Names of supported coordinators, a required class attribute.
     """
 
     # [scaffold] required_cls_var
@@ -130,13 +129,19 @@ class Synthesizer(Component):
         Raises
         ------
         TypeError
-            If ``SUPPORTED_COORDINATORS`` is not declared.
+            If ``SUPPORTED_COORDINATORS`` is not declared or does not support
+            membership tests.
         """
         super().__init_subclass__(**kwargs)
         if "SUPPORTED_COORDINATORS" not in cls.__dict__:
             raise TypeError(
                 f"{cls}: Synthesizer subclass must declare class attribute "
                 "SUPPORTED_COORDINATORS."
+            )
+        if not hasattr(cls.SUPPORTED_COORDINATORS, "__contains__"):
+            raise TypeError(
+                f"{cls}: The value of SUPPORTED_COORDINATORS must support "
+                "membership tests. Using a set is recommended."
             )
         if "sample" not in cls.__dict__:
             return
