@@ -20,15 +20,15 @@ jobs:
     permissions:
       id-token: write  # required for PyPI Trusted Publisher (OIDC)
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd  # v5
 
       - name: Set up Python
-        uses: actions/setup-python@v6
+        uses: actions/setup-python@a309ff8b426b58ec0e2a45f0f869d46889d02405  # v6
         with:
           python-version: "3.12"
 
       - name: Install Poetry
-        uses: snok/install-poetry@v1
+        uses: snok/install-poetry@76e04a911780d5b312d89783f7b1cd627778900a  # v1
         with:
           virtualenvs-create: true
           virtualenvs-in-project: true
@@ -37,6 +37,6 @@ jobs:
         run: poetry build
 
       - name: Publish to PyPI
-        uses: pypa/gh-action-pypi-publish@release/v1
+        uses: pypa/gh-action-pypi-publish@cef221092ed1bacb1cc03d23a2d87d1d172e277b  # release/v1
         with:
           repository-url: ${{ (inputs.target == 'testpypi' || github.event.release.prerelease) && 'https://test.pypi.org/legacy/' || '' }}

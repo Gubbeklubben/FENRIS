@@ -11,9 +11,9 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5  # v4
       - name: Create GitHub release
-        uses: docker://antonyurchenko/git-release:v5
+        uses: docker://antonyurchenko/git-release@sha256:b1ef56a7ef18d23b7bd59efe10ddbfb9e38fa8cf644ef63c3cf5f2f64d70a32c  # v5
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       - name: Trigger publish
