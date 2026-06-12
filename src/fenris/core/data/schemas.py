@@ -85,7 +85,7 @@ class TableSchema:
         """
         return self.lookup(name).kind
 
-    def numeric_columns(self, df: pd.DataFrame) -> list[str]:
+    def numeric_columns(self, df: pd.DataFrame | None = None) -> list[str]:
         """Return schema columns with kind ``"continuous"`` or ``"integer"`` present in
         *df*.
 
@@ -98,11 +98,12 @@ class TableSchema:
         -------
         list[str]
         """
-        df_cols = set(df.columns)
+        df_cols = None if df is None else set(df.columns)
         return [
             c.name
             for c in self.columns
-            if c.kind in ("continuous", "integer") and c.name in df_cols
+            if c.kind in ("continuous", "integer")
+            and (df_cols is None or c.name in df_cols)
         ]
 
     def nominal_columns(self, df: pd.DataFrame) -> list[str]:

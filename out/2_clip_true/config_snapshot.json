@@ -1,0 +1,47 @@
+{
+    "synthesizer": "fed_gauss",
+    "coordinator": "fedavg",
+    "data": {
+        "dataset": "/home/alex/PycharmProjects/FedBench/datasets/breast_cancer.csv",
+        "schema": "/home/alex/PycharmProjects/FedBench/datasets/breast_cancer.schema.json",
+        "partitioner": "iid_partitioner",
+        "partitioner_kwargs": {
+            "num_partitions": 3
+        },
+        "target_col": null,
+        "sensitive_cols": []
+    },
+    "synthesizer_kwargs": {
+        "local_steps": 40,
+        "learning_rate": 0.05,
+        "clip": true
+    },
+    "coordinator_kwargs": {
+        "weighted": true
+    },
+    "num_clients": 3,
+    "num_rounds": 20,
+    "test_size": 0.2,
+    "seed": 42,
+    "outputdir": "/home/alex/PycharmProjects/FedBench/out",
+    "num_synthetic_rows": null,
+    "client_cpus": 2.0,
+    "client_gpus": 0.5,
+    "metrics": {
+        "run_categories": [
+            "fidelity",
+            "utility",
+            "privacy",
+            "fairness",
+            "scalability"
+        ],
+        "early_stop": false,
+        "stop_metric": null,
+        "stop_mode": null,
+        "stop_epsilon": 0.001,
+        "stop_patience": 3,
+        "stop_min_rounds": 1,
+        "stop_eval_every": 1,
+        "stop_synthetic_rows": null
+    }
+}

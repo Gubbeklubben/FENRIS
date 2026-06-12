@@ -1,0 +1,13 @@
+{
+    "platform.os": "Linux",
+    "platform.os_version": "6.17.0-35-generic",
+    "platform.cpu_model": "AMD Ryzen 5 7640HS w/ Radeon 760M Graphics",
+    "platform.cpu_count": 12,
+    "platform.gpu_model": "NVIDIA GeForce RTX 4050 Laptop GPU",
+    "platform.ram_gb": 15,
+    "platform.python_version": "3.12.3",
+    "platform.torch_version": "2.10.0+cu128",
+    "platform.flwr_version": "1.25.0",
+    "platform.numpy_version": "2.4.2",
+    "platform.sklearn_version": "1.8.0"
+}

@@ -1,0 +1,130 @@
+{
+    "schema_format": "FenrisSchema",
+    "schema_format_version": "1.0.0",
+    "columns": [
+        {
+            "name": "mean radius",
+            "kind": "continuous"
+        },
+        {
+            "name": "mean texture",
+            "kind": "continuous"
+        },
+        {
+            "name": "mean perimeter",
+            "kind": "continuous"
+        },
+        {
+            "name": "mean area",
+            "kind": "continuous"
+        },
+        {
+            "name": "mean smoothness",
+            "kind": "continuous"
+        },
+        {
+            "name": "mean compactness",
+            "kind": "continuous"
+        },
+        {
+            "name": "mean concavity",
+            "kind": "continuous"
+        },
+        {
+            "name": "mean concave points",
+            "kind": "continuous"
+        },
+        {
+            "name": "mean symmetry",
+            "kind": "continuous"
+        },
+        {
+            "name": "mean fractal dimension",
+            "kind": "continuous"
+        },
+        {
+            "name": "radius error",
+            "kind": "continuous"
+        },
+        {
+            "name": "texture error",
+            "kind": "continuous"
+        },
+        {
+            "name": "perimeter error",
+            "kind": "continuous"
+        },
+        {
+            "name": "area error",
+            "kind": "continuous"
+        },
+        {
+            "name": "smoothness error",
+            "kind": "continuous"
+        },
+        {
+            "name": "compactness error",
+            "kind": "continuous"
+        },
+        {
+            "name": "concavity error",
+            "kind": "continuous"
+        },
+        {
+            "name": "concave points error",
+            "kind": "continuous"
+        },
+        {
+            "name": "symmetry error",
+            "kind": "continuous"
+        },
+        {
+            "name": "fractal dimension error",
+            "kind": "continuous"
+        },
+        {
+            "name": "worst radius",
+            "kind": "continuous"
+        },
+        {
+            "name": "worst texture",
+            "kind": "continuous"
+        },
+        {
+            "name": "worst perimeter",
+            "kind": "continuous"
+        },
+        {
+            "name": "worst area",
+            "kind": "continuous"
+        },
+        {
+            "name": "worst smoothness",
+            "kind": "continuous"
+        },
+        {
+            "name": "worst compactness",
+            "kind": "continuous"
+        },
+        {
+            "name": "worst concavity",
+            "kind": "continuous"
+        },
+        {
+            "name": "worst concave points",
+            "kind": "continuous"
+        },
+        {
+            "name": "worst symmetry",
+            "kind": "continuous"
+        },
+        {
+            "name": "worst fractal dimension",
+            "kind": "continuous"
+        },
+        {
+            "name": "label",
+            "kind": "binary"
+        }
+    ]
+}

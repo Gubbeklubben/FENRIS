@@ -1,0 +1,128 @@
+{
+    "iid_partitioner": {
+        "name": "iid_partitioner",
+        "group": "fenris.partitioners",
+        "value": "fenris.builtins.partitioners.flwr_delegates:IidPartitioner",
+        "module": "fenris.builtins.partitioners.flwr_delegates",
+        "attr": "IidPartitioner",
+        "dist_name": "fenris",
+        "dist_version": "0.1.0"
+    },
+    "fed_gauss": {
+        "name": "fed_gauss",
+        "group": "fenris.synthesizers",
+        "value": "demo.synthesizers.fed_gauss:FedGauss",
+        "module": "demo.synthesizers.fed_gauss",
+        "attr": "FedGauss",
+        "dist_name": "demo",
+        "dist_version": "0.1.0"
+    },
+    "fedavg": {
+        "name": "fedavg",
+        "group": "fenris.coordinators",
+        "value": "fenris.builtins.coordinators.fedavg:FedAvg",
+        "module": "fenris.builtins.coordinators.fedavg",
+        "attr": "FedAvg",
+        "dist_name": "fenris",
+        "dist_version": "0.1.0"
+    },
+    "categorical_tv_mean": {
+        "name": "categorical_tv_mean",
+        "group": "fenris.evaluators",
+        "value": "fenris.builtins.evaluators.fidelity:CategoricalTvMeanEvaluator",
+        "module": "fenris.builtins.evaluators.fidelity",
+        "attr": "CategoricalTvMeanEvaluator",
+        "dist_name": "fenris",
+        "dist_version": "0.1.0"
+    },
+    "corr_fro_diff": {
+        "name": "corr_fro_diff",
+        "group": "fenris.evaluators",
+        "value": "fenris.builtins.evaluators.fidelity:CorrFroDiffEvaluator",
+        "module": "fenris.builtins.evaluators.fidelity",
+        "attr": "CorrFroDiffEvaluator",
+        "dist_name": "fenris",
+        "dist_version": "0.1.0"
+    },
+    "distribution_similarity_metrics": {
+        "name": "distribution_similarity_metrics",
+        "group": "fenris.evaluators",
+        "value": "fenris.builtins.evaluators.fidelity:DistributionSimilarityMetricsEvaluator",
+        "module": "fenris.builtins.evaluators.fidelity",
+        "attr": "DistributionSimilarityMetricsEvaluator",
+        "dist_name": "fenris",
+        "dist_version": "0.1.0"
+    },
+    "moment_reduction_metrics": {
+        "name": "moment_reduction_metrics",
+        "group": "fenris.evaluators",
+        "value": "fenris.builtins.evaluators.fidelity:MomentReductionMetricsEvaluator",
+        "module": "fenris.builtins.evaluators.fidelity",
+        "attr": "MomentReductionMetricsEvaluator",
+        "dist_name": "fenris",
+        "dist_version": "0.1.0"
+    },
+    "range_check": {
+        "name": "range_check",
+        "group": "fenris.evaluators",
+        "value": "demo.evaluators.range_check:RangeCheck",
+        "module": "demo.evaluators.range_check",
+        "attr": "RangeCheck",
+        "dist_name": "demo",
+        "dist_version": "0.1.0"
+    },
+    "tstr": {
+        "name": "tstr",
+        "group": "fenris.evaluators",
+        "value": "fenris.builtins.evaluators.utility:TSTREvaluator",
+        "module": "fenris.builtins.evaluators.utility",
+        "attr": "TSTREvaluator",
+        "dist_name": "fenris",
+        "dist_version": "0.1.0"
+    },
+    "aia_supervised_attack": {
+        "name": "aia_supervised_attack",
+        "group": "fenris.evaluators",
+        "value": "fenris.builtins.evaluators.privacy:AIASupervisedAttackEvaluator",
+        "module": "fenris.builtins.evaluators.privacy",
+        "attr": "AIASupervisedAttackEvaluator",
+        "dist_name": "fenris",
+        "dist_version": "0.1.0"
+    },
+    "direct_overlap_diagnostic": {
+        "name": "direct_overlap_diagnostic",
+        "group": "fenris.evaluators",
+        "value": "fenris.builtins.evaluators.privacy:DirectOverlapDiagnosticEvaluator",
+        "module": "fenris.builtins.evaluators.privacy",
+        "attr": "DirectOverlapDiagnosticEvaluator",
+        "dist_name": "fenris",
+        "dist_version": "0.1.0"
+    },
+    "mia_nearest_neighbor_attack": {
+        "name": "mia_nearest_neighbor_attack",
+        "group": "fenris.evaluators",
+        "value": "fenris.builtins.evaluators.privacy:MIANearestNeighborAttackEvaluator",
+        "module": "fenris.builtins.evaluators.privacy",
+        "attr": "MIANearestNeighborAttackEvaluator",
+        "dist_name": "fenris",
+        "dist_version": "0.1.0"
+    },
+    "fairness": {
+        "name": "fairness",
+        "group": "fenris.evaluators",
+        "value": "fenris.builtins.evaluators.fairness:FairnessEvaluator",
+        "module": "fenris.builtins.evaluators.fairness",
+        "attr": "FairnessEvaluator",
+        "dist_name": "fenris",
+        "dist_version": "0.1.0"
+    },
+    "scalability": {
+        "name": "scalability",
+        "group": "fenris.evaluators",
+        "value": "fenris.builtins.evaluators.scalability:ScalabilityEvaluator",
+        "module": "fenris.builtins.evaluators.scalability",
+        "attr": "ScalabilityEvaluator",
+        "dist_name": "fenris",
+        "dist_version": "0.1.0"
+    }
+}

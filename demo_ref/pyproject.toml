@@ -1,0 +1,16 @@
+# Created by fenris.cli.plugin.new using tomlkit 0.14.0.
+
+[project]
+name = "demo"
+version = "0.1.0"
+description = ""
+authors = []
+license = "MIT"
+
+dependencies = ["fenris (>=0.1.0,<=0.1.0)"]
+
+[project.entry-points."fenris.synthesizers"]
+fed_gauss = "demo.synthesizers.fed_gauss:FedGauss"
+
+[project.entry-points."fenris.evaluators"]
+range_check = "demo.evaluators.range_check:RangeCheck"
