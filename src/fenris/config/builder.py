@@ -150,8 +150,8 @@ def validate_stop_metrics(
     try:
         evaluator, metric = eval_suite.get_evaluator_for_metric_key(
             metrics_cfg["stop_metric"],
-            data_cfg["target_col"],
-            data_cfg["sensitive_cols"],
+            data_cfg.get("target_col"),
+            data_cfg.get("sensitive_cols"),
         )
     except KeyError as e:
         raise ValueError(
