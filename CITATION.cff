@@ -1,0 +1,74 @@
+cff-version: 1.2.0
+title: "FENRIS: Federated Extensible Norwegian Research Interface for Synthetic data"
+message: "If you use this software, please cite the conference paper listed under preferred-citation."
+type: software
+authors:
+  - given-names: Trond
+    family-names: Thorsteinsson
+  - given-names: Ken Solbakken
+    family-names: Remen
+  - given-names: Alexander Rød
+    family-names: Opedal
+  - given-names: Bård Hogne Solheimslid
+    family-names: Linga
+  - given-names: Thomas Stavik
+    family-names: Lønning
+repository-code: "https://github.com/Gubbeklubben/FENRIS"
+url: "https://pypi.org/project/fenris/"
+abstract: >-
+  An extensible benchmarking framework for federated synthetic tabular data
+  generators. Built on Flower, it provides a reproducible pipeline covering
+  dataset preparation, client partitioning, federated training,
+  multi-dimensional evaluation, and artifact generation.
+keywords:
+  - federated learning
+  - synthetic data
+  - tabular data
+  - benchmarking
+  - privacy
+license: MIT
+version: 0.1.0
+date-released: "2026-05-18"
+preferred-citation:
+  type: conference-paper
+  title: "FENRIS: A Reproducible Benchmarking Framework for Federated Synthetic Tabular Data Generation in Healthcare"
+  authors:
+    - given-names: Trond
+      family-names: Thorsteinsson
+      affiliation: "Department of Computer Science, Oslo Metropolitan University"
+    - given-names: Ken Solbakken
+      family-names: Remen
+      affiliation: "Department of Computer Science, Oslo Metropolitan University"
+    - given-names: Alexander Rød
+      family-names: Opedal
+      affiliation: "Department of Computer Science, Oslo Metropolitan University"
+    - given-names: Bård Hogne Solheimslid
+      family-names: Linga
+      affiliation: "Department of Computer Science, Oslo Metropolitan University"
+    - given-names: Thomas Stavik
+      family-names: Lønning
+      affiliation: "Department of Computer Science, Oslo Metropolitan University"
+    - given-names: Narasimha Raghavan
+      family-names: Veeraragavan
+      affiliation: "Cancer Registry of Norway, Norwegian Institute of Public Health"
+    - given-names: Safiqul
+      family-names: Islam
+      affiliation: "Department of Computer Science, Oslo Metropolitan University"
+    - given-names: Boning
+      family-names: Feng
+      affiliation: "Department of Computer Science, Oslo Metropolitan University"
+    - given-names: Jan F
+      family-names: Nygård
+      affiliation: "Cancer Registry of Norway, Norwegian Institute of Public Health"
+  collection-title: "2026 2nd International Conference on Federated Learning and Intelligent Computing Systems (FLICS)"
+  conference:
+    name: "2026 2nd International Conference on Federated Learning and Intelligent Computing Systems (FLICS)"
+    city: Valencia
+    country: ES
+  publisher:
+    name: IEEE
+  year: 2026
+  month: 6
+  start: 571
+  end: 580
+  doi: "10.1109/FLICS70075.2026.11621937"

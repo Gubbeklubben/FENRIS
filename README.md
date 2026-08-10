@@ -19,9 +19,21 @@ FENRIS ships with two literature-based reference implementations (Fed-TGAN and F
 
 This framework was initially developed during Spring 2026 as part of a bachelor thesis at OsloMet in collaboration with the [Norwegian Institute of Public Health](https://fhi.no/en/) (Folkehelseinstituttet, FHI) and the [Cancer Registry of Norway](https://www.fhi.no/en/cancer/cancer-registry-norway/) (Kreftregisteret).
 
-The following sections provide a quickstart guide to using the framework, including prerequisites, setting up the environment, verifying the installation, and running a benchmarking pipeline. For more detailed documentation and examples, please refer to the links at the top of this README.
+## Publications
+
+FENRIS is described in the following conference paper, which is the preferred citation if you use the framework in your research:
+
+> T. Thorsteinsson et al., "FENRIS: A Reproducible Benchmarking Framework for Federated Synthetic Tabular Data Generation in Healthcare," 2026 2nd International Conference on Federated Learning and Intelligent Computing Systems (FLICS), Valencia, Spain, 2026, pp. 571-580, doi: [10.1109/FLICS70075.2026.11621937](https://doi.org/10.1109/FLICS70075.2026.11621937).
+
+The bachelor thesis the framework originated from covers its design, implementation and evaluation in greater detail:
+
+> Thorsteinsson, T., Remen, K. S., Opedal, A. B. R., Linga, B. H. S., & Stavik Lønning, T. (2026). *FENRIS: An extensible benchmarking framework for federated synthetic tabular data generators* [Bachelor's thesis, OsloMet – Oslo Metropolitan University]. https://hdl.handle.net/11250/5553248
+
+Machine-readable citation metadata is available in [CITATION.cff](https://github.com/Gubbeklubben/FENRIS/blob/main/CITATION.cff). BibTeX and other formats can be exported via the "Cite this repository" button in the sidebar of the [GitHub repository](https://github.com/Gubbeklubben/FENRIS).
 
 ## Quickstart Guide
+
+The following sections provide a quickstart guide to using the framework, including prerequisites, setting up the environment, verifying the installation, and running a benchmarking pipeline. For more detailed documentation and examples, please refer to the links at the top of this README.
 
 ### Prerequisites
 
